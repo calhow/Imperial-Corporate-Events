@@ -171,6 +171,8 @@ function toggleBodyScrollAndAnimate(modalGroup) {
 }
 
 function handleVideosOnModalOpen(modalGroup) {
+  if (modalGroup === 'filter' || modalGroup === 'nav') return;
+
   document.querySelectorAll("video").forEach((video) => {
     const isInModal = video.closest(
       `[data-modal-element='content'][data-modal-group='${modalGroup}']`
@@ -194,6 +196,8 @@ function handleVideosOnModalOpen(modalGroup) {
 }
 
 function handleVideosOnModalClose(modalGroup) {
+  if (modalGroup === 'filter' || modalGroup === 'nav') return;
+  
   document.querySelectorAll("video").forEach((video) => {
     const isInModal = video.closest(
       `[data-modal-element='content'][data-modal-group='${modalGroup}']`
@@ -218,6 +222,11 @@ document.addEventListener("click", (event) => {
     modalToggleBtn.getAttribute("data-modal-open") ||
     modalToggleBtn.getAttribute("data-modal-close");
   const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
+  
+  // Check if this is a tray-type modal - declare once at the beginning
+  const isTrayModal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}'][data-modal-type='tray']`) !== null;
+  // Identify which specific tray modal we're dealing with
+  const trayModalType = isTrayModal ? modalGroup : null;
 
   let modalTl = gsap.timeline({
     onComplete: () => {
@@ -245,43 +254,143 @@ document.addEventListener("click", (event) => {
 
   if (isOpening) {
     modalStates[modalGroup] = true;
+    
     modalTl
       .set(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`, {
         display: "inline-flex",
-      })
-      .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, {
-        opacity: 1,
-        duration: 0.2,
-      })
-      .to(
-        `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
-        {
-          opacity: 1,
-          filter: "blur(0rem)",
-          y: "0rem",
-          duration: 0.25,
-          ease: "power1.out",
-          stagger: 0.05,
-        }
-      );
+      });
+      
+    if (isTrayModal) {        
+      
+      // Different animations based on tray modal type
+      if (trayModalType === 'nav') {
+        // Nav tray animation
+        modalTl
+          // BG & Tray
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105 }, { xPercent: 0, duration: 0.3, ease: "power1.inOut" }, "<+0.1" )
+           // Bar & close buttons
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          // 1st wave - Upcoming
+          .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.05, ease: "power1.out", stagger: 0.015 }, "<")
+           // 1st wave - Trending
+          .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.02 }, "<+0.05")
+          // 1st wave - Contact
+          .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<-0.05")
+          .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, "<")
+          // 2nd wave - Upcoming
+          .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.05")
+          .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_calendar_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.02 }, "<+0.05")
+          .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}, "<")
+          // 2nd wave - Trending
+          .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<-0.05")
+          .to("[menu-category-label='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
+          .to("[menu-category-cms-list='1'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
+          .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04")
+          // 2nd wave - Contact
+          .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<-0.05")
+          // 3rd wave - Trending
+          .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.1")
+          .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
+          .to("[menu-category-cms-list='2'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
+          .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04")
+          // 4th wave - Trending
+          .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.05") 
+          .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
+          .to("[menu-category-cms-list='3'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
+          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04")
+
+      } else if (trayModalType === 'package') {
+        // Package tray animation
+        modalTl
+          // BG & Tray
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105 }, { xPercent: 0, duration: 0.3, ease: "power1.inOut" }, "<+0.1" )
+          // Bar & close buttons
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+
+      } else if (trayModalType === 'reviews') {
+        // Reviews tray animation
+        modalTl
+          // BG & Tray
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105 }, { xPercent: 0, duration: 0.3, ease: "power1.inOut" }, "<+0.1" )
+          // Bar & close buttons
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+      }
+    } else {
+      // Animate in for regular modals
+      modalTl
+        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
+        .fromTo(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, y: "1rem" }, { opacity: 1, y: "0rem", duration: 0.3, ease: "power1.out", stagger: 0.1 });
+    }
   } else {
     modalStates[modalGroup] = false;
-    modalTl
-      .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, {
-        opacity: 0,
-        duration: 0.2,
-      })
-      .to(
-        `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
-        {
-          opacity: 0,
-          filter: "blur(0.75rem)",
-          y: "1rem",
-          duration: 0.2,
-          ease: "power1.in",
-        },
-        "<"
-      );
+    
+    if (isTrayModal) {
+      // Animate out for tray-type modals - different exit animations based on type
+        
+      // Different exit animations based on tray modal type
+      if (trayModalType === 'nav') {
+        // Nav tray exit animation
+        modalTl
+          .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" })
+          .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_link_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".form_menu_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_calendar_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-wrap='3']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<") 
+          .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<") 
+          .to("[menu-category-label='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-cms-list='1'] > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to("[menu-category-cms-list='2'] > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<") 
+          .to("[menu-category-cms-list='3'] > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
+          .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.3, ease: "power1.in" }, "<");
+      } else if (trayModalType === 'package') {
+        // Package tray exit animation
+        modalTl
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
+          .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.3, ease: "power1.in" }, "<");
+      } else if (trayModalType === 'reviews') {
+        // Reviews tray exit animation
+        modalTl
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
+          .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.3, ease: "power1.in" }, "<");
+      }
+    } else {
+      // Animate out for regular modals
+      modalTl
+        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25 })
+        .to(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, y: "-1rem", duration: 0.2, ease: "power1.in", stagger: -0.05 }, "<" );
+    }
   }
 
   toggleBodyScrollAndAnimate(modalGroup);
