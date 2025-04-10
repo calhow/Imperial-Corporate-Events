@@ -283,7 +283,7 @@ document.addEventListener("click", (event) => {
           .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, "<")
           // 2nd wave - Upcoming
           .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.05")
-          .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, "<")
           .to(".menu_calendar_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.02 }, "<+0.05")
           .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}, "<")
           // 2nd wave - Trending
@@ -323,6 +323,9 @@ document.addEventListener("click", (event) => {
           // Bar & close buttons
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          // Review list
+          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, "<+0.05")
+          
       }
     } else {
       // Animate in for regular modals
@@ -348,7 +351,7 @@ document.addEventListener("click", (event) => {
           .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
           .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
           .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
+          .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, "<")
           .to(".menu_calendar_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
           .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
           .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
@@ -379,7 +382,8 @@ document.addEventListener("click", (event) => {
       } else if (trayModalType === 'reviews') {
         // Reviews tray exit animation
         modalTl
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
+        .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" })  
+        .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
           .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
@@ -415,105 +419,112 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // TAB SWITCH ANIMATION
-document.addEventListener("DOMContentLoaded", () => {
-  // Function to initialize each tab group
-  const initializeTabGroup = (group) => {
-    const tabs = document.querySelectorAll(
-      `[data-tab-element="tab"][data-tab-group="${group}"]`
-    );
-    if (tabs.length === 0) return;
+// === Shared tab logic available everywhere ===
+const initializeTabGroup = (group, root = document) => {
+  const tabs = root.querySelectorAll(
+    `[data-tab-element="tab"][data-tab-group="${group}"]`
+  );
+  if (tabs.length === 0) return;
 
-    const contentElements = document.querySelectorAll(
-      `[data-tab-element="content"][data-tab-group="${group}"]`
-    );
-    if (contentElements.length === 0) return;
+  const contentElements = root.querySelectorAll(
+    `[data-tab-element="content"][data-tab-group="${group}"]`
+  );
+  if (contentElements.length === 0) return;
 
-    const contentsContainer = contentElements[0].parentElement;
+  const contentsContainer = contentElements[0].parentElement;
 
-    const parent = document.querySelector(
-      `[data-tab-element="tab-wrap"][data-tab-group="${group}"]`
-    );
-    if (!parent) return;
+  const parent = root.querySelector(
+    `[data-tab-element="tab-wrap"][data-tab-group="${group}"]`
+  );
+  if (!parent) return;
 
-    const tabMode = parent.getAttribute("data-tab-mode");
+  const tabMode = parent.getAttribute("data-tab-mode");
 
-    let highlight;
-    if (tabMode === "highlight") {
-      highlight = parent.querySelector(".g_switch_tabs_highlight");
-      if (!highlight) {
-        highlight = document.createElement("div");
-        highlight.className = "g_switch_tabs_highlight";
-        parent.appendChild(highlight);
-      }
+  let highlight;
+  if (tabMode === "highlight") {
+    highlight = parent.querySelector(".g_switch_tabs_highlight");
+    if (!highlight) {
+      highlight = document.createElement("div");
+      highlight.className = "g_switch_tabs_highlight";
+      parent.appendChild(highlight);
     }
+  }
 
-    const positionHighlight = (target) => {
-      if (!highlight) return;
-      highlight.style.top = `${target.offsetTop}px`;
-      highlight.style.left = `${target.offsetLeft}px`;
-      highlight.style.width = `${target.offsetWidth}px`;
-      highlight.style.height = `${target.offsetHeight}px`;
-    };
-
-    tabs[0].classList.add("is-active");
-
-    const isInModal =
-      parent.closest('.u-modal-prevent-scroll[data-modal-element="modal"]') !==
-      null;
-
-    if (tabMode === "highlight") {
-      if (isInModal) {
-        document.addEventListener("click", (event) => {
-          const modalOpenBtn = event.target.closest("[data-modal-open]");
-          if (modalOpenBtn) {
-            const modalGroup = modalOpenBtn.getAttribute("data-modal-open");
-            if (parent.closest(`[data-modal-group='${modalGroup}']`)) {
-              setTimeout(() => positionHighlight(tabs[0]), 50); // 50ms delay
-            }
-          }
-        });
-      } else {
-        window.addEventListener("load", () => {
-          positionHighlight(tabs[0]);
-        });
-      }
-    }
-
-    tabs.forEach((tab, index) => {
-      tab.dataset.index = index;
-
-      tab.addEventListener("click", () => {
-        if (tab.classList.contains("is-active")) return;
-
-        tabs.forEach((t) => t.classList.remove("is-active"));
-        tab.classList.add("is-active");
-
-        if (tabMode === "highlight") {
-          const state = Flip.getState(highlight);
-          positionHighlight(tab);
-
-          Flip.from(state, {
-            duration: 0.5,
-            ease: "power2.inOut",
-            scale: true,
-          });
-        }
-
-        gsap.to(contentsContainer, {
-          xPercent: -100 * index,
-          duration: 0.5,
-          ease: "power2.inOut",
-        });
-      });
-    });
+  const positionHighlight = (target) => {
+    if (!highlight) return;
+    highlight.style.top = `${target.offsetTop}px`;
+    highlight.style.left = `${target.offsetLeft}px`;
+    highlight.style.width = `${target.offsetWidth}px`;
+    highlight.style.height = `${target.offsetHeight}px`;
   };
 
+  tabs[0].classList.add("is-active");
+
+  const isInModal =
+    parent.closest('.u-modal-prevent-scroll[data-modal-element="modal"]') !==
+    null;
+
+  if (tabMode === "highlight") {
+    if (isInModal) {
+      document.addEventListener("click", (event) => {
+        const modalOpenBtn = event.target.closest("[data-modal-open]");
+        if (modalOpenBtn) {
+          const modalGroup = modalOpenBtn.getAttribute("data-modal-open");
+          if (parent.closest(`[data-modal-group='${modalGroup}']`)) {
+            setTimeout(() => positionHighlight(tabs[0]), 50);
+          }
+        }
+      });
+    } else {
+      window.addEventListener("load", () => {
+        positionHighlight(tabs[0]);
+      });
+    }
+  }
+
+  tabs.forEach((tab, index) => {
+    tab.dataset.index = index;
+
+    tab.addEventListener("click", () => {
+      if (tab.classList.contains("is-active")) return;
+
+      tabs.forEach((t) => t.classList.remove("is-active"));
+      tab.classList.add("is-active");
+
+      if (tabMode === "highlight") {
+        const state = Flip.getState(highlight);
+        positionHighlight(tab);
+
+        Flip.from(state, {
+          duration: 0.5,
+          ease: "power2.inOut",
+          scale: true,
+        });
+      }
+
+      gsap.to(contentsContainer, {
+        xPercent: -100 * index,
+        duration: 0.5,
+        ease: "power2.inOut",
+      });
+    });
+  });
+};
+
+const initializeTabsInScope = (root = document) => {
   const tabGroups = new Set();
-  document.querySelectorAll('[data-tab-element="tab"]').forEach((tab) => {
+  root.querySelectorAll('[data-tab-element="tab"]').forEach((tab) => {
     tabGroups.add(tab.dataset.tabGroup);
   });
-  tabGroups.forEach((group) => initializeTabGroup(group));
+  tabGroups.forEach((group) => initializeTabGroup(group, root));
+};
+
+// === Global page-load init ===
+document.addEventListener("DOMContentLoaded", () => {
+  initializeTabsInScope(); // initializes tabs in global page
 });
+
+
 
 //MENU SEARCH BUTTON
 // Utility function to wait for the upcoming tab with retries

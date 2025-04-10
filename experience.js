@@ -454,6 +454,11 @@ function initializeGallerySwipers() {
       const uniqueValue = gallery.getAttribute(dataAttr);
       if (!uniqueValue) return;
 
+      // Count the number of slides
+      const slideCount = gallery.querySelectorAll('.swiper-slide').length;
+      // Only enable loop if there are more than 1 slide
+      const shouldLoop = slideCount > 1;
+
       new Swiper(gallery, {
         slidesPerView: 1,
         slideActiveClass: "is-active",
@@ -461,7 +466,7 @@ function initializeGallerySwipers() {
         fadeEffect: {
           crossFade: true,
         },
-        loop: true,
+        loop: shouldLoop,
         preventClicks: false,
         preventClicksPropagation: false,
         navigation: {
@@ -686,58 +691,199 @@ function adjustHotelStars() {
 }
 
 // PACKAGE MODAL CONTENT RETRIEVAL
-window.addEventListener("load", () => {
-  // Get elements to use
-  const cardsSelector = ".packages_card";
-  const contentSelector = ".package_contain";
 
-  // Get cards and panel elements
-  const cards = document.querySelectorAll(cardsSelector);
-  const packageModal = document.querySelector(".package_modal");
-  const packageModalTarget = packageModal.querySelector(".package_modal_wrap");
+// Get elements to use
+const cardsSelector = ".packages_card";
+const contentSelector = ".package_contain";
 
-  // Iterate over cards
-  cards.forEach((card) => {
-    card.addEventListener("click", () => {
-      // Get the hidden link inside the card
-      const linkElement = card.querySelector(".packages_link");
+// Get cards and panel elements
+const packageCards = document.querySelectorAll(cardsSelector);
+const packageModal = document.querySelector(".package_modal");
+const packageModalTarget = packageModal.querySelector(".package_modal_wrap");
 
-      // Extract the URL from the hidden link
-      const url = linkElement.getAttribute("href");
+// Store for pre-fetched content
+const contentCache = new Map();
+// Store for pending fetches
+const pendingFetches = new Map();
 
-      // Use AJAX to get the project content from the URL
-      $.ajax({
-        url: url,
-        success: function (data) {
-          const content = $(data).find(contentSelector);
-          packageModalTarget.innerHTML = ""; // Clear previous content
-          packageModalTarget.append(content[0]); // Append it to the panel
-          initializePackageAccordion(); // Reinitialize the inclusion accordion
-          setupParagraphToggles(); // Reinitialize paragraph toggles
-          initializeGallerySwipers();
-          adjustHotelStars();
+// Function to populate modal with content
+const populateModal = (content, url) => {
+  packageModalTarget.innerHTML = ""; // Clear previous content
+  packageModalTarget.appendChild(content.cloneNode(true)); // Append cloned content to the panel
+  packageModalTarget.setAttribute('data-current-url', url);
+  
+  try {
+    initializePackageAccordion(); // Reinitialize the inclusion accordion
+    setupParagraphToggles(); // Reinitialize paragraph toggles
+    initializeGallerySwipers();
+    adjustHotelStars();
+    initializeTabsInScope(packageModalTarget);
+    
+    // Run cmsNest and listen for completion event
+    cmsNest();
 
-          // Run cmsNest and listen for completion event
-          cmsNest();
+    // Set up the event listener for cmsNestComplete
+    document.addEventListener(
+      "cmsNestComplete",
+      function handleCMSNestComplete() {
+        try {
+          // Run insertSVGFromCMS immediately once cmsNest is complete
+          insertSVGFromCMS(packageModalTarget);
+          hideEmptyDivs();
+        } catch (error) {
+          // Keep error handling without the console.error
+        }
+      },
+      { once: true }
+    );
+  } catch (error) {
+    // Keep error handling without the console.error
+  }
+};
 
-          // Set up the event listener for cmsNestComplete
-          document.addEventListener(
-            "cmsNestComplete",
-            function handleCMSNestComplete(event) {
-              // Run insertSVGFromCMS immediately once cmsNest is complete
-              insertSVGFromCMS(packageModalTarget);
-              hideEmptyDivs();
+// Function to check if modal already contains the correct content
+const isModalContentCorrect = (url) => {
+  // Check if the modal has a data-current-url attribute
+  const currentUrl = packageModalTarget.getAttribute('data-current-url');
+  return currentUrl === url;
+};
 
-              // Remove the event listener to prevent duplicates on future calls
-              document.removeEventListener(
-                "cmsNestComplete",
-                handleCMSNestComplete
-              );
-            },
-            { once: true }
-          ); // Using once: true as an alternative way to ensure it only runs once
-        }, // ajax success
-      }); // ajax
-    }); // card click
-  }); // foreach
+// Function to fetch content from URL
+const fetchContent = async (url) => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    
+    const text = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, "text/html");
+    const content = doc.querySelector(contentSelector);
+    
+    if (!content) throw new Error("Content not found in fetched document");
+    
+    return content;
+  } catch (error) {
+    // Keep error handling without the console.error
+    return null;
+  }
+};
+
+// Function to handle content population for a URL
+const handleContentForUrl = (url) => {
+  // Check if modal already contains the correct content
+  if (isModalContentCorrect(url)) {
+    return;
+  }
+  
+  // Check if content is already cached
+  if (contentCache.has(url)) {
+    populateModal(contentCache.get(url), url);
+    return;
+  }
+  
+  // Check if fetch is in progress
+  if (pendingFetches.has(url)) {
+    pendingFetches.get(url).then(content => {
+      if (content) {
+        populateModal(content, url);
+      }
+    });
+    return;
+  }
+  
+  // If not cached or pending, fetch it now
+  const fetchPromise = fetchContent(url).then(content => {
+    if (content) {
+      contentCache.set(url, content);
+      populateModal(content, url);
+    }
+    return content;
+  }).catch(error => {
+    // Keep error handling without the console.error
+    return null;
+  });
+  
+  pendingFetches.set(url, fetchPromise);
+};
+
+// Function to handle card click
+const handleCardClick = async (event) => {
+  // Prevent default behavior to avoid page navigation
+  event.preventDefault();
+  
+  const card = event.currentTarget;
+  const linkElement = card.querySelector(".packages_link");
+  if (!linkElement) {
+    return;
+  }
+  
+  const url = linkElement.getAttribute("href");
+  if (!url) {
+    return;
+  }
+  
+  // Check if content is already cached
+  if (contentCache.has(url)) {
+    handleContentForUrl(url);
+    return;
+  }
+  
+  // Check if fetch is in progress
+  if (pendingFetches.has(url)) {
+    pendingFetches.get(url).then(content => {
+      if (content) {
+        handleContentForUrl(url);
+      }
+    });
+    return;
+  }
+  
+  // If not cached or pending, fetch it now
+  const fetchPromise = fetchContent(url).then(content => {
+    if (content) {
+      contentCache.set(url, content);
+      handleContentForUrl(url);
+    }
+    pendingFetches.delete(url);
+    return content;
+  }).catch(error => {
+    // Keep error handling without the console.error
+    pendingFetches.delete(url);
+    return null;
+  });
+  
+  pendingFetches.set(url, fetchPromise);
+};
+
+// Attach click handlers to all cards
+packageCards.forEach((card) => {
+  card.addEventListener("click", handleCardClick);
+});
+
+// Pre-fetch content for all cards
+packageCards.forEach((card) => {
+  const linkElement = card.querySelector(".packages_link");
+  if (!linkElement) {
+    return;
+  }
+  
+  const url = linkElement.getAttribute("href");
+  if (!url) {
+    return;
+  }
+  
+  // Start fetch and store the promise
+  const fetchPromise = fetchContent(url).then(content => {
+    if (content) {
+      contentCache.set(url, content);
+    }
+    pendingFetches.delete(url);
+    return content;
+  }).catch(error => {
+    // Keep error handling without the console.error
+    pendingFetches.delete(url);
+    return null;
+  });
+  
+  pendingFetches.set(url, fetchPromise);
 });
