@@ -718,7 +718,9 @@ const populateModal = (content, url) => {
     initializeGallerySwipers();
     adjustHotelStars();
     initializeTabsInScope(packageModalTarget);
-    
+    initializeCountersInScope(packageModalTarget);
+    initializePackageForm(); // Call the form init here
+
     // Run cmsNest and listen for completion event
     cmsNest();
 
@@ -887,3 +889,50 @@ packageCards.forEach((card) => {
   
   pendingFetches.set(url, fetchPromise);
 });
+
+
+// PACKAGE FORM
+const initializePackageForm = () => {
+  const form = packageModalTarget.querySelector('#wf-form-Package');
+  const submitBtn = packageModalTarget.querySelector('[data-form-submit="package"]');
+  if (!form || !submitBtn) return;
+
+  // Add loading state on form submit
+  form.addEventListener('submit', () => {
+    submitBtn.classList.add('is-loading');
+    submitBtn.disabled = true;
+
+    const btnText = submitBtn.querySelector('.btn_flip_text');
+    if (btnText) btnText.textContent = 'Sending...';
+  });
+
+  // Remove loading state on success or failure
+  const stopLoading = () => {
+    submitBtn.classList.remove('is-loading');
+    submitBtn.disabled = false;
+
+    const btnText = submitBtn.querySelector('.btn_flip_text');
+    if (btnText) btnText.textContent = 'Submit';
+  };
+
+  form.addEventListener('w-form-done', stopLoading);
+  form.addEventListener('w-form-fail', stopLoading);
+
+  // Click handler to trigger form submit via hidden button
+  submitBtn.addEventListener('click', () => {
+    const tempBtn = document.createElement('button');
+    tempBtn.type = 'submit';
+    tempBtn.style.display = 'none';
+    form.appendChild(tempBtn);
+    tempBtn.click();
+    form.removeChild(tempBtn);
+  });
+
+  // Webflow re-init
+  if (window.Webflow && Webflow.require) {
+    try {
+      Webflow.require("forms").ready();
+    } catch (e) {}
+  }
+};
+

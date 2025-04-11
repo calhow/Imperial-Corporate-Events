@@ -70,6 +70,30 @@ document.addEventListener("DOMContentLoaded", function () {
   ]);
 });
 
+// FORM COUNTER
+
+const initializeCountersInScope = (scope = document) => {
+  scope.querySelectorAll('.form_field_counter_wrap').forEach(wrapper => {
+    const input = wrapper.querySelector('.form_field_input.is-counter');
+    const buttons = wrapper.querySelectorAll('.btn_counter_wrap');
+    if (!input || buttons.length !== 2) return;
+
+    const min = +input.min || 2;
+    const step = +input.step || 1;
+
+    if (!input.value) input.value = min;
+
+    const getValue = () => isNaN(+input.value) ? min : +input.value;
+
+    buttons[0].onclick = () => input.value = Math.max(min, getValue() - step);
+    buttons[1].onclick = () => input.value = getValue() + step;
+  });
+};
+
+document.addEventListener('DOMContentLoaded', () => initializeCountersInScope());
+
+
+
 // PARALLAX ANIMATIONS
 
 // Initialize timelines conditionally
