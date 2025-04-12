@@ -952,22 +952,250 @@ const fetchContent = async (url) => {
   try {
     const response = await fetch(url);
     
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
     
     const text = await response.text();
     
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, "text/html");
-    
-    const content = doc.querySelector(contentSelector);
-    
-    if (!content) {
-      throw new Error("Content not found in fetched document");
+    // Set up Web Worker for content processing if not already done
+    if (!window.contentProcessorReady) {
+      setupContentProcessor();
     }
     
-    return content;
+    // Use the web worker if available, otherwise fall back to main thread processing
+    if (window.contentProcessor) {
+      return new Promise((resolve) => {
+        // Set up one-time handler for this specific URL
+        const messageHandler = (e) => {
+          const { processedUrl, content, error } = e.data;
+          
+          if (processedUrl === url) {
+            // Remove the event listener once we've received the right response
+            window.contentProcessor.removeEventListener('message', messageHandler);
+            
+            if (error) {
+              fallbackToMainThreadProcessing();
+              return;
+            }
+            
+            try {
+              // Convert the processed content back to DOM nodes
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = content || '';
+              const processedContent = tempDiv.querySelector(contentSelector);
+              
+              if (!processedContent) {
+                fallbackToMainThreadProcessing();
+                return;
+              }
+              
+              resolve(processedContent);
+            } catch (e) {
+              fallbackToMainThreadProcessing();
+            }
+          }
+        };
+        
+        // Fallback function for when worker fails
+        const fallbackToMainThreadProcessing = () => {
+          try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, "text/html");
+            const content = doc.querySelector(contentSelector);
+            
+            if (!content) {
+              resolve(null);
+              return;
+            }
+            
+            resolve(content);
+          } catch (e) {
+            resolve(null);
+          }
+        };
+        
+        window.contentProcessor.addEventListener('message', messageHandler);
+        
+        // Set timeout for worker response
+        const timeoutId = setTimeout(() => {
+          window.contentProcessor.removeEventListener('message', messageHandler);
+          fallbackToMainThreadProcessing();
+        }, 3000);
+        
+        // Send the HTML for processing
+        try {
+          window.contentProcessor.postMessage({ 
+            action: 'processContent', 
+            html: text, 
+            url: url,
+            selector: contentSelector
+          });
+        } catch (e) {
+          clearTimeout(timeoutId);
+          fallbackToMainThreadProcessing();
+        }
+      });
+    } else {
+      // Fallback to synchronous processing
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, "text/html");
+      const content = doc.querySelector(contentSelector);
+      
+      if (!content) {
+        throw new Error("Content not found in fetched document");
+      }
+      
+      return content;
+    }
   } catch (error) {
     return null;
+  }
+};
+
+// Function to set up the Content Processor Web Worker
+const setupContentProcessor = () => {
+  // Only set up once
+  if (window.contentProcessorReady) return;
+  
+  try {
+    // Create the worker code as a blob
+    const workerCode = `
+      self.addEventListener('message', (e) => {
+        const { action, html, url, selector } = e.data;
+        
+        if (action === 'processContent') {
+          try {
+            // Since DOMParser is not available in workers, use string manipulation instead
+            // This is a simplified version that handles basic cases
+            const findContent = (html, selector) => {
+              try {
+                // For selector like ".package_contain", look for class="package_contain"
+                // This is a simplified approach and won't work for complex selectors
+                const classMatch = selector.match(/\\.(\\w+)/);
+                if (classMatch && classMatch[1]) {
+                  const className = classMatch[1];
+                  
+                  // Find the opening tag with this class
+                  const classPattern = new RegExp('<([^>]+)\\\\s+class="([^"]*\\\\s+)?' + className + '(\\\\s+[^"]*)?">');
+                  const match = html.match(classPattern);
+                  
+                  if (match) {
+                    // Get the tag name to help find the closing tag
+                    const tagName = match[1].trim();
+                    const startIndex = match.index;
+                    
+                    // Simple way to find the corresponding closing tag
+                    // Note: This doesn't handle nested tags of the same type perfectly
+                    let openTags = 1;
+                    let endIndex = startIndex + match[0].length;
+                    
+                    const openPattern = new RegExp('<' + tagName + '\\\\b', 'g');
+                    const closePattern = new RegExp('<\\\\/' + tagName + '\\\\s*>', 'g');
+                    
+                    openPattern.lastIndex = endIndex;
+                    closePattern.lastIndex = endIndex;
+                    
+                    let openMatch, closeMatch;
+                    
+                    while (openTags > 0 && endIndex < html.length) {
+                      openPattern.lastIndex = endIndex;
+                      closePattern.lastIndex = endIndex;
+                      
+                      openMatch = openPattern.exec(html);
+                      closeMatch = closePattern.exec(html);
+                      
+                      if (!closeMatch) break;
+                      
+                      if (openMatch && openMatch.index < closeMatch.index) {
+                        openTags++;
+                        endIndex = openMatch.index + openMatch[0].length;
+                      } else {
+                        openTags--;
+                        endIndex = closeMatch.index + closeMatch[0].length;
+                      }
+                    }
+                    
+                    if (openTags === 0) {
+                      // Got the full content
+                      return html.substring(startIndex, endIndex);
+                    }
+                  }
+                }
+                
+                return null;
+              } catch (e) {
+                return null;
+              }
+            };
+            
+            // Extract the content based on the selector
+            const content = findContent(html, selector);
+            
+            if (content) {
+              // Basic processing - remove script tags
+              let processedContent = content.replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, '');
+              
+              // Mark images for optimization
+              processedContent = processedContent.replace(/<img([^>]*)>/gi, (match, attributes) => {
+                return '<img' + attributes + ' data-worker-processed="true">';
+              });
+              
+              // Handle lazy-loaded elements
+              processedContent = processedContent.replace(/data-src=/gi, 'data-worker-lazy="true" data-src=');
+              
+              // Mark iframes and embeds
+              processedContent = processedContent.replace(/<(iframe|embed)([^>]*)>/gi, 
+                (match, tag, attributes) => {
+                  return '<' + tag + attributes + ' data-worker-embed="true">';
+                }
+              );
+              
+              // Return the processed content HTML
+              self.postMessage({
+                processedUrl: url,
+                content: processedContent
+              });
+            } else {
+              self.postMessage({
+                processedUrl: url,
+                error: 'Content not found',
+                content: null
+              });
+            }
+          } catch (error) {
+            self.postMessage({
+              processedUrl: url,
+              error: error.message,
+              content: null
+            });
+          }
+        }
+      });
+    `;
+    
+    // Create a blob URL for the worker
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    
+    // Create the worker
+    window.contentProcessor = new Worker(workerUrl);
+    
+    // Set up error handler
+    window.contentProcessor.onerror = (error) => {
+      window.contentProcessor = null;
+      window.contentProcessorReady = false;
+    };
+    
+    // Clean up the blob URL
+    URL.revokeObjectURL(workerUrl);
+    
+    // Mark as ready
+    window.contentProcessorReady = true;
+  } catch (error) {
+    // If web workers aren't supported or fail to initialize
+    window.contentProcessor = null;
+    window.contentProcessorReady = false;
   }
 };
 
