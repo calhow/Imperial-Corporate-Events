@@ -62,6 +62,37 @@ gsap.ticker.lagSmoothing(0);
 // Enable Finsweet Attributes to work together
 document.addEventListener("DOMContentLoaded", function () {
   window.fsAttributes = window.fsAttributes || [];
+  
+  // Handle CMS Load completion for dynamic package cards
+  window.fsAttributes.push([
+    "cmsload",
+    (listInstances) => {
+      // Find the package card list instance if it exists
+      const packageLoadInstance = listInstances.find(instance => 
+        instance.el && instance.el.getAttribute('fs-cmsload-element') === 'list-2'
+      );
+      
+      if (packageLoadInstance) {
+        // Listen for when new items are loaded
+        packageLoadInstance.on('renderitems', (renderedItems) => {
+          // Find package cards in the rendered items
+          const newPackageCards = [];
+          renderedItems.forEach(item => {
+            const packageCards = item.querySelectorAll('.packages_card');
+            if (packageCards.length) {
+              packageCards.forEach(card => newPackageCards.push(card));
+            }
+          });
+          
+          // Initialize newly added package cards if the function exists
+          if (typeof attachPackageCardHandlers === 'function' && newPackageCards.length > 0) {
+            attachPackageCardHandlers(newPackageCards);
+          }
+        });
+      }
+    }
+  ]);
+  
   window.fsAttributes.push([
     "cmsnest",
     (listInstances) => {
@@ -179,6 +210,7 @@ function toggleBodyScrollAndAnimate(modalGroup) {
   const anyModalOpen = Object.values(modalStates).some((state) => state);
   const navContain = document.querySelector(".nav_main_contain");
   const navWrap = document.querySelector(".nav_main_wrap");
+  
   if (anyModalOpen) {
     document.body.classList.add("no-scroll");
     if (modalGroup !== "nav") {
@@ -195,8 +227,11 @@ function toggleBodyScrollAndAnimate(modalGroup) {
 }
 
 function handleVideosOnModalOpen(modalGroup) {
-  if (modalGroup === 'filter' || modalGroup === 'nav') return;
+  if (modalGroup === 'filter' || modalGroup === 'nav') {
+    return;
+  }
 
+  // Process videos on page
   document.querySelectorAll("video").forEach((video) => {
     const isInModal = video.closest(
       `[data-modal-element='content'][data-modal-group='${modalGroup}']`
@@ -210,18 +245,24 @@ function handleVideosOnModalOpen(modalGroup) {
   });
 
   // Play videos inside the modal
-  document
-    .querySelectorAll(
-      `[data-modal-element='content'][data-modal-group='${modalGroup}'] video`
-    )
-    .forEach((video) => {
-      video.play();
-    });
+  const modalVideos = document.querySelectorAll(
+    `[data-modal-element='content'][data-modal-group='${modalGroup}'] video`
+  );
+  
+  modalVideos.forEach((video) => {
+    // Don't autoplay videos in the package modal
+    if (modalGroup !== 'package') {
+      video.play().catch(err => {});
+    }
+  });
 }
 
 function handleVideosOnModalClose(modalGroup) {
-  if (modalGroup === 'filter' || modalGroup === 'nav') return;
+  if (modalGroup === 'filter' || modalGroup === 'nav') {
+    return;
+  }
   
+  // Process videos for modal close
   document.querySelectorAll("video").forEach((video) => {
     const isInModal = video.closest(
       `[data-modal-element='content'][data-modal-group='${modalGroup}']`
@@ -253,6 +294,12 @@ document.addEventListener("click", (event) => {
   const trayModalType = isTrayModal ? modalGroup : null;
 
   let modalTl = gsap.timeline({
+    onStart: () => {
+      if (isOpening) {
+        updateLiveChatVisibility();
+        handleVideosOnModalOpen(modalGroup);
+      }
+    },
     onComplete: () => {
       if (!isOpening) {
         gsap.set(
@@ -267,13 +314,7 @@ document.addEventListener("click", (event) => {
         `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
         { filter: "none" }
       );
-    },
-    onStart: () => {
-      if (isOpening) {
-        updateLiveChatVisibility();
-        handleVideosOnModalOpen(modalGroup);
-      }
-    },
+    }
   });
 
   if (isOpening) {
@@ -281,18 +322,27 @@ document.addEventListener("click", (event) => {
     
     modalTl
       .set(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`, {
-        display: "inline-flex",
+        display: "inline-flex"
       });
       
     if (isTrayModal) {        
-      
       // Different animations based on tray modal type
       if (trayModalType === 'nav') {
         // Nav tray animation
         modalTl
           // BG & Tray
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105 }, { xPercent: 0, duration: 0.3, ease: "power1.inOut" }, "<+0.1" )
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+            opacity: 1, 
+            duration: 0.3, 
+            ease: "power1.inOut"
+          })
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
+            { xPercent: 105 }, 
+            { 
+              xPercent: 0, 
+              duration: 0.3, 
+              ease: "power1.inOut"
+            }, "<+0.1" )
            // Bar & close buttons
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
@@ -326,43 +376,70 @@ document.addEventListener("click", (event) => {
           .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.05") 
           .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
           .to("[menu-category-cms-list='3'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
-          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04")
+          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04");
 
       } else if (trayModalType === 'package') {
         // Package tray animation
         modalTl
           // BG & Tray
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105 }, { xPercent: 0, duration: 0.3, ease: "power1.inOut" }, "<+0.1" )
-          // Bar & close buttons
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+            opacity: 1, 
+            duration: 0.3, 
+            ease: "power1.inOut"
+          })
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
+            { xPercent: 105 }, 
+            { 
+              xPercent: 0, 
+              duration: 0.3, 
+              ease: "power1.inOut"
+            }, "<+0.1" );
 
       } else if (trayModalType === 'reviews') {
         // Reviews tray animation
         modalTl
           // BG & Tray
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105 }, { xPercent: 0, duration: 0.3, ease: "power1.inOut" }, "<+0.1" )
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+            opacity: 1, 
+            duration: 0.3, 
+            ease: "power1.inOut"
+          })
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
+            { xPercent: 105 }, 
+            { 
+              xPercent: 0, 
+              duration: 0.3, 
+              ease: "power1.inOut"
+            }, "<+0.1" )
           // Bar & close buttons
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
           // Review list
-          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, "<+0.05")
+          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, "<+0.05");
           
       }
     } else {
       // Animate in for regular modals
       modalTl
-        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 1, duration: 0.3, ease: "power1.inOut" })
-        .fromTo(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, y: "1rem" }, { opacity: 1, y: "0rem", duration: 0.3, ease: "power1.out", stagger: 0.1 });
+        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "power1.inOut"
+        })
+        .fromTo(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, 
+          { opacity: 0, y: "1rem" }, 
+          { 
+            opacity: 1, 
+            y: "0rem", 
+            duration: 0.3, 
+            ease: "power1.out", 
+            stagger: 0.1
+          });
     }
   } else {
     modalStates[modalGroup] = false;
     
     if (isTrayModal) {
-      // Animate out for tray-type modals - different exit animations based on type
-        
       // Different exit animations based on tray modal type
       if (trayModalType === 'nav') {
         // Nav tray exit animation
@@ -398,11 +475,16 @@ document.addEventListener("click", (event) => {
       } else if (trayModalType === 'package') {
         // Package tray exit animation
         modalTl
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
-          .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.3, ease: "power1.in" }, "<");
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+            opacity: 0, 
+            duration: 0.25, 
+            ease: "power1.inOut"
+          }, "<")
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { 
+            xPercent: 105, 
+            duration: 0.3, 
+            ease: "power1.in"
+          }, "<");
       } else if (trayModalType === 'reviews') {
         // Reviews tray exit animation
         modalTl
@@ -416,8 +498,17 @@ document.addEventListener("click", (event) => {
     } else {
       // Animate out for regular modals
       modalTl
-        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25 })
-        .to(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, y: "-1rem", duration: 0.2, ease: "power1.in", stagger: -0.05 }, "<" );
+        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+          opacity: 0, 
+          duration: 0.25
+        })
+        .to(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, { 
+          opacity: 0, 
+          y: "-1rem", 
+          duration: 0.2, 
+          ease: "power1.in", 
+          stagger: -0.05
+        }, "<" );
     }
   }
 
@@ -642,7 +733,7 @@ document.addEventListener("click", async (event) => {
 
 (function setupParagraphToggles() {
   // Define the initialization function globally
-  window.setupParagraphToggles = function () {
+  window.setupParagraphToggles = function (scope = document) {
     const classSets = [
       {
         wrap: ".g_para_clamped_wrap",
@@ -658,7 +749,7 @@ document.addEventListener("click", async (event) => {
 
     // Handle initial setup of buttons (hiding if not needed)
     classSets.forEach(({ wrap, para, btn }) => {
-      const items = document.querySelectorAll(wrap);
+      const items = scope.querySelectorAll(wrap);
 
       items.forEach(function (wrapElement) {
         const paraElement = wrapElement.querySelector(para);

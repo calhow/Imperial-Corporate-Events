@@ -204,25 +204,63 @@ document.addEventListener("DOMContentLoaded", setCardHighlightListeners);
 
 // ADD & REMOVE CONTROLS FROM EXP VIDEO WHEN PLAYING OUTSIDE OF MODAL
 document.addEventListener("DOMContentLoaded", () => {
-  setupVideoEvents();
+  // Find all video containers and set up events for each
+  document.querySelectorAll('.video_contain').forEach(setupVideoEvents);
 });
 
-function setupVideoEvents() {
-  const videoWrap = document.querySelector(".video_cover_wrap");
-  const videoPlayer = document.querySelector(".video_gallery_player");
-  const testimonialBtn = document.querySelector(".gallery_selection_btn_wrap");
-  const swiperControls = document.querySelector(
-    ".swiper-pagination.is-gallery"
-  );
-  const swiperPagination = document.querySelector(".gallery_btn_wrap");
+function setupVideoEvents(container) {
+  // Handle case when function is called without a container parameter
+  if (!container) {
+    // Find all video containers and process them instead
+    document.querySelectorAll('.video_contain').forEach(videoContainer => {
+      setupVideoEvents(videoContainer);
+    });
+    return;
+  }
 
+  const videoWrap = container.querySelector(".video_cover_wrap");
+  const videoPlayer = container.querySelector(".video_gallery_player");
+  
   if (!videoWrap || !videoPlayer) return;
+  
+  // Find optional UI elements using more reliable selectors
+  // First try to find them within the slide, then fallback to document level for gallery
+  const parentSlide = container.closest('.swiper-slide');
+  const swiperContainer = container.closest('.swiper');
+  
+  // Find testimonial button - could be in slide or nearby in DOM
+  let testimonialBtn = parentSlide?.querySelector(".gallery_selection_btn_wrap");
+  if (!testimonialBtn) {
+    // If not in the slide, look for it in the closest common container
+    testimonialBtn = swiperContainer?.querySelector(".gallery_selection_btn_wrap");
+  }
+  
+  // Find swiper pagination - could be in swiper container or elsewhere
+  let swiperControls = swiperContainer?.querySelector(".swiper-pagination.is-gallery");
+  if (!swiperControls) {
+    // Try to find pagination near the swiper
+    swiperControls = document.querySelector(".swiper-pagination.is-gallery");
+  }
+  
+  // Find gallery buttons - could be in container or elsewhere
+  let galleryBtnWrap = swiperContainer?.parentElement?.querySelector(".gallery_btn_wrap");
+  if (!galleryBtnWrap) {
+    // Try to find it in a parent container
+    galleryBtnWrap = swiperContainer?.closest(".video_wrap")?.querySelector(".gallery_btn_wrap");
+    // If still not found, try a broader search
+    if (!galleryBtnWrap) {
+      galleryBtnWrap = document.querySelector(".gallery_btn_wrap");
+    }
+  }
 
   const disableUI = (disable) => {
     videoWrap.classList.toggle("is-disabled", disable);
-    testimonialBtn?.classList.toggle("is-disabled", disable);
-    swiperControls?.classList.toggle("is-disabled", disable);
-    swiperPagination?.classList.toggle("is-disabled", disable);
+    
+    // Only toggle optional UI elements if they exist
+    if (testimonialBtn) testimonialBtn.classList.toggle("is-disabled", disable);
+    if (swiperControls) swiperControls.classList.toggle("is-disabled", disable);
+    if (galleryBtnWrap) galleryBtnWrap.classList.toggle("is-disabled", disable);
+    
     if (disable) videoPlayer.setAttribute("controls", "true");
     else videoPlayer.removeAttribute("controls");
   };
@@ -300,7 +338,12 @@ const gallerySwiper = new Swiper(".swiper.is-gallery", {
             videoSlide.parentNode.removeChild(videoSlide);
             swiperInstance.prependSlide(videoSlide);
             swiperInstance.slideTo(0, 0, false);
-            setupVideoEvents();
+            
+            // Fix: Find video container and pass it to setupVideoEvents
+            const videoContainer = videoSlide.querySelector('.video_contain');
+            if (videoContainer) {
+              setupVideoEvents(videoContainer);
+            }
           }
         }
       }
@@ -697,75 +740,233 @@ const cardsSelector = ".packages_card";
 const contentSelector = ".package_contain";
 
 // Get cards and panel elements
-const packageCards = document.querySelectorAll(cardsSelector);
 const packageModal = document.querySelector(".package_modal");
-const packageModalTarget = packageModal.querySelector(".package_modal_wrap");
+const packageModalTarget = packageModal?.querySelector(".package_modal_wrap");
 
 // Store for pre-fetched content
 const contentCache = new Map();
 // Store for pending fetches
 const pendingFetches = new Map();
+// Queue for URLs waiting to be fetched
+const prefetchQueue = [];
+// Maximum number of concurrent prefetches
+const MAX_CONCURRENT_PREFETCHES = 4;
+
+// Function to attach event handlers to package cards
+const attachPackageCardHandlers = (cards) => {
+  if (!cards || !cards.length) return;
+  
+  // Convert to array and prioritize visible cards
+  const cardsArray = Array.from(cards);
+  cardsArray.sort((a, b) => {
+    const aVisible = isElementInViewport(a);
+    const bVisible = isElementInViewport(b);
+    return (bVisible ? 1 : 0) - (aVisible ? 1 : 0);
+  });
+  
+  cardsArray.forEach((card) => {
+    // Skip if already processed
+    if (card.hasAttribute('data-package-card-initialized')) return;
+    
+    // Mark as initialized
+    card.setAttribute('data-package-card-initialized', 'true');
+    
+    // Add click handler
+    card.addEventListener("click", handleCardClick);
+    
+    // Start pre-fetch
+    const linkElement = card.querySelector(".packages_link");
+    if (linkElement) {
+      const url = linkElement.getAttribute("href");
+      if (url && !contentCache.has(url) && !pendingFetches.has(url)) {
+        prefetchPackageContent(url);
+      }
+    }
+  });
+};
+
+// Function to check if element is in viewport
+function isElementInViewport(el) {
+  const rect = el.getBoundingClientRect();
+  return (
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
+}
+
+// Function to request content prefetching - either start immediately or queue
+const prefetchPackageContent = (url) => {
+  // Skip if already cached or fetching
+  if (contentCache.has(url) || pendingFetches.has(url)) return;
+  
+  // If we're below the concurrent limit, start the fetch
+  if (pendingFetches.size < MAX_CONCURRENT_PREFETCHES) {
+    startPrefetch(url);
+  } else {
+    // Otherwise add to queue for later
+    if (!prefetchQueue.includes(url)) {
+      prefetchQueue.push(url);
+    }
+  }
+};
+
+// Function to actually start a prefetch
+const startPrefetch = (url) => {
+  const fetchPromise = fetchContent(url).then(content => {
+    if (content) {
+      contentCache.set(url, content);
+    }
+    pendingFetches.delete(url);
+    
+    // Process next queued URL if available
+    processNextQueuedFetch();
+    
+    return content;
+  }).catch(error => {
+    pendingFetches.delete(url);
+    
+    // Process next queued URL even on error
+    processNextQueuedFetch();
+    
+    return null;
+  });
+  
+  pendingFetches.set(url, fetchPromise);
+};
+
+// Function to process the next URL in the prefetch queue
+const processNextQueuedFetch = () => {
+  if (prefetchQueue.length > 0 && pendingFetches.size < MAX_CONCURRENT_PREFETCHES) {
+    const nextUrl = prefetchQueue.shift();
+    startPrefetch(nextUrl);
+  }
+};
 
 // Function to populate modal with content
 const populateModal = (content, url) => {
-  packageModalTarget.innerHTML = ""; // Clear previous content
-  packageModalTarget.appendChild(content.cloneNode(true)); // Append cloned content to the panel
+  if (!packageModalTarget) return;
+  
+  // Clear previous content immediately
+  packageModalTarget.innerHTML = "";
   packageModalTarget.setAttribute('data-current-url', url);
   
+  // Defer content population to ensure animation runs smoothly first
+  setTimeout(() => {
+    // Minimize layout thrashing by doing operations in batch
+    // 1. Clone the content (no DOM impact)
+    const contentClone = content.cloneNode(true);
+    
+    // 2. Prepare the content before adding to DOM (minimize reflows)
+    // Apply any needed modifications to the clone before insertion
+    prepareContentForInsertion(contentClone);
+    
+    // 3. Insert into DOM (single reflow)
+    packageModalTarget.appendChild(contentClone);
+    
+    // 4. Start component initialization with requestAnimationFrame to avoid blocking the main thread
+    requestAnimationFrame(() => initializeModalContent(contentClone));
+  }, 0);
+};
+
+// Function to prepare content before DOM insertion
+// This helps minimize reflows by doing operations before the element is in the live DOM
+const prepareContentForInsertion = (contentElement) => {
+  // Remove any loading states or temporary attributes
+  contentElement.querySelectorAll('[data-temp-loading]').forEach(el => {
+    el.removeAttribute('data-temp-loading');
+  });
+  
+  // Set initial state for animations or transitions if needed
+  contentElement.querySelectorAll('.package_animate').forEach(el => {
+    el.style.opacity = '0';
+  });
+};
+
+// Separate function to initialize modal content across multiple animation frames
+const initializeModalContent = (contentElement) => {
   try {
-    initializePackageAccordion(); // Reinitialize the inclusion accordion
-    setupParagraphToggles(); // Reinitialize paragraph toggles
-    initializeGallerySwipers();
-    adjustHotelStars();
-    initializeTabsInScope(packageModalTarget);
-    initializeCountersInScope(packageModalTarget);
-    initializePackageForm(); // Call the form init here
-
-    // Run cmsNest and listen for completion event
-    cmsNest();
-
-    // Set up the event listener for cmsNestComplete
-    document.addEventListener(
-      "cmsNestComplete",
-      function handleCMSNestComplete() {
-        try {
-          // Run insertSVGFromCMS immediately once cmsNest is complete
-          insertSVGFromCMS(packageModalTarget);
-          hideEmptyDivs();
-        } catch (error) {
-          // Keep error handling without the console.error
-        }
-      },
-      { once: true }
-    );
+    // First batch of initializations
+    initializePackageAccordion();
+    
+    // Schedule paragraph toggles for the next frame (most expensive operation)
+    requestAnimationFrame(() => {
+      setupParagraphToggles(packageModalTarget);
+      
+      // Schedule gallery initializations for the next frame
+      requestAnimationFrame(() => {
+        initializeGallerySwipers();
+        adjustHotelStars();
+        
+        // Schedule remaining initializations
+        requestAnimationFrame(() => {
+          initializeTabsInScope(packageModalTarget);
+          initializeCountersInScope(packageModalTarget);
+          initializePackageForm();
+          initializeTabButtons(packageModalTarget);
+          
+          // Handle video setup and CMS operations last
+          requestAnimationFrame(() => {
+            packageModalTarget.querySelectorAll('.video_contain').forEach(setupVideoEvents);
+            
+            // Run CMS operations
+            cmsNest();
+            
+            // Set up CMS Nest completion event
+            document.addEventListener(
+              "cmsNestComplete",
+              (e) => {
+                try {
+                  requestAnimationFrame(() => {
+                    insertSVGFromCMS(packageModalTarget);
+                    hideEmptyDivs();
+                  });
+                } catch (error) {
+                  // Silently handle errors
+                }
+              },
+              { once: true }
+            );
+          });
+        });
+      });
+    });
   } catch (error) {
-    // Keep error handling without the console.error
+    // Silently handle errors
   }
 };
 
 // Function to check if modal already contains the correct content
 const isModalContentCorrect = (url) => {
+  if (!packageModalTarget) return false;
+  
   // Check if the modal has a data-current-url attribute
   const currentUrl = packageModalTarget.getAttribute('data-current-url');
-  return currentUrl === url;
+  const isCorrect = currentUrl === url;
+  return isCorrect;
 };
 
 // Function to fetch content from URL
 const fetchContent = async (url) => {
   try {
     const response = await fetch(url);
+    
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     
     const text = await response.text();
+    
     const parser = new DOMParser();
     const doc = parser.parseFromString(text, "text/html");
+    
     const content = doc.querySelector(contentSelector);
     
-    if (!content) throw new Error("Content not found in fetched document");
+    if (!content) {
+      throw new Error("Content not found in fetched document");
+    }
     
     return content;
   } catch (error) {
-    // Keep error handling without the console.error
     return null;
   }
 };
@@ -801,7 +1002,6 @@ const handleContentForUrl = (url) => {
     }
     return content;
   }).catch(error => {
-    // Keep error handling without the console.error
     return null;
   });
   
@@ -809,114 +1009,167 @@ const handleContentForUrl = (url) => {
 };
 
 // Function to handle card click
-const handleCardClick = async (event) => {
+const handleCardClick = (event) => {
   // Prevent default behavior to avoid page navigation
   event.preventDefault();
   
   const card = event.currentTarget;
   const linkElement = card.querySelector(".packages_link");
-  if (!linkElement) {
-    return;
-  }
+  if (!linkElement) return;
   
   const url = linkElement.getAttribute("href");
-  if (!url) {
-    return;
-  }
+  if (!url) return;
   
-  // Check if content is already cached
-  if (contentCache.has(url)) {
-    handleContentForUrl(url);
-    return;
-  }
-  
-  // Check if fetch is in progress
-  if (pendingFetches.has(url)) {
-    pendingFetches.get(url).then(content => {
-      if (content) {
-        handleContentForUrl(url);
-      }
-    });
-    return;
-  }
-  
-  // If not cached or pending, fetch it now
-  const fetchPromise = fetchContent(url).then(content => {
-    if (content) {
-      contentCache.set(url, content);
-      handleContentForUrl(url);
-    }
-    pendingFetches.delete(url);
-    return content;
-  }).catch(error => {
-    // Keep error handling without the console.error
-    pendingFetches.delete(url);
-    return null;
-  });
-  
-  pendingFetches.set(url, fetchPromise);
+  // First trigger the modal open animation immediately
+  // This ensures the animation begins right away without waiting for content
+  openModalForUrl(url);
 };
 
-// Attach click handlers to all cards
-packageCards.forEach((card) => {
-  card.addEventListener("click", handleCardClick);
-});
-
-// Pre-fetch content for all cards
-packageCards.forEach((card) => {
-  const linkElement = card.querySelector(".packages_link");
-  if (!linkElement) {
-    return;
-  }
+// Function to trigger the modal opening
+const openModalForUrl = (url) => {
+  // Create and trigger a modal open button
+  // This approach ensures we follow the exact same path as a user click
+  // which maintains compatibility with the modal animation system
+  const btn = document.createElement('button');
+  btn.setAttribute('data-modal-open', 'package');
+  btn.style.position = 'absolute';
+  btn.style.opacity = '0';
+  btn.style.pointerEvents = 'none';
   
-  const url = linkElement.getAttribute("href");
-  if (!url) {
-    return;
-  }
-  
-  // Start fetch and store the promise
-  const fetchPromise = fetchContent(url).then(content => {
-    if (content) {
-      contentCache.set(url, content);
-    }
-    pendingFetches.delete(url);
-    return content;
-  }).catch(error => {
-    // Keep error handling without the console.error
-    pendingFetches.delete(url);
-    return null;
+  // Add to DOM, click, then clean up
+  document.body.appendChild(btn);
+  btn.click();
+  requestAnimationFrame(() => {
+    // Remove in next frame to ensure click event is processed
+    document.body.removeChild(btn);
+    
+    // Start content handling after the modal animation has started
+    setTimeout(() => handleContentForUrl(url), 10);
   });
-  
-  pendingFetches.set(url, fetchPromise);
+};
+
+// Initialize existing package cards on page load
+document.addEventListener('DOMContentLoaded', () => {
+  if (packageModalTarget) {
+    const packageCards = document.querySelectorAll(cardsSelector);
+    attachPackageCardHandlers(packageCards);
+  }
+}, { passive: true });
+
+// Create a more efficient MutationObserver to watch for new package cards added to the DOM
+const packageCardObserver = new MutationObserver((mutations) => {
+  // Process in a separate task to avoid blocking rendering
+  setTimeout(() => {
+    let newCards = [];
+    
+    // First collect all new cards
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if the added node is a package card
+            if (node.matches && node.matches(cardsSelector)) {
+              newCards.push(node);
+            }
+            
+            // Check for package cards inside the added node
+            if (node.querySelectorAll) {
+              const nestedCards = node.querySelectorAll(cardsSelector);
+              if (nestedCards.length > 0) {
+                newCards = newCards.concat(Array.from(nestedCards));
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Then process all the new cards in a batch
+    if (newCards.length > 0) {
+      attachPackageCardHandlers(newCards);
+    }
+  }, 0);
 });
 
+// Start observing the document for added package cards with optimized options
+if (packageModalTarget) {
+  packageCardObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: false,  // We don't need to observe attribute changes
+    characterData: false  // We don't need to observe text changes
+  });
+}
 
 // PACKAGE FORM
 const initializePackageForm = () => {
   const form = packageModalTarget.querySelector('#wf-form-Package');
   const submitBtn = packageModalTarget.querySelector('[data-form-submit="package"]');
-  if (!form || !submitBtn) return;
+  const formWrapper = form?.closest('.w-form');
+  if (!form || !submitBtn || !formWrapper) return;
 
   // Add loading state on form submit
   form.addEventListener('submit', () => {
     submitBtn.classList.add('is-loading');
+    submitBtn.classList.remove('is-success');
     submitBtn.disabled = true;
-
-    const btnText = submitBtn.querySelector('.btn_flip_text');
-    if (btnText) btnText.textContent = 'Sending...';
+    
+    // Update button text and hide icon
+    const btnText = submitBtn.querySelector('.btn_push_text');
+    const btnIcon = submitBtn.querySelector('.btn_push_icon_mask');
+    if (btnText) {
+      btnText.textContent = 'Sending...';
+      btnText.classList.remove('has-tick');
+    }
+    if (btnIcon) btnIcon.style.display = 'none';
   });
 
   // Remove loading state on success or failure
-  const stopLoading = () => {
+  const stopLoading = (isSuccess = false) => {
     submitBtn.classList.remove('is-loading');
-    submitBtn.disabled = false;
+    const btnText = submitBtn.querySelector('.btn_push_text');
+    const btnIcon = submitBtn.querySelector('.btn_push_icon_mask');
 
-    const btnText = submitBtn.querySelector('.btn_flip_text');
-    if (btnText) btnText.textContent = 'Submit';
+    if (isSuccess) {
+      submitBtn.classList.add('is-success');
+      if (btnText) {
+        btnText.textContent = 'Request sent';
+        btnText.classList.add('has-tick');
+      }
+    } else {
+      submitBtn.classList.remove('is-success');
+      if (btnText) {
+        btnText.textContent = 'Submit';
+        btnText.classList.remove('has-tick');
+      }
+    }
+    submitBtn.disabled = false;
+    
+    if (btnIcon) btnIcon.style.display = isSuccess ? 'none' : '';
   };
 
-  form.addEventListener('w-form-done', stopLoading);
-  form.addEventListener('w-form-fail', stopLoading);
+  // Watch for Webflow's form state changes
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+        const successWrap = formWrapper.querySelector('.w-form-done');
+        const failWrap = formWrapper.querySelector('.w-form-fail');
+        
+        if (successWrap && successWrap.style.display === 'block') {
+          stopLoading(true);
+        } else if (failWrap && failWrap.style.display === 'block') {
+          stopLoading(false);
+        }
+      }
+    });
+  });
+
+  // Start observing the form wrapper for style changes
+  observer.observe(formWrapper, {
+    attributes: true,
+    attributeFilter: ['style'],
+    subtree: true
+  });
 
   // Click handler to trigger form submit via hidden button
   submitBtn.addEventListener('click', () => {
@@ -928,11 +1181,38 @@ const initializePackageForm = () => {
     form.removeChild(tempBtn);
   });
 
-  // Webflow re-init
+  // Webflow re-init with proper error handling
   if (window.Webflow && Webflow.require) {
     try {
-      Webflow.require("forms").ready();
-    } catch (e) {}
+      const forms = Webflow.require("forms");
+      if (forms && typeof forms.ready === 'function') {
+        forms.ready();
+      }
+    } catch (e) {
+      console.error('Webflow forms initialization failed:', e);
+    }
   }
+};
+
+// MANAGES PACKAGE TAB BUTTONS
+
+const initializeTabButtons = (scope = document) => {
+  const backBtn = scope.querySelector('.package_btn_tab_wrap.is-back');
+  const forwardBtn = scope.querySelector('.package_btn_tab_wrap.is-forward');
+  const submitBtn = scope.querySelector('.package_btn_tab_wrap.is-submit');
+  
+  if (!backBtn || !forwardBtn || !submitBtn) return;
+  
+  forwardBtn.addEventListener('click', function() {
+    forwardBtn.classList.add('is-hidden');
+    submitBtn.classList.remove('is-hidden');
+    backBtn.classList.remove('is-hidden');
+  });
+  
+  backBtn.addEventListener('click', function() {
+    backBtn.classList.add('is-hidden');
+    submitBtn.classList.add('is-hidden');
+    forwardBtn.classList.remove('is-hidden');
+  });
 };
 
