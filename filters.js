@@ -617,9 +617,8 @@ const ScrollTriggerModule = (() => {
   function scrollEffect() {
     const content = document.querySelector("[data-scroll-element='content']");
     const trigger = document.querySelector("[data-scroll-element='trigger']");
-    const heroBg = document.querySelector(".hero_home_bg");
 
-    if (!content || !trigger || !heroBg) return; // Prevent errors if elements are missing
+    if (!content || !trigger) return; // Prevent errors if elements are missing
 
     // Get bounding rectangles for both content and trigger
     const contentRect = content.getBoundingClientRect();
@@ -627,7 +626,7 @@ const ScrollTriggerModule = (() => {
 
     // Adjust fade start by 120px above the original fadeStart position
     const fadeStart = contentRect.bottom + 150; // Start 150px before the original position
-    const fadeEnd = contentRect.top + 50; // When fully faded (trigger reaches top of content)
+    const fadeEnd = contentRect.top + 100; // When fully faded (trigger reaches top of content)
 
     // Calculate the scroll progress based on the trigger's position relative to content
     let progress = (fadeStart - triggerRect.top) / (fadeStart - fadeEnd);
@@ -636,15 +635,6 @@ const ScrollTriggerModule = (() => {
     // Apply opacity, which decreases as the trigger gets closer
     gsap.to(content, { opacity: 1 - progress, duration: 0.1, ease: "none" });
 
-    // Update the background color of .hero_home_bg based on scroll progress
-    const backgroundColor = `rgba(27, 27, 34, ${
-      0.12 + (0.4 - 0.12) * progress
-    })`;
-    gsap.to(heroBg, {
-      backgroundColor: backgroundColor,
-      duration: 0.1,
-      ease: "none",
-    });
   }
 
   // Function to handle media query changes

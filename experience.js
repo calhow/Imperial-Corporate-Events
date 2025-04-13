@@ -1,3 +1,39 @@
+// Copy first gallery image to experience background image
+const setExpBackgroundImage = () => {
+
+  const hasVideoPoster = document.getElementsByClassName('video_gallery_poster').length > 0;
+  const sourceElement = hasVideoPoster ? 
+    document.getElementsByClassName('video_gallery_poster')[0] : 
+    document.getElementsByClassName('gallery_img')[0];
+  
+  if (!sourceElement) return;
+  
+  let imageUrl;
+  if (sourceElement.tagName === 'IMG') {
+    imageUrl = sourceElement.currentSrc || sourceElement.src;
+  } else {
+    const bgImage = getComputedStyle(sourceElement).backgroundImage;
+    const urlMatch = bgImage.split('"');
+    imageUrl = urlMatch.length > 1 ? urlMatch[1] : bgImage.substring(4, bgImage.length - 1);
+  }
+  
+  if (!imageUrl) return;
+  
+  const expBgImgs = document.getElementsByClassName('exp_bg_img');
+  const len = expBgImgs.length;
+  if (len === 0) return;
+  
+  for (let i = 0; i < len; i++) {
+    expBgImgs[i].src = imageUrl;
+  }
+};
+
+if (document.readyState !== 'loading') {
+  setExpBackgroundImage();
+} else {
+  document.addEventListener('DOMContentLoaded', setExpBackgroundImage, {once: true});
+}
+
 const swiperInstances = [];
 
 const swiperConfigs = [
@@ -579,7 +615,7 @@ function cmsNest() {
   items.forEach((item) => {
     const link = item.querySelector("[data-cms-nest='link']");
     if (!link) {
-      console.warn("CMS Nest: Link not found", item);
+      // Silently handle missing link
       pendingFetches--;
       if (pendingFetches === 0) {
         document.dispatchEvent(
@@ -593,7 +629,7 @@ function cmsNest() {
 
     const href = link.getAttribute("href");
     if (!href) {
-      console.warn("CMS Nest: Href attribute not found", link);
+      // Silently handle missing href
       pendingFetches--;
       if (pendingFetches === 0) {
         document.dispatchEvent(
@@ -608,7 +644,7 @@ function cmsNest() {
     try {
       const url = new URL(href, window.location.origin);
       if (url.hostname !== window.location.hostname) {
-        console.warn("CMS Nest: URL is not on the same domain", url);
+        // Silently handle cross-origin URLs
         pendingFetches--;
         if (pendingFetches === 0) {
           document.dispatchEvent(
@@ -647,12 +683,8 @@ function cmsNest() {
               dropzone.appendChild(target);
               foundContent = true;
               contentFound = true;
-            } else {
-              console.warn(
-                `CMS Nest: ${targetSelector} not found in fetched content`,
-                url
-              );
             }
+            // Silently handle missing targets - no console warning
           });
 
           // Dispatch event for this specific item completion
@@ -672,11 +704,8 @@ function cmsNest() {
             );
           }
         })
-        .catch((error) => {
-          console.error(
-            "CMS Nest: Error fetching the link or request timed out:",
-            error
-          );
+        .catch(() => {
+          // Silently handle fetch errors
           pendingFetches--;
           if (pendingFetches === 0) {
             document.dispatchEvent(
@@ -687,7 +716,7 @@ function cmsNest() {
           }
         });
     } catch (error) {
-      console.error("CMS Nest: Invalid URL", href, error);
+      // Silently handle URL parsing errors
       pendingFetches--;
       if (pendingFetches === 0) {
         document.dispatchEvent(

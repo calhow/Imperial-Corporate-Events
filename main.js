@@ -8,6 +8,7 @@ const setBgColor = (element) => {
 // Initially set background color for existing elements
 document.querySelectorAll("[data-bg-color]").forEach(setBgColor);
 
+
 // Create a MutationObserver to watch for added nodes
 const observer = new MutationObserver((mutations) => {
   for (const { addedNodes } of mutations) {
@@ -33,9 +34,41 @@ function insertSVGFromCMS(container = document) {
   container.querySelectorAll(".svg-code").forEach((element) => {
     const svgCode = element.textContent;
     if (!svgCode) return;
-    const svgElement = document.createElement("div");
-    svgElement.innerHTML = svgCode;
-    element.insertAdjacentElement("afterend", svgElement.firstChild);
+    
+    try {
+      // Parse SVG
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgCode, 'image/svg+xml');
+      const svg = doc.querySelector('svg');
+      
+      if (svg && doc.querySelector('parsererror') === null) {
+        // Instead of changing values, just remove problematic attributes
+        // This lets the container control sizing naturally
+        const invalidValueAttrs = Array.from(svg.attributes)
+          .filter(attr => (attr.name === 'width' || attr.name === 'height') && attr.value === 'auto');
+        
+        invalidValueAttrs.forEach(attr => {
+          svg.removeAttribute(attr.name);
+        });
+        
+        // Clone the fixed SVG to insert it
+        const fixedSvg = svg.cloneNode(true);
+        element.insertAdjacentElement("afterend", document.importNode(fixedSvg, true));
+      } else {
+        // Fallback: create wrapper with default fix
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = svgCode.replace(/\s(width|height)="auto"/g, '');
+        element.insertAdjacentElement("afterend", wrapper.firstElementChild);
+      }
+    } catch (e) {
+      // Last resort: try direct insertion with cleaned string
+      try {
+        const cleanSvg = svgCode.replace(/\s(width|height)="auto"/g, '');
+        element.insertAdjacentHTML("afterend", cleanSvg);
+      } catch (err) {
+        // Silent fallback - avoid breaking the page
+      }
+    }
   });
 }
 
@@ -123,14 +156,24 @@ const initializeCountersInScope = (scope = document) => {
 
 document.addEventListener('DOMContentLoaded', () => initializeCountersInScope());
 
-
-
 // PARALLAX ANIMATIONS
 
 // Initialize timelines conditionally
 const homeHeroWrap = document.querySelector(".hero_home_wrap");
 const catHeroWrap = document.querySelector(".hero_cat_wrap");
 const ctaContent = document.querySelector(".cta_content");
+const expGallery = document.querySelector(".gallery_img");
+const videoElement = document.querySelector(".video_gallery_player");
+const posterElement = document.querySelector(".video_gallery_poster");
+
+// Get combined top-padding of .exp_content + .gallery_wrap for gallery parallax offset
+const getPaddingTop = el =>
+  parseFloat(getComputedStyle(el).paddingTop) || 0;
+const expContent = document.querySelector(".exp_content");
+const galleryWrap = document.querySelector(".gallery_wrap");
+const expContentPadding = expContent ? getPaddingTop(expContent) : 0;
+const galleryWrapPadding = galleryWrap ? getPaddingTop(galleryWrap) : 0;
+const totalGalleryOffset = expContentPadding + galleryWrapPadding;
 
 // Home video parallax trigger
 let homeHeroParallax;
@@ -171,19 +214,51 @@ if (ctaContent) {
   });
 }
 
+// Exp Gallery parallax trigger
+let expGalleryParallax;
+if (expGallery) {
+  expGalleryParallax = gsap.timeline({
+    scrollTrigger: {
+      trigger: ".gallery_img",
+      start: `top ${totalGalleryOffset}px`, 
+      end: "bottom top",
+      scrub: true,
+    },
+  });
+}
+
+// Video poster parallax trigger
+let videoPosterParallax;
+if (videoElement && posterElement) {
+  videoPosterParallax = gsap.timeline({
+    scrollTrigger: {
+      trigger: videoElement,
+      start: `top ${totalGalleryOffset}px`,
+      end: "bottom top",
+      scrub: true,
+    },
+  });
+}
+
 // Handle media queries
 let mm = gsap.matchMedia();
 
 // Parallax for CTA & Hero on devices above 480px
 mm.add("(min-width: 480px)", () => {
   if (homeHeroParallax) {
-    homeHeroParallax.to(".hero_home_vid", { y: "12rem" });
+    homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
   }
   if (catHeroParallax) {
     catHeroParallax.to(".hero_cat_img", { y: "-4rem" });
   }
+  if (expGalleryParallax) {
+    expGalleryParallax.to(".gallery_img", { y: "3rem" });
+  }
+  if (videoPosterParallax) {
+    videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
+  }
   if (ctaParallax) {
-    ctaParallax.to(".cta_bg_img", { y: "12rem" });
+    ctaParallax.to(".cta_bg_img", { y: "10rem" });
   }
 });
 
@@ -334,49 +409,53 @@ document.addEventListener("click", (event) => {
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
             opacity: 1, 
             duration: 0.3, 
-            ease: "power1.inOut"
-          })
+            ease: "power4.Out"
+          }, 0)
           .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
             { xPercent: 105 }, 
             { 
               xPercent: 0, 
-              duration: 0.3, 
-              ease: "power1.inOut"
-            }, "<+0.1" )
+              duration: 0.35, 
+              ease: "power4.Out"
+            }, 0.1 )
            // Bar & close buttons
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
+          .to(".nav_modal_close_mob", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+
           // 1st wave - Upcoming
-          .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.05, ease: "power1.out", stagger: 0.015 }, "<")
-           // 1st wave - Trending
-          .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.02 }, "<+0.05")
-          // 1st wave - Contact
-          .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<-0.05")
-          .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, "<")
+          .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
+          .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.30)
           // 2nd wave - Upcoming
-          .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.05")
-          .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_calendar_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.02 }, "<+0.05")
-          .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}, "<")
-          // 2nd wave - Trending
-          .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<-0.05")
-          .to("[menu-category-label='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
-          .to("[menu-category-cms-list='1'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
-          .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04")
+          .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
+          .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
+          .to(".menu_calendar_list", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.45)
+          .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}, 0.5)
+
+          // 1st wave - Contact
+          .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
+          .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
           // 2nd wave - Contact
-          .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<-0.05")
+          .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.45)
+          
+           // 1st wave - Trending
+           .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+           .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, 0.35)
+          // 2nd wave - Trending
+          .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
+          .to("[menu-category-label='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.4) 
+          .to("[menu-category-cms-list='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.42)
+          .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.44)
           // 3rd wave - Trending
-          .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.1")
-          .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
-          .to("[menu-category-cms-list='2'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
-          .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04")
+          .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46)
+          .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.46) 
+          .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.48)
+          .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.5)
           // 4th wave - Trending
-          .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.05") 
-          .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<") 
-          .to("[menu-category-cms-list='3'] > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out", stagger: 0.025 }, "<+0.01")
-          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, "<+0.04");
+          .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
+          .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.52) 
+          .to("[menu-category-cms-list='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.54)
+          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.56);
 
       } else if (trayModalType === 'package') {
         // Package tray animation
@@ -385,15 +464,15 @@ document.addEventListener("click", (event) => {
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
             opacity: 1, 
             duration: 0.3, 
-            ease: "power1.inOut"
-          })
+            ease: "power4.Out"
+          }, 0)
           .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
             { xPercent: 105 }, 
             { 
               xPercent: 0, 
-              duration: 0.3, 
-              ease: "power1.inOut"
-            }, "<+0.1" );
+              duration: 0.35, 
+              ease: "power4.Out"
+            }, 0.1 )
 
       } else if (trayModalType === 'reviews') {
         // Reviews tray animation
@@ -402,20 +481,20 @@ document.addEventListener("click", (event) => {
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
             opacity: 1, 
             duration: 0.3, 
-            ease: "power1.inOut"
-          })
+            ease: "power4.Out"
+          }, 0)
           .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
             { xPercent: 105 }, 
             { 
               xPercent: 0, 
-              duration: 0.3, 
-              ease: "power1.inOut"
-            }, "<+0.1" )
+              duration: 0.35, 
+              ease: "power4.Out"
+            }, 0.1 )
           // Bar & close buttons
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<+0.2")
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, "<")
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
           // Review list
-          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, "<+0.05");
+          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, 0.35);
           
       }
     } else {
@@ -425,7 +504,7 @@ document.addEventListener("click", (event) => {
           opacity: 1, 
           duration: 0.3, 
           ease: "power1.inOut"
-        })
+        }, 0)
         .fromTo(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, 
           { opacity: 0, y: "1rem" }, 
           { 
@@ -434,7 +513,7 @@ document.addEventListener("click", (event) => {
             duration: 0.3, 
             ease: "power1.out", 
             stagger: 0.1
-          });
+          }, 0.1);
     }
   } else {
     modalStates[modalGroup] = false;
@@ -444,56 +523,48 @@ document.addEventListener("click", (event) => {
       if (trayModalType === 'nav') {
         // Nav tray exit animation
         modalTl
-          .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" })
-          .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_link_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".form_menu_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_calendar_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-wrap='3']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<") 
-          .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<") 
-          .to("[menu-category-label='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-cms-list='1'] > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to("[menu-category-cms-list='2'] > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<") 
-          .to("[menu-category-cms-list='3'] > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
-          .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.3, ease: "power1.in" }, "<");
+          .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_link_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".form_menu_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_calendar_list", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-wrap='3']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0) 
+          .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0) 
+          .to("[menu-category-label='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-cms-list='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-cms-list='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0) 
+          .to("[menu-category-cms-list='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
+          .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
       } else if (trayModalType === 'package') {
         // Package tray exit animation
         modalTl
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
-            opacity: 0, 
-            duration: 0.25, 
-            ease: "power1.inOut"
-          }, "<")
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { 
-            xPercent: 105, 
-            duration: 0.3, 
-            ease: "power1.in"
-          }, "<");
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
       } else if (trayModalType === 'reviews') {
         // Reviews tray exit animation
         modalTl
-        .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" })  
-        .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, "<")
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.25, ease: "power1.inOut" }, "<")
-          .to(`[data-modal-element='tray-content'][data-modal-group='${modalGroup}'] > *`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out"}, "<")
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.3, ease: "power1.in" }, "<");
+        .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)  
+        .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
+        .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
+        .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
+        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
+        .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
       }
     } else {
       // Animate out for regular modals
@@ -501,14 +572,14 @@ document.addEventListener("click", (event) => {
         .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
           opacity: 0, 
           duration: 0.25
-        })
+        }, 0)
         .to(`[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`, { 
           opacity: 0, 
           y: "-1rem", 
           duration: 0.2, 
           ease: "power1.in", 
           stagger: -0.05
-        }, "<" );
+        }, 0);
     }
   }
 
@@ -638,8 +709,6 @@ const initializeTabsInScope = (root = document) => {
 document.addEventListener("DOMContentLoaded", () => {
   initializeTabsInScope(); // initializes tabs in global page
 });
-
-
 
 //MENU SEARCH BUTTON
 // Utility function to wait for the upcoming tab with retries
