@@ -1,28 +1,57 @@
 // Copy first gallery image to experience background image
-const setExpBackgroundImage = () => {
 
-  const hasVideoPoster = document.getElementsByClassName('video_gallery_poster').length > 0;
-  const sourceElement = hasVideoPoster ? 
-    document.getElementsByClassName('video_gallery_poster')[0] : 
-    document.getElementsByClassName('gallery_img')[0];
+const setExpBackgroundImage = () => {
+  // Check for video poster first
+  const videoPosterElements = document.getElementsByClassName('video_gallery_poster');
+  const hasVideoPoster = videoPosterElements.length > 0;
   
+  // Check for gallery images as fallback
+  const galleryImgElements = document.getElementsByClassName('gallery_img');
+  
+  // Start with null sourceElement and imageUrl
+  let sourceElement = null;
+  let imageUrl = null;
+  
+  // Try to get video poster first
+  if (hasVideoPoster) {
+    const videoPoster = videoPosterElements[0];
+    if (videoPoster) {
+      const bgImage = getComputedStyle(videoPoster).backgroundImage;
+      // Only use video poster if it has a valid background image
+      if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
+        sourceElement = videoPoster;
+      }
+    }
+  }
+  
+  // If no valid video poster found, fall back to gallery image
+  if (!sourceElement && galleryImgElements.length > 0) {
+    sourceElement = galleryImgElements[0];
+  }
+  
+  // Exit if no source element found
   if (!sourceElement) return;
   
-  let imageUrl;
+  // Extract image URL from source element
   if (sourceElement.tagName === 'IMG') {
     imageUrl = sourceElement.currentSrc || sourceElement.src;
   } else {
     const bgImage = getComputedStyle(sourceElement).backgroundImage;
-    const urlMatch = bgImage.split('"');
-    imageUrl = urlMatch.length > 1 ? urlMatch[1] : bgImage.substring(4, bgImage.length - 1);
+    if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
+      const urlMatch = bgImage.split('"');
+      imageUrl = urlMatch.length > 1 ? urlMatch[1] : bgImage.substring(4, bgImage.length - 1);
+    }
   }
   
+  // Exit if no image URL found
   if (!imageUrl) return;
   
+  // Find target elements to update
   const expBgImgs = document.getElementsByClassName('exp_bg_img');
   const len = expBgImgs.length;
   if (len === 0) return;
   
+  // Update all target elements with the image URL
   for (let i = 0; i < len; i++) {
     expBgImgs[i].src = imageUrl;
   }
@@ -238,169 +267,307 @@ function handleClick(event) {
 
 document.addEventListener("DOMContentLoaded", setCardHighlightListeners);
 
-// ADD & REMOVE CONTROLS FROM EXP VIDEO WHEN PLAYING OUTSIDE OF MODAL
+// ADD & REMOVE CONTROLS FROM VIDEOS - Unified Video Handling
+const VideoManager = {
+  // Video container setup
+  setupVideo(container) {
+    if (!container) return;
+    
+    const videoWrap = container.querySelector(".video_cover_wrap");
+    const videoPlayer = container.querySelector(".video_gallery_player");
+    
+    if (!videoWrap || !videoPlayer) return;
+    
+    // Find UI elements to toggle
+    const uiElements = this._findUIElements(container);
+    
+    // Set up all event handlers
+    this._setupEventHandlers(videoWrap, videoPlayer, uiElements);
+    
+    return {
+      videoWrap,
+      videoPlayer,
+      uiElements
+    };
+  },
+  
+  // Find UI elements related to this video
+  _findUIElements(container) {
+    // Store all UI elements in a single object
+    const uiElements = {
+      testimonialBtn: null,
+      swiperControls: null,
+      galleryBtnWrap: null
+    };
+    
+    // Parent slide and swiper container
+    const parentSlide = container.closest('.swiper-slide');
+    const swiperContainer = container.closest('.swiper');
+    
+    // Find testimonial button
+    uiElements.testimonialBtn = parentSlide?.querySelector(".gallery_selection_btn_wrap") || 
+                               swiperContainer?.querySelector(".gallery_selection_btn_wrap");
+    
+    // Find swiper pagination
+    uiElements.swiperControls = swiperContainer?.querySelector(".swiper-pagination.is-gallery") ||
+                               document.querySelector(".swiper-pagination.is-gallery");
+    
+    // Find gallery buttons
+    uiElements.galleryBtnWrap = swiperContainer?.parentElement?.querySelector(".gallery_btn_wrap") ||
+                               swiperContainer?.closest(".video_wrap")?.querySelector(".gallery_btn_wrap") ||
+                               document.querySelector(".gallery_btn_wrap");
+    
+    return uiElements;
+  },
+  
+  // Set up all event handlers for a video
+  _setupEventHandlers(videoWrap, videoPlayer, uiElements) {
+    let isScrubbing = false;
+    
+    // Toggle UI element visibility and video controls
+    const toggleUI = (disable) => {
+      videoWrap.classList.toggle("is-disabled", disable);
+      
+      // Only toggle optional UI elements if they exist
+      if (uiElements.testimonialBtn) uiElements.testimonialBtn.classList.toggle("is-disabled", disable);
+      if (uiElements.swiperControls) uiElements.swiperControls.classList.toggle("is-disabled", disable);
+      if (uiElements.galleryBtnWrap) uiElements.galleryBtnWrap.classList.toggle("is-disabled", disable);
+      
+      // Toggle native video controls
+      if (disable) videoPlayer.setAttribute("controls", "true");
+      else videoPlayer.removeAttribute("controls");
+    };
+    
+    // Video wrapper click
+    videoWrap.addEventListener("click", () => {
+      toggleUI(true);
+      videoPlayer.play().catch(() => {});
+    });
+    
+    // Video ended event
+    videoPlayer.addEventListener("ended", () => {
+      videoPlayer.currentTime = 0;
+      toggleUI(false);
+    });
+    
+    // Track scrubbing state
+    videoPlayer.addEventListener("seeking", () => (isScrubbing = true));
+    
+    videoPlayer.addEventListener("seeked", () => {
+      setTimeout(() => (isScrubbing = false), 100);
+    });
+    
+    // Handle pause events
+    videoPlayer.addEventListener("pause", () => {
+      setTimeout(() => {
+        if (!isScrubbing) toggleUI(false);
+      }, 100);
+    });
+  },
+  
+  // Initialize all videos on the page
+  initAll() {
+    document.querySelectorAll('.video_contain').forEach(container => 
+      this.setupVideo(container)
+    );
+  }
+};
+
+// Initialize all videos on DOM load
 document.addEventListener("DOMContentLoaded", () => {
-  // Find all video containers and set up events for each
-  document.querySelectorAll('.video_contain').forEach(setupVideoEvents);
+  VideoManager.initAll();
 });
 
-function setupVideoEvents(container) {
-  // Handle case when function is called without a container parameter
-  if (!container) {
-    // Find all video containers and process them instead
-    document.querySelectorAll('.video_contain').forEach(videoContainer => {
-      setupVideoEvents(videoContainer);
-    });
-    return;
-  }
+// PRE-POSITION VIDEO SLIDE BEFORE SWIPER INIT
+const prepareGalleryVideoSlide = () => {
+  const videoSlide = document.querySelector(".video_wrap .swiper-slide.is-gallery");
+  if (!videoSlide) return false;
+  
+  const videoElement = videoSlide.querySelector("video");
+  if (!videoElement) return false;
+  
+  const src = videoElement.getAttribute("src") || "";
+  const poster = videoElement.getAttribute("poster") || "";
+  if (!src.trim() || !poster.trim()) return false;
+  
+  const swiperWrapper = document.querySelector(".swiper.is-gallery .swiper-wrapper");
+  if (!swiperWrapper) return false;
+  
+  videoSlide.remove();
+  swiperWrapper.prepend(videoSlide);
+  
+  // Use the video manager instead of the old setupVideoEvents
+  const videoContainer = videoSlide.querySelector('.video_contain');
+  if (videoContainer) VideoManager.setupVideo(videoContainer);
+  
+  return true;
+};
 
-  const videoWrap = container.querySelector(".video_cover_wrap");
-  const videoPlayer = container.querySelector(".video_gallery_player");
-  
-  if (!videoWrap || !videoPlayer) return;
-  
-  // Find optional UI elements using more reliable selectors
-  // First try to find them within the slide, then fallback to document level for gallery
-  const parentSlide = container.closest('.swiper-slide');
-  const swiperContainer = container.closest('.swiper');
-  
-  // Find testimonial button - could be in slide or nearby in DOM
-  let testimonialBtn = parentSlide?.querySelector(".gallery_selection_btn_wrap");
-  if (!testimonialBtn) {
-    // If not in the slide, look for it in the closest common container
-    testimonialBtn = swiperContainer?.querySelector(".gallery_selection_btn_wrap");
-  }
-  
-  // Find swiper pagination - could be in swiper container or elsewhere
-  let swiperControls = swiperContainer?.querySelector(".swiper-pagination.is-gallery");
-  if (!swiperControls) {
-    // Try to find pagination near the swiper
-    swiperControls = document.querySelector(".swiper-pagination.is-gallery");
-  }
-  
-  // Find gallery buttons - could be in container or elsewhere
-  let galleryBtnWrap = swiperContainer?.parentElement?.querySelector(".gallery_btn_wrap");
-  if (!galleryBtnWrap) {
-    // Try to find it in a parent container
-    galleryBtnWrap = swiperContainer?.closest(".video_wrap")?.querySelector(".gallery_btn_wrap");
-    // If still not found, try a broader search
-    if (!galleryBtnWrap) {
-      galleryBtnWrap = document.querySelector(".gallery_btn_wrap");
+// SWIPER UTILITIES - Unified handling for common Swiper operations
+const SwiperManager = {
+  // Setup loop mode based on slide count
+  setupLoopMode(swiper, minSlidesForLoop = 2) {
+    const slideCount = swiper.slides.length;
+    const hasEnoughSlides = slideCount >= minSlidesForLoop;
+    
+    if (hasEnoughSlides) {
+      swiper.params.loop = true;
+      swiper.loopDestroy(); // Ensure clean state
+      swiper.loopCreate();
+      swiper.update();
+      return true;
+    } else {
+      swiper.params.loop = false;
+      swiper.loopDestroy(); // Make sure loop is disabled
+      swiper.update();
+      return false;
     }
+  },
+  
+  // Toggle navigation visibility based on slide count
+  toggleNavigationVisibility(swiper, options = {}) {
+    const {
+      galleryBtnWrap = null,
+      prevBtn = null,
+      nextBtn = null,
+      galleryClass = null,
+      uniqueValue = null
+    } = options;
+    
+    const slideCount = swiper.slides.length;
+    const hasMultipleSlides = slideCount > 1;
+    
+    // Find elements if not provided
+    const btnWrap = galleryBtnWrap || 
+      (galleryClass && document.querySelector(`.gallery_btn_wrap.${galleryClass}`)) ||
+      document.querySelector(".gallery_btn_wrap");
+      
+    const prevButton = prevBtn || 
+      (uniqueValue && document.querySelector(`[data-swiper-button-prev="${uniqueValue}"]`)) ||
+      document.querySelector('[data-swiper-button-prev]');
+      
+    const nextButton = nextBtn || 
+      (uniqueValue && document.querySelector(`[data-swiper-button-next="${uniqueValue}"]`)) ||
+      document.querySelector('[data-swiper-button-next]');
+    
+    // Toggle visibility
+    if (btnWrap) {
+      btnWrap.style.display = hasMultipleSlides ? "flex" : "none";
+    }
+    
+    if (prevButton && nextButton) {
+      const displayValue = hasMultipleSlides ? "block" : "none";
+      prevButton.style.display = displayValue;
+      nextButton.style.display = displayValue;
+    }
+    
+    return hasMultipleSlides;
   }
+};
 
-  const disableUI = (disable) => {
-    videoWrap.classList.toggle("is-disabled", disable);
-    
-    // Only toggle optional UI elements if they exist
-    if (testimonialBtn) testimonialBtn.classList.toggle("is-disabled", disable);
-    if (swiperControls) swiperControls.classList.toggle("is-disabled", disable);
-    if (galleryBtnWrap) galleryBtnWrap.classList.toggle("is-disabled", disable);
-    
-    if (disable) videoPlayer.setAttribute("controls", "true");
-    else videoPlayer.removeAttribute("controls");
-  };
-
-  let isScrubbing = false;
-
-  videoWrap.addEventListener("click", () => {
-    disableUI(true);
-    videoPlayer.play().catch(() => {});
-  });
-
-  videoPlayer.addEventListener("ended", () => {
-    videoPlayer.currentTime = 0;
-    disableUI(false);
-  });
-
-  videoPlayer.addEventListener("seeking", () => (isScrubbing = true));
-
-  videoPlayer.addEventListener("seeked", () => {
-    setTimeout(() => (isScrubbing = false), 100);
-  });
-
-  videoPlayer.addEventListener("pause", () => {
-    setTimeout(() => {
-      if (!isScrubbing) disableUI(false);
-    }, 100);
-  });
-}
-
-// GALLERY SLIDER
-
-const gallerySwiper = new Swiper(".swiper.is-gallery", {
-  slidesPerView: 1,
-  slideActiveClass: "is-active",
-  effect: "fade",
-  fadeEffect: {
-    crossFade: true,
-  },
-  loop: true,
-  preventClicks: false,
-  preventClicksPropagation: false,
-  navigation: {
-    nextEl: '[data-swiper-button-next="is-gallery"]',
-    prevEl: '[data-swiper-button-prev="is-gallery"]',
-    disabledClass: "is-disabled",
-  },
-  pagination: {
-    el: ".swiper-pagination.is-gallery",
-    type: "bullets",
-    dynamicBullets: true,
-  },
-  on: {
-    init: function () {
-      const swiperInstance = this;
-      const hasOnlyOneSlide = swiperInstance.slides.length === 1;
-
-      swiperInstance.params.loop = !hasOnlyOneSlide;
-      swiperInstance.loopDestroy();
-      if (!hasOnlyOneSlide) {
-        swiperInstance.loopCreate();
-      }
-      swiperInstance.update();
-
-      const videoSlide = document.querySelector(
-        ".video_wrap .swiper-slide.is-gallery"
-      );
-
-      if (videoSlide) {
-        const videoElement = videoSlide.querySelector("video");
-        if (videoElement) {
-          const src = videoElement.getAttribute("src");
-          const poster = videoElement.getAttribute("poster");
-
-          if (src && src.trim() !== "" && poster && poster.trim() !== "") {
-            videoSlide.parentNode.removeChild(videoSlide);
-            swiperInstance.prependSlide(videoSlide);
-            swiperInstance.slideTo(0, 0, false);
-            
-            // Fix: Find video container and pass it to setupVideoEvents
-            const videoContainer = videoSlide.querySelector('.video_contain');
-            if (videoContainer) {
-              setupVideoEvents(videoContainer);
-            }
+// GALLERY SLIDER INITIALIZATION
+(() => {
+  const videoSlidePrePositioned = prepareGalleryVideoSlide();
+  
+  const gallerySwiper = new Swiper(".swiper.is-gallery", {
+    slidesPerView: 1,
+    slideActiveClass: "is-active",
+    effect: "fade",
+    fadeEffect: { crossFade: true },
+    loop: false, // Start with loop disabled, will be configured by SwiperManager
+    loopedSlides: 1,
+    preventClicks: false,
+    preventClicksPropagation: false,
+    navigation: {
+      nextEl: '[data-swiper-button-next="is-gallery"]',
+      prevEl: '[data-swiper-button-prev="is-gallery"]',
+      disabledClass: "is-disabled"
+    },
+    pagination: {
+      el: ".swiper-pagination.is-gallery",
+      type: "bullets",
+      dynamicBullets: true
+    },
+    on: {
+      init(swiper) {
+        // Set up loop mode using the SwiperManager
+        const loopEnabled = SwiperManager.setupLoopMode(swiper);
+        
+        // Position to video slide if pre-positioned
+        if (videoSlidePrePositioned) {
+          if (loopEnabled) {
+            swiper.slideToLoop(0, 0, false);
+          } else {
+            swiper.slideTo(0, 0, false);
           }
         }
+        
+        // Toggle navigation visibility using SwiperManager
+        SwiperManager.toggleNavigationVisibility(swiper, {
+          galleryBtnWrap: document.querySelector(".gallery_btn_wrap"),
+          prevBtn: document.querySelector('[data-swiper-button-prev="is-gallery"]'),
+          nextBtn: document.querySelector('[data-swiper-button-next="is-gallery"]')
+        });
       }
+    }
+  });
+  
+  return gallerySwiper;
+})();
 
-      const galleryBtnWrap = document.querySelector(".gallery_btn_wrap");
-      const prevBtn = document.querySelector(
-        '[data-swiper-button-prev="is-gallery"]'
-      );
-      const nextBtn = document.querySelector(
-        '[data-swiper-button-next="is-gallery"]'
-      );
+// SWIPER FOR MODAL GALLERIES
+function initializeGallerySwipers() {
+  const galleryTypes = [
+    { class: "is-hotel-gallery", attr: "data-swiper-hotel" },
+    { class: "is-room-gallery", attr: "data-swiper-room" },
+    { class: "is-hospitality-gallery", attr: "data-swiper-hospitality" },
+  ];
 
-      if (swiperInstance.slides.length === 1) {
-        if (galleryBtnWrap) galleryBtnWrap.style.display = "none";
-      } else {
-        if (prevBtn) prevBtn.style.display = "block";
-        if (nextBtn) nextBtn.style.display = "block";
-      }
-    },
-  },
-});
+  galleryTypes.forEach(({ class: galleryClass, attr: dataAttr }) => {
+    document.querySelectorAll(`.swiper.${galleryClass}`).forEach((gallery) => {
+      const uniqueValue = gallery.getAttribute(dataAttr);
+      if (!uniqueValue) return;
+
+      const slideCount = gallery.querySelectorAll('.swiper-slide').length;
+
+      new Swiper(gallery, {
+        slidesPerView: 1,
+        slideActiveClass: "is-active",
+        effect: "fade",
+        fadeEffect: {
+          crossFade: true,
+        },
+        loop: false, // Will be set by SwiperManager
+        loopedSlides: 1,
+        preventClicks: false,
+        preventClicksPropagation: false,
+        navigation: {
+          nextEl: `[data-swiper-button-next="${uniqueValue}"]`,
+          prevEl: `[data-swiper-button-prev="${uniqueValue}"]`,
+          disabledClass: "is-disabled",
+        },
+        pagination: {
+          el: `.swiper-pagination[${dataAttr}="${uniqueValue}"]`,
+          type: "bullets",
+          dynamicBullets: true,
+        },
+        on: {
+          init: function() {
+            // Setup loop mode using SwiperManager
+            SwiperManager.setupLoopMode(this);
+            
+            // Toggle navigation visibility using SwiperManager
+            SwiperManager.toggleNavigationVisibility(this, {
+              galleryBtnWrap: gallery.closest(".package_gallery_contain")?.querySelector(".gallery_btn_wrap"),
+              prevBtn: document.querySelector(`[data-swiper-button-prev="${uniqueValue}"]`),
+              nextBtn: document.querySelector(`[data-swiper-button-next="${uniqueValue}"]`)
+            });
+          }
+        }
+      });
+    });
+  });
+}
 
 // HIGHLIGHTS FILTER TABS
 
@@ -514,85 +681,6 @@ if (window.innerWidth <= 767 && btnWrap) {
 
       lastScrollTop = currentScrollTop <= 0 ? 0 : currentScrollTop;
     }
-  });
-}
-
-// SWIPER FOR MODAL GALLERIES
-
-function initializeGallerySwipers() {
-  // Define gallery types with their specific selectors and attributes
-  const galleryTypes = [
-    { class: "is-hotel-gallery", attr: "data-swiper-hotel" },
-    { class: "is-room-gallery", attr: "data-swiper-room" },
-    { class: "is-hospitality-gallery", attr: "data-swiper-hospitality" },
-  ];
-
-  // Initialize all gallery types
-  galleryTypes.forEach(({ class: galleryClass, attr: dataAttr }) => {
-    document.querySelectorAll(`.swiper.${galleryClass}`).forEach((gallery) => {
-      const uniqueValue = gallery.getAttribute(dataAttr);
-      if (!uniqueValue) return;
-
-      // Count the number of slides
-      const slideCount = gallery.querySelectorAll('.swiper-slide').length;
-      // Only enable loop if there are more than 1 slide
-      const shouldLoop = slideCount > 1;
-
-      new Swiper(gallery, {
-        slidesPerView: 1,
-        slideActiveClass: "is-active",
-        effect: "fade",
-        fadeEffect: {
-          crossFade: true,
-        },
-        loop: shouldLoop,
-        preventClicks: false,
-        preventClicksPropagation: false,
-        navigation: {
-          nextEl: `[data-swiper-button-next="${uniqueValue}"]`,
-          prevEl: `[data-swiper-button-prev="${uniqueValue}"]`,
-          disabledClass: "is-disabled",
-        },
-        pagination: {
-          el: `.swiper-pagination[${dataAttr}="${uniqueValue}"]`,
-          type: "bullets",
-          dynamicBullets: true,
-        },
-        on: {
-          init: function () {
-            const swiperInstance = this;
-            const hasOnlyOneSlide = swiperInstance.slides.length === 1;
-
-            // Handle loop for single slides
-            swiperInstance.params.loop = !hasOnlyOneSlide;
-            swiperInstance.loopDestroy();
-            if (!hasOnlyOneSlide) {
-              swiperInstance.loopCreate();
-            }
-            swiperInstance.update();
-
-            // Toggle visibility of navigation elements
-            const galleryBtnWrap = gallery
-              .closest(".package_gallery_contain")
-              .querySelector(".gallery_btn_wrap");
-
-            const prevBtn = document.querySelector(
-              `[data-swiper-button-prev="${uniqueValue}"]`
-            );
-            const nextBtn = document.querySelector(
-              `[data-swiper-button-next="${uniqueValue}"]`
-            );
-
-            if (hasOnlyOneSlide) {
-              if (galleryBtnWrap) galleryBtnWrap.style.display = "none";
-            } else {
-              if (prevBtn) prevBtn.style.display = "block";
-              if (nextBtn) nextBtn.style.display = "block";
-            }
-          },
-        },
-      });
-    });
   });
 }
 
@@ -781,6 +869,141 @@ const prefetchQueue = [];
 // Maximum number of concurrent prefetches
 const MAX_CONCURRENT_PREFETCHES = 4;
 
+// ANIMATION STATE MANAGER
+class AnimationStateManager {
+  constructor(modalTarget) {
+    this.modalTarget = modalTarget;
+    this.timeline = null;
+    this.elements = null;
+    console.log('[AnimationManager] Initialized with modal target:', !!modalTarget);
+  }
+
+  getElements() {
+    this.elements = {
+      headingWrap: this.modalTarget.querySelector('.package_heading_wrap'),
+      contentChildren: this.modalTarget.querySelectorAll('.package_content > *'),
+      contentGrandchildren: this.modalTarget.querySelectorAll('.package_content > * > *'),
+      btnWrap: this.modalTarget.querySelector('.package_btn_wrap')
+    };
+    console.log('[AnimationManager] Found elements:', {
+      hasHeadingWrap: !!this.elements.headingWrap,
+      contentChildrenCount: this.elements.contentChildren?.length,
+      contentGrandchildrenCount: this.elements.contentGrandchildren?.length,
+      hasButtonWrap: !!this.elements.btnWrap
+    });
+    return this.elements;
+  }
+
+  setInitialState() {
+    const elements = this.getElements();
+    console.log('[AnimationManager] Setting initial state');
+    
+    // Set all elements to opacity 0 first
+    const allElements = [
+      elements.headingWrap,
+      ...(elements.contentChildren || []),
+      ...(elements.contentGrandchildren || []),
+      elements.btnWrap
+    ].filter(Boolean);
+    
+    gsap.set(allElements, { opacity: 0 });
+    
+    // Set specific initial states
+    if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
+    if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
+    if (elements.contentGrandchildren?.length) {
+      gsap.set(elements.contentGrandchildren, { 
+        opacity: 0, 
+        x: "0.125rem", 
+        y: "-0.25rem", 
+        filter: "blur(2px)" 
+      });
+    }
+    if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
+    
+    // Force reflow
+    this.modalTarget.offsetHeight;
+    console.log('[AnimationManager] Initial state set');
+  }
+
+  createTimeline() {
+    console.log('[AnimationManager] Creating timeline');
+    const elements = this.getElements();
+    this.timeline = gsap.timeline({
+      onComplete: () => {
+        console.log('[AnimationManager] Timeline completed');
+      }
+    });
+
+    if (elements.headingWrap) {
+      this.timeline.to(elements.headingWrap, {
+        opacity: 1,
+        x: "0rem",
+        duration: 0.2,
+        ease: "power1.out"
+      }, 0);
+    }
+
+    if (elements.contentChildren?.length) {
+      this.timeline.to(elements.contentChildren, {
+        opacity: 1,
+        x: "0rem",
+        duration: 0.2,
+        ease: "power1.out",
+        stagger: 0.03
+      }, 0);
+    }
+
+    if (elements.contentGrandchildren?.length) {
+      this.timeline.to(elements.contentGrandchildren, {
+        opacity: 1,
+        x: "0rem",
+        y: "0rem",
+        filter: "blur(0rem)",
+        duration: 0.2,
+        ease: "power1.out",
+        stagger: 0.015
+      }, 0);
+    }
+
+    if (elements.btnWrap) {
+      this.timeline.to(elements.btnWrap, {
+        opacity: 1,
+        x: "0rem",
+        duration: 0.2,
+        ease: "power1.out"
+      }, 0);
+    }
+    
+    console.log('[AnimationManager] Timeline created');
+    return this.timeline;
+  }
+
+  animate() {
+    console.log('[AnimationManager] Starting animation sequence');
+    this.setInitialState();
+    
+    // Use double RAF to ensure initial state is rendered
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.createTimeline();
+      });
+    });
+  }
+
+  cleanup() {
+    console.log('[AnimationManager] Cleaning up');
+    if (this.timeline) {
+      this.timeline.kill();
+      this.timeline = null;
+    }
+    this.elements = null;
+  }
+}
+
+// Create a singleton instance for the package modal
+const packageAnimationManager = new AnimationStateManager(packageModalTarget);
+
 // Function to attach event handlers to package cards
 const attachPackageCardHandlers = (cards) => {
   if (!cards || !cards.length) return;
@@ -873,108 +1096,228 @@ const processNextQueuedFetch = () => {
   }
 };
 
-// Function to populate modal with content
-const populateModal = (content, url) => {
-  if (!packageModalTarget) return;
-  
-  // Clear previous content immediately
-  packageModalTarget.innerHTML = "";
-  packageModalTarget.setAttribute('data-current-url', url);
-  
-  // Defer content population to ensure animation runs smoothly first
-  setTimeout(() => {
-    // Minimize layout thrashing by doing operations in batch
-    // 1. Clone the content (no DOM impact)
-    const contentClone = content.cloneNode(true);
+// Memory Management Utilities
+const TimelineManager = {
+    timelines: new Set(),
     
-    // 2. Prepare the content before adding to DOM (minimize reflows)
-    // Apply any needed modifications to the clone before insertion
-    prepareContentForInsertion(contentClone);
+    add(timeline) {
+        if (!timeline) return;
+        this.timelines.add(timeline);
+        timeline.eventCallback("onComplete", () => this.remove(timeline));
+    },
     
-    // 3. Insert into DOM (single reflow)
-    packageModalTarget.appendChild(contentClone);
+    remove: timeline => timeline && (timeline.kill(), this.timelines.delete(timeline)),
     
-    // 4. Start component initialization with requestAnimationFrame to avoid blocking the main thread
-    requestAnimationFrame(() => initializeModalContent(contentClone));
-  }, 0);
+    clearAll() {
+        this.timelines.forEach(tl => tl.kill());
+        this.timelines.clear();
+    }
 };
 
-// Function to prepare content before DOM insertion
-// This helps minimize reflows by doing operations before the element is in the live DOM
-const prepareContentForInsertion = (contentElement) => {
-  // Remove any loading states or temporary attributes
-  contentElement.querySelectorAll('[data-temp-loading]').forEach(el => {
-    el.removeAttribute('data-temp-loading');
-  });
-  
-  // Set initial state for animations or transitions if needed
-  contentElement.querySelectorAll('.package_animate').forEach(el => {
-    el.style.opacity = '0';
-  });
-};
-
-// Separate function to initialize modal content across multiple animation frames
-const initializeModalContent = (contentElement) => {
-  try {
-    // First batch of initializations
-    initializePackageAccordion();
+const EventManager = {
+    listeners: new Map(),
     
-    // Schedule paragraph toggles for the next frame (most expensive operation)
-    requestAnimationFrame(() => {
-      setupParagraphToggles(packageModalTarget);
-      
-      // Schedule gallery initializations for the next frame
-      requestAnimationFrame(() => {
-        initializeGallerySwipers();
-        adjustHotelStars();
+    add(element, type, handler, options = false) {
+        if (!element || !type || !handler) return;
+        element.addEventListener(type, handler, options);
         
-        // Schedule remaining initializations
-        requestAnimationFrame(() => {
-          initializeTabsInScope(packageModalTarget);
-          initializeCountersInScope(packageModalTarget);
-          initializePackageForm();
-          initializeTabButtons(packageModalTarget);
-          
-          // Handle video setup and CMS operations last
-          requestAnimationFrame(() => {
-            packageModalTarget.querySelectorAll('.video_contain').forEach(setupVideoEvents);
-            
-            // Run CMS operations
-            cmsNest();
-            
-            // Set up CMS Nest completion event
-            document.addEventListener(
-              "cmsNestComplete",
-              (e) => {
-                try {
-                  requestAnimationFrame(() => {
-                    insertSVGFromCMS(packageModalTarget);
-                    hideEmptyDivs();
-                  });
-                } catch (error) {
-                  // Silently handle errors
-                }
-              },
-              { once: true }
-            );
-          });
-        });
-      });
-    });
-  } catch (error) {
-    // Silently handle errors
-  }
+        const elementMap = this.listeners.get(element) || new Map();
+        const handlers = elementMap.get(type) || new Set();
+        
+        handlers.add(handler);
+        elementMap.set(type, handlers);
+        this.listeners.set(element, elementMap);
+    },
+    
+    remove(element, type, handler) {
+        if (!element || !type || !handler) return;
+        element.removeEventListener(type, handler);
+        
+        const elementMap = this.listeners.get(element);
+        const handlers = elementMap?.get(type);
+        if (handlers) {
+            handlers.delete(handler);
+            if (!handlers.size) elementMap.delete(type);
+            if (!elementMap.size) this.listeners.delete(element);
+        }
+    },
+    
+    removeAll(element) {
+        if (!element) return;
+        const elementMap = this.listeners.get(element);
+        if (!elementMap) return;
+        
+        elementMap.forEach((handlers, type) => 
+            handlers.forEach(handler => element.removeEventListener(type, handler))
+        );
+        this.listeners.delete(element);
+    },
+    
+    clearAll() {
+        this.listeners.forEach((elementMap, element) => this.removeAll(element));
+        this.listeners.clear();
+    }
 };
 
 // Function to check if modal already contains the correct content
 const isModalContentCorrect = (url) => {
-  if (!packageModalTarget) return false;
-  
-  // Check if the modal has a data-current-url attribute
-  const currentUrl = packageModalTarget.getAttribute('data-current-url');
-  const isCorrect = currentUrl === url;
-  return isCorrect;
+    if (!packageModalTarget) return false;
+    const currentUrl = packageModalTarget.getAttribute('data-current-url');
+    return currentUrl === url;
 };
+
+// Function to prepare content before DOM insertion
+const prepareContentForInsertion = (contentElement) => {
+    contentElement.querySelectorAll('[data-temp-loading]').forEach(el => {
+        el.removeAttribute('data-temp-loading');
+    });
+};
+
+// Separate function to initialize modal content
+const initializeModalContent = async (contentElement) => {
+    const initSequence = [
+        () => initializePackageAccordion(),
+        () => setupParagraphToggles(packageModalTarget),
+        () => {
+            initializeGallerySwipers();
+            adjustHotelStars();
+        },
+        () => {
+            initializeTabsInScope(packageModalTarget);
+            initializeCountersInScope(packageModalTarget);
+            initializePackageForm();
+            initializeTabButtons(packageModalTarget);
+        },
+        () => {
+            packageModalTarget.querySelectorAll('.video_contain')
+                .forEach(container => VideoManager.setupVideo(container));
+            cmsNest();
+        }
+    ];
+
+    // Execute each initialization step in sequence
+    for (const init of initSequence) {
+        await new Promise(resolve => requestAnimationFrame(() => {
+            init();
+            resolve();
+        }));
+    }
+
+    // Wait for CMS nest completion
+    await new Promise(resolve => {
+        document.addEventListener("cmsNestComplete", () => {
+            requestAnimationFrame(() => {
+                insertSVGFromCMS(packageModalTarget);
+                hideEmptyDivs();
+                resolve();
+            });
+        }, { once: true });
+    });
+};
+
+const createContentAnimation = (elements) => {
+    const timeline = gsap.timeline({
+        paused: true,
+        onComplete: () => TimelineManager.remove(timeline)
+    });
+
+    const animations = [
+        {
+            targets: elements.headingWrap,
+            props: { opacity: 1, x: "0rem" }
+        },
+        {
+            targets: elements.contentChildren,
+            props: { opacity: 1, x: "0rem" },
+            stagger: 0.03
+        },
+        {
+            targets: elements.contentGrandchildren,
+            props: { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)" },
+            stagger: 0.015
+        },
+        {
+            targets: elements.btnWrap,
+            props: { opacity: 1, x: "0rem" }
+        }
+    ];
+
+    animations.forEach(({ targets, props, stagger }) => {
+        if (!targets) return;
+        timeline.to(targets, {
+            ...props,
+            duration: 0.2,
+            ease: "power1.out",
+            ...(stagger && { stagger })
+        }, 0);
+    });
+
+    TimelineManager.add(timeline);
+    return timeline;
+};
+
+const setInitialStates = (elements) => {
+    // Set all elements to opacity 0 first
+    const allElements = [
+        elements.headingWrap,
+        ...(elements.contentChildren || []),
+        ...(elements.contentGrandchildren || []),
+        elements.btnWrap
+    ].filter(Boolean);
+    
+    gsap.set(allElements, { opacity: 0 });
+
+    // Set specific initial states
+    const states = {
+        headingWrap: { opacity: 0, x: "0.5rem" },
+        contentChildren: { opacity: 0, x: "1rem" },
+        contentGrandchildren: { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)" },
+        btnWrap: { opacity: 0, x: "0.5rem" }
+    };
+
+    Object.entries(states).forEach(([key, props]) => {
+        const target = elements[key];
+        if (target) gsap.set(target, props);
+    });
+};
+
+async function populateModal(content, url) {
+    if (!packageModalTarget) return;
+    
+    // Cleanup
+    TimelineManager.clearAll();
+    EventManager.removeAll(packageModalTarget);
+    packageModalTarget.innerHTML = "";
+    
+    if (url) {
+        packageModalTarget.setAttribute('data-current-url', url);
+    }
+    
+    // Prepare content
+    const contentClone = content.cloneNode(true);
+    prepareContentForInsertion(contentClone);
+    
+    // Get elements and set initial states
+    const elements = {
+        headingWrap: contentClone.querySelector('.package_heading_wrap'),
+        contentChildren: contentClone.querySelectorAll('.package_content > *'),
+        contentGrandchildren: contentClone.querySelectorAll('.package_content > * > *'),
+        btnWrap: contentClone.querySelector('.package_btn_wrap')
+    };
+    
+    setInitialStates(elements);
+    
+    // Add to DOM and initialize
+    packageModalTarget.appendChild(contentClone);
+    packageModalTarget.offsetHeight; // Force reflow
+    await initializeModalContent(contentClone);
+    
+    // Create and play animation
+    const timeline = createContentAnimation(elements);
+    timeline.play();
+    
+    return timeline;
+}
 
 // Function to fetch content from URL
 const fetchContent = async (url) => {
@@ -1283,26 +1626,253 @@ const handleCardClick = (event) => {
 };
 
 // Function to trigger the modal opening
-const openModalForUrl = (url) => {
-  // Create and trigger a modal open button
-  // This approach ensures we follow the exact same path as a user click
-  // which maintains compatibility with the modal animation system
+const openModalForUrl = async (url) => {
+  // Create a promise that resolves when the modal animation completes
+  const modalAnimationComplete = new Promise(resolve => {
+    document.addEventListener('packageModalAnimationComplete', () => {
+      resolve();
+    }, { once: true });
+  });
+  
+  // Immediately trigger modal animation
   const btn = document.createElement('button');
   btn.setAttribute('data-modal-open', 'package');
   btn.style.position = 'absolute';
   btn.style.opacity = '0';
   btn.style.pointerEvents = 'none';
-  
-  // Add to DOM, click, then clean up
   document.body.appendChild(btn);
   btn.click();
+  
+  // Clean up button in next frame
   requestAnimationFrame(() => {
-    // Remove in next frame to ensure click event is processed
     document.body.removeChild(btn);
-    
-    // Start content handling after the modal animation has started
-    setTimeout(() => handleContentForUrl(url), 10);
   });
+
+  // Then handle content population
+  if (!isModalContentCorrect(url)) {
+    let content = null;
+    
+    // Try to get content from cache or pending fetches
+    try {
+      if (contentCache.has(url)) {
+        content = contentCache.get(url);
+      } else if (pendingFetches.has(url)) {
+        content = await pendingFetches.get(url);
+      } else {
+        const fetchPromise = fetchContent(url);
+        pendingFetches.set(url, fetchPromise);
+        content = await fetchPromise;
+        if (content) {
+          contentCache.set(url, content);
+        }
+      }
+    } catch (error) {
+      return;
+    }
+
+    if (content) {
+      // Clear and populate modal
+      packageModalTarget.innerHTML = "";
+      packageModalTarget.setAttribute('data-current-url', url);
+      
+      // Clone and prepare content
+      const contentClone = content.cloneNode(true);
+      prepareContentForInsertion(contentClone);
+      
+      // Set initial animation states before adding to DOM
+      const elements = {
+        headingWrap: contentClone.querySelector('.package_heading_wrap'),
+        contentChildren: contentClone.querySelectorAll('.package_content > *'),
+        contentGrandchildren: contentClone.querySelectorAll('.package_content > * > *'),
+        btnWrap: contentClone.querySelector('.package_btn_wrap')
+      };
+      
+      // Set initial states with GSAP.set
+      const setInitialStates = () => {
+        // First set all elements to opacity 0
+        gsap.set([
+          elements.headingWrap, 
+          ...elements.contentChildren, 
+          ...elements.contentGrandchildren, 
+          elements.btnWrap
+        ].filter(Boolean), { opacity: 0 });
+        
+        // Then set specific initial states
+        if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
+        if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
+        if (elements.contentGrandchildren?.length) {
+          gsap.set(elements.contentGrandchildren, { 
+            opacity: 0, 
+            x: "0.125rem", 
+            y: "-0.25rem", 
+            filter: "blur(2px)" 
+          });
+        }
+        if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
+        
+        // Force a reflow
+        packageModalTarget.offsetHeight;
+      };
+      
+      // Add to DOM and set initial states
+      packageModalTarget.appendChild(contentClone);
+      
+      // Set initial states immediately and force a reflow
+      setInitialStates();
+
+      // Initialize content and set up animation
+      requestAnimationFrame(() => {
+        initializeModalContent(contentClone);
+        
+        // Ensure initial states are maintained
+        setInitialStates();
+        
+        // Wait for modal animation to complete before starting content animation
+        modalAnimationComplete.then(() => {
+          // Double RAF to ensure initial states are rendered
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // Ensure initial states one last time before animating
+              setInitialStates();
+              
+              const contentTl = gsap.timeline();
+              
+              if (elements.headingWrap) {
+                contentTl.to(elements.headingWrap, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out"
+                }, 0);
+              }
+              
+              if (elements.contentChildren?.length) {
+                contentTl.to(elements.contentChildren, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out",
+                  stagger: 0.03
+                }, 0); 
+              }
+              
+              if (elements.contentGrandchildren?.length) {
+                contentTl.to(elements.contentGrandchildren, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  y: "0rem", 
+                  filter: "blur(0rem)", 
+                  duration: 0.2, 
+                  ease: "power1.out",
+                  stagger: 0.015
+                }, 0);
+              }
+              
+              if (elements.btnWrap) {
+                contentTl.to(elements.btnWrap, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out"
+                }, 0);
+              }
+            });
+          });
+        });
+      });
+    }
+  } else {
+    // For existing content, just reset and replay animation
+    const elements = {
+      headingWrap: packageModalTarget.querySelector('.package_heading_wrap'),
+      contentChildren: packageModalTarget.querySelectorAll('.package_content > *'),
+      contentGrandchildren: packageModalTarget.querySelectorAll('.package_content > * > *'),
+      btnWrap: packageModalTarget.querySelector('.package_btn_wrap')
+    };
+    
+    // Create a function to set initial states
+    const setInitialStates = () => {
+      // First set all elements to opacity 0
+      gsap.set([
+        elements.headingWrap, 
+        ...elements.contentChildren, 
+        ...elements.contentGrandchildren, 
+        elements.btnWrap
+      ].filter(Boolean), { opacity: 0 });
+      
+      // Then set specific initial states
+      if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
+      if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
+      if (elements.contentGrandchildren?.length) {
+        gsap.set(elements.contentGrandchildren, { 
+          opacity: 0, 
+          x: "0.125rem", 
+          y: "-0.25rem", 
+          filter: "blur(2px)" 
+        });
+      }
+      if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
+      
+      // Force a reflow
+      packageModalTarget.offsetHeight;
+    };
+    
+    // Set initial states immediately
+    setInitialStates();
+    
+    // Wait for modal animation to complete before starting content animation
+    modalAnimationComplete.then(() => {
+      // Double RAF to ensure initial states are rendered
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Ensure initial states one last time before animating
+          setInitialStates();
+          
+          const contentTl = gsap.timeline();
+          
+          if (elements.headingWrap) {
+            contentTl.to(elements.headingWrap, { 
+              opacity: 1, 
+              x: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out"
+            }, 0);
+          }
+          
+          if (elements.contentChildren?.length) {
+            contentTl.to(elements.contentChildren, { 
+              opacity: 1, 
+              x: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out",
+              stagger: 0.03
+            }, 0); 
+          }
+          
+          if (elements.contentGrandchildren?.length) {
+            contentTl.to(elements.contentGrandchildren, { 
+              opacity: 1, 
+              x: "0rem", 
+              y: "0rem", 
+              filter: "blur(0rem)", 
+              duration: 0.2, 
+              ease: "power1.out",
+              stagger: 0.015
+            }, 0);
+          }
+          
+          if (elements.btnWrap) {
+            contentTl.to(elements.btnWrap, { 
+              opacity: 1, 
+              x: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out"
+            }, 0);
+          }
+        });
+      });
+    });
+  }
 };
 
 // Initialize existing package cards on page load
@@ -1446,7 +2016,7 @@ const initializePackageForm = () => {
         forms.ready();
       }
     } catch (e) {
-      console.error('Webflow forms initialization failed:', e);
+      // Silently handle Webflow forms initialization errors
     }
   }
 };
@@ -1472,4 +2042,3 @@ const initializeTabButtons = (scope = document) => {
     forwardBtn.classList.remove('is-hidden');
   });
 };
-

@@ -268,16 +268,35 @@ const autoplayVideos = new WeakSet(); // Tracks videos that were autoplaying
 
 function updateLiveChatVisibility() {
   const anyModalOpen = Object.values(modalStates).some((state) => state);
-  if (window.LiveChatWidget) {
-    const initialState = LiveChatWidget.get("state");
-    if (
-      initialState.visibility === "maximized" ||
-      initialState.visibility === "minimized"
-    ) {
-      anyModalOpen
-        ? window.LiveChatWidget.call("hide")
-        : window.LiveChatWidget.call("minimize");
+  
+  // Only proceed if LiveChatWidget exists
+  if (!window.LiveChatWidget) return;
+
+  // Try to safely get widget state
+  try {
+    // Check if widget is ready by testing the get method
+    if (typeof window.LiveChatWidget.get === 'function') {
+      const state = window.LiveChatWidget.get("state");
+      
+      // Only modify visibility if widget is in a visible state
+      if (state && (state.visibility === "maximized" || state.visibility === "minimized")) {
+        if (anyModalOpen) {
+          window.LiveChatWidget.call("hide");
+        } else {
+          window.LiveChatWidget.call("minimize");
+        }
+      }
+    } else {
+      // If widget isn't ready, set up a one-time retry
+      requestAnimationFrame(() => {
+        if (typeof window.LiveChatWidget.get === 'function') {
+          updateLiveChatVisibility();
+        }
+      });
     }
+  } catch (e) {
+    // Silently handle any LiveChat errors
+    // This prevents console spam while the widget is initializing
   }
 }
 
@@ -473,6 +492,11 @@ document.addEventListener("click", (event) => {
               duration: 0.35, 
               ease: "power4.Out"
             }, 0.1 )
+          // Adding content animation with timing offsets as requested
+          .add(() => {
+            // Dispatch a custom event that will be caught by the content animation logic
+            document.dispatchEvent(new CustomEvent('packageModalAnimationComplete'));
+          }, 0.35); // This callback runs after the tray animation completes
 
       } else if (trayModalType === 'reviews') {
         // Reviews tray animation
@@ -554,8 +578,48 @@ document.addEventListener("click", (event) => {
       } else if (trayModalType === 'package') {
         // Package tray exit animation
         modalTl
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
+          // First animate package contents back to initial state
+          .to('.package_heading_wrap', { 
+            opacity: 0, 
+            x: "0.5rem", 
+            duration: 0.2, 
+            ease: "power1.in"
+          }, 0)
+          .to('.package_content > *', { 
+            opacity: 0, 
+            x: "1rem", 
+            duration: 0.2, 
+            ease: "power1.in"
+          }, 0)
+          .to('.package_content > * > *', { 
+            opacity: 0, 
+            x: "0.125rem", 
+            y: "-0.25rem", 
+            filter: "blur(2px)", 
+            duration: 0.2, 
+            ease: "power1.in"
+          }, 0)
+          .to('.package_btn_wrap', { 
+            opacity: 0, 
+            x: "0.5rem", 
+            duration: 0.2, 
+            ease: "power1.in"
+          }, 0)
+          // Then animate the modal out
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+            opacity: 0, 
+            duration: 0.3, 
+            ease: "power1.in" 
+          }, 0.1)
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { 
+            xPercent: 105, 
+            duration: 0.35, 
+            ease: "power1.in" 
+          }, 0.1)
+          .add(() => {
+            // Dispatch event for any cleanup needed
+            document.dispatchEvent(new CustomEvent('packageModalClosed'));
+          });
       } else if (trayModalType === 'reviews') {
         // Reviews tray exit animation
         modalTl
