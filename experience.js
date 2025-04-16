@@ -1,38 +1,29 @@
-// Copy first gallery image to experience background image
-
+// Sets experience background image from gallery or video poster
 const setExpBackgroundImage = () => {
-  // Check for video poster first
   const videoPosterElements = document.getElementsByClassName('video_gallery_poster');
   const hasVideoPoster = videoPosterElements.length > 0;
   
-  // Check for gallery images as fallback
   const galleryImgElements = document.getElementsByClassName('gallery_img');
   
-  // Start with null sourceElement and imageUrl
   let sourceElement = null;
   let imageUrl = null;
   
-  // Try to get video poster first
   if (hasVideoPoster) {
     const videoPoster = videoPosterElements[0];
     if (videoPoster) {
       const bgImage = getComputedStyle(videoPoster).backgroundImage;
-      // Only use video poster if it has a valid background image
       if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
         sourceElement = videoPoster;
       }
     }
   }
   
-  // If no valid video poster found, fall back to gallery image
   if (!sourceElement && galleryImgElements.length > 0) {
     sourceElement = galleryImgElements[0];
   }
   
-  // Exit if no source element found
   if (!sourceElement) return;
   
-  // Extract image URL from source element
   if (sourceElement.tagName === 'IMG') {
     imageUrl = sourceElement.currentSrc || sourceElement.src;
   } else {
@@ -43,15 +34,12 @@ const setExpBackgroundImage = () => {
     }
   }
   
-  // Exit if no image URL found
   if (!imageUrl) return;
   
-  // Find target elements to update
   const expBgImgs = document.getElementsByClassName('exp_bg_img');
   const len = expBgImgs.length;
   if (len === 0) return;
   
-  // Update all target elements with the image URL
   for (let i = 0; i < len; i++) {
     expBgImgs[i].src = imageUrl;
   }
@@ -83,7 +71,7 @@ const swiperConfigs = [
   },
 ];
 
-// Function to initialize Swiper
+// Initializes Swiper with proper navigation and breakpoints
 const initializeSwiper = ({
   selector,
   comboClass,
@@ -92,13 +80,13 @@ const initializeSwiper = ({
 }) => {
   const swiper = new Swiper(selector, {
     speed: 400,
-    slidesPerView, // Default slidesPerView
+    slidesPerView,
     spaceBetween: 0,
     navigation: {
       nextEl: `[data-swiper-button-next="${comboClass}"]`,
       prevEl: `[data-swiper-button-prev="${comboClass}"]`,
     },
-    breakpoints, // Apply breakpoints here
+    breakpoints,
     on: {
       init() {
         toggleButtonWrapper(this);
@@ -116,16 +104,16 @@ const initializeSwiper = ({
   return swiper;
 };
 
-// Function to toggle Swiper visibility
+// Toggles button wrapper visibility based on swiper state
 const toggleButtonWrapper = (swiper) => {
   const { comboClass } = swiper;
   const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
 
-  if (!btnWrap) return; // Safeguard for missing elements
+  if (!btnWrap) return;
   btnWrap.style.display = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
 };
 
-// Function to reset button wrappers to default value
+// Resets button wrappers to default state
 const resetButtonWrappers = () => {
   const buttonWrappers = document.querySelectorAll("[data-swiper-combo]");
   buttonWrappers.forEach((btnWrap) => {
@@ -133,7 +121,7 @@ const resetButtonWrappers = () => {
   });
 };
 
-// Function to manage Swiper initialization/destroying
+// Manages Swiper initialization based on screen width
 const manageSwipers = () => {
   const isSwiperEnabled = window.innerWidth > 991;
 
@@ -142,7 +130,6 @@ const manageSwipers = () => {
       swiperConfigs.forEach((config) => {
         const swiperContainer = document.querySelector(config.selector);
         if (swiperContainer) {
-          // Check if the container has any slides
           const slides = swiperContainer.querySelectorAll(".swiper-slide");
           if (slides.length > 0) {
             swiperInstances.push(initializeSwiper(config));
@@ -151,7 +138,6 @@ const manageSwipers = () => {
       });
     }
   } else {
-    // Reset button wrappers to default state for smaller devices
     resetButtonWrappers();
 
     while (swiperInstances.length > 0) {
@@ -162,21 +148,19 @@ const manageSwipers = () => {
 };
 
 // Debounce function
-const debounce = (func, wait) => {
+const debounce = (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
   let timeout;
   return (...args) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
-};
+});
 
-// Attach listener to window resize
 window.addEventListener("resize", debounce(manageSwipers, 200));
 
-// Run on page load
 manageSwipers();
 
-// HANDLE DESTRUCTION OF IS HIGHLIGHTS Swiper
+// Handles highlights swiper destruction and recreation during filter changes
 window.fsAttributes = window.fsAttributes || [];
 window.fsAttributes.push([
   "cmsfilter",
@@ -196,7 +180,7 @@ window.fsAttributes.push([
     });
 
     const triggerRenderItems = () => {
-      if (window.innerWidth < 992) return; // Only run on 992px and above
+      if (window.innerWidth < 992) return;
 
       const highlightsSwiper = swiperInstances.find(
         (swiper) => swiper.comboClass === "is-highlights"
@@ -232,18 +216,18 @@ window.fsAttributes.push([
   },
 ]);
 
-// KEY FEATURE CARD CLICK ANIMATION
+// Handles key feature card animation on click
 const cards = document.querySelectorAll(".card_key-feature_wrap");
 
 cards.forEach((card) => {
   const para = card.querySelector(".card_key-feature_para");
 
-  para.classList.add("line-clamp-2"); // Initially add the line clamp combo class
+  para.classList.add("line-clamp-2");
 
   card.addEventListener("click", () => {
     if (card.classList.contains("is-expanded")) {
       card.classList.remove("is-expanded");
-      setTimeout(() => para.classList.add("line-clamp-2"), 500); // Reapply line clamp after 500ms
+      setTimeout(() => para.classList.add("line-clamp-2"), 500);
     } else {
       card.classList.add("is-expanded");
       para.classList.remove("line-clamp-2");
@@ -251,7 +235,7 @@ cards.forEach((card) => {
   });
 });
 
-// Highlight card tap toggle (only for devices < 992px)
+// Sets up highlight card tap behavior for mobile
 function setCardHighlightListeners() {
   if (window.innerWidth < 992) {
     document.querySelectorAll(".card_highlight_wrap").forEach((card) => {
@@ -267,9 +251,8 @@ function handleClick(event) {
 
 document.addEventListener("DOMContentLoaded", setCardHighlightListeners);
 
-// ADD & REMOVE CONTROLS FROM VIDEOS - Unified Video Handling
+// Unified video management system
 const VideoManager = {
-  // Video container setup
   setupVideo(container) {
     if (!container) return;
     
@@ -278,10 +261,8 @@ const VideoManager = {
     
     if (!videoWrap || !videoPlayer) return;
     
-    // Find UI elements to toggle
     const uiElements = this._findUIElements(container);
     
-    // Set up all event handlers
     this._setupEventHandlers(videoWrap, videoPlayer, uiElements);
     
     return {
@@ -291,28 +272,22 @@ const VideoManager = {
     };
   },
   
-  // Find UI elements related to this video
   _findUIElements(container) {
-    // Store all UI elements in a single object
     const uiElements = {
       testimonialBtn: null,
       swiperControls: null,
       galleryBtnWrap: null
     };
     
-    // Parent slide and swiper container
     const parentSlide = container.closest('.swiper-slide');
     const swiperContainer = container.closest('.swiper');
     
-    // Find testimonial button
     uiElements.testimonialBtn = parentSlide?.querySelector(".gallery_selection_btn_wrap") || 
                                swiperContainer?.querySelector(".gallery_selection_btn_wrap");
     
-    // Find swiper pagination
     uiElements.swiperControls = swiperContainer?.querySelector(".swiper-pagination.is-gallery") ||
                                document.querySelector(".swiper-pagination.is-gallery");
     
-    // Find gallery buttons
     uiElements.galleryBtnWrap = swiperContainer?.parentElement?.querySelector(".gallery_btn_wrap") ||
                                swiperContainer?.closest(".video_wrap")?.querySelector(".gallery_btn_wrap") ||
                                document.querySelector(".gallery_btn_wrap");
@@ -320,44 +295,36 @@ const VideoManager = {
     return uiElements;
   },
   
-  // Set up all event handlers for a video
   _setupEventHandlers(videoWrap, videoPlayer, uiElements) {
     let isScrubbing = false;
     
-    // Toggle UI element visibility and video controls
     const toggleUI = (disable) => {
       videoWrap.classList.toggle("is-disabled", disable);
       
-      // Only toggle optional UI elements if they exist
       if (uiElements.testimonialBtn) uiElements.testimonialBtn.classList.toggle("is-disabled", disable);
       if (uiElements.swiperControls) uiElements.swiperControls.classList.toggle("is-disabled", disable);
       if (uiElements.galleryBtnWrap) uiElements.galleryBtnWrap.classList.toggle("is-disabled", disable);
       
-      // Toggle native video controls
       if (disable) videoPlayer.setAttribute("controls", "true");
       else videoPlayer.removeAttribute("controls");
     };
     
-    // Video wrapper click
     videoWrap.addEventListener("click", () => {
       toggleUI(true);
       videoPlayer.play().catch(() => {});
     });
     
-    // Video ended event
     videoPlayer.addEventListener("ended", () => {
       videoPlayer.currentTime = 0;
       toggleUI(false);
     });
     
-    // Track scrubbing state
     videoPlayer.addEventListener("seeking", () => (isScrubbing = true));
     
     videoPlayer.addEventListener("seeked", () => {
       setTimeout(() => (isScrubbing = false), 100);
     });
     
-    // Handle pause events
     videoPlayer.addEventListener("pause", () => {
       setTimeout(() => {
         if (!isScrubbing) toggleUI(false);
@@ -365,7 +332,6 @@ const VideoManager = {
     });
   },
   
-  // Initialize all videos on the page
   initAll() {
     document.querySelectorAll('.video_contain').forEach(container => 
       this.setupVideo(container)
@@ -378,7 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
   VideoManager.initAll();
 });
 
-// PRE-POSITION VIDEO SLIDE BEFORE SWIPER INIT
+// Positions video slide to first position before swiper initialization
 const prepareGalleryVideoSlide = () => {
   const videoSlide = document.querySelector(".video_wrap .swiper-slide.is-gallery");
   if (!videoSlide) return false;
@@ -396,35 +362,32 @@ const prepareGalleryVideoSlide = () => {
   videoSlide.remove();
   swiperWrapper.prepend(videoSlide);
   
-  // Use the video manager instead of the old setupVideoEvents
   const videoContainer = videoSlide.querySelector('.video_contain');
   if (videoContainer) VideoManager.setupVideo(videoContainer);
   
   return true;
 };
 
-// SWIPER UTILITIES - Unified handling for common Swiper operations
+// Unified Swiper utilities
 const SwiperManager = {
-  // Setup loop mode based on slide count
   setupLoopMode(swiper, minSlidesForLoop = 2) {
     const slideCount = swiper.slides.length;
     const hasEnoughSlides = slideCount >= minSlidesForLoop;
     
     if (hasEnoughSlides) {
       swiper.params.loop = true;
-      swiper.loopDestroy(); // Ensure clean state
+      swiper.loopDestroy();
       swiper.loopCreate();
       swiper.update();
       return true;
     } else {
       swiper.params.loop = false;
-      swiper.loopDestroy(); // Make sure loop is disabled
+      swiper.loopDestroy();
       swiper.update();
       return false;
     }
   },
   
-  // Toggle navigation visibility based on slide count
   toggleNavigationVisibility(swiper, options = {}) {
     const {
       galleryBtnWrap = null,
@@ -437,7 +400,6 @@ const SwiperManager = {
     const slideCount = swiper.slides.length;
     const hasMultipleSlides = slideCount > 1;
     
-    // Find elements if not provided
     const btnWrap = galleryBtnWrap || 
       (galleryClass && document.querySelector(`.gallery_btn_wrap.${galleryClass}`)) ||
       document.querySelector(".gallery_btn_wrap");
@@ -450,7 +412,6 @@ const SwiperManager = {
       (uniqueValue && document.querySelector(`[data-swiper-button-next="${uniqueValue}"]`)) ||
       document.querySelector('[data-swiper-button-next]');
     
-    // Toggle visibility
     if (btnWrap) {
       btnWrap.style.display = hasMultipleSlides ? "flex" : "none";
     }
@@ -465,7 +426,7 @@ const SwiperManager = {
   }
 };
 
-// GALLERY SLIDER INITIALIZATION
+// Main gallery slider initialization
 (() => {
   const videoSlidePrePositioned = prepareGalleryVideoSlide();
   
@@ -474,7 +435,7 @@ const SwiperManager = {
     slideActiveClass: "is-active",
     effect: "fade",
     fadeEffect: { crossFade: true },
-    loop: false, // Start with loop disabled, will be configured by SwiperManager
+    loop: false,
     loopedSlides: 1,
     preventClicks: false,
     preventClicksPropagation: false,
@@ -490,10 +451,8 @@ const SwiperManager = {
     },
     on: {
       init(swiper) {
-        // Set up loop mode using the SwiperManager
         const loopEnabled = SwiperManager.setupLoopMode(swiper);
         
-        // Position to video slide if pre-positioned
         if (videoSlidePrePositioned) {
           if (loopEnabled) {
             swiper.slideToLoop(0, 0, false);
@@ -502,7 +461,6 @@ const SwiperManager = {
           }
         }
         
-        // Toggle navigation visibility using SwiperManager
         SwiperManager.toggleNavigationVisibility(swiper, {
           galleryBtnWrap: document.querySelector(".gallery_btn_wrap"),
           prevBtn: document.querySelector('[data-swiper-button-prev="is-gallery"]'),
@@ -515,7 +473,7 @@ const SwiperManager = {
   return gallerySwiper;
 })();
 
-// SWIPER FOR MODAL GALLERIES
+// Initializes swipers for all modal galleries
 function initializeGallerySwipers() {
   const galleryTypes = [
     { class: "is-hotel-gallery", attr: "data-swiper-hotel" },
@@ -537,7 +495,7 @@ function initializeGallerySwipers() {
         fadeEffect: {
           crossFade: true,
         },
-        loop: false, // Will be set by SwiperManager
+        loop: false,
         loopedSlides: 1,
         preventClicks: false,
         preventClicksPropagation: false,
@@ -553,10 +511,8 @@ function initializeGallerySwipers() {
         },
         on: {
           init: function() {
-            // Setup loop mode using SwiperManager
             SwiperManager.setupLoopMode(this);
             
-            // Toggle navigation visibility using SwiperManager
             SwiperManager.toggleNavigationVisibility(this, {
               galleryBtnWrap: gallery.closest(".package_gallery_contain")?.querySelector(".gallery_btn_wrap"),
               prevBtn: document.querySelector(`[data-swiper-button-prev="${uniqueValue}"]`),
@@ -569,24 +525,18 @@ function initializeGallerySwipers() {
   });
 }
 
-// HIGHLIGHTS FILTER TABS
-
+// Initializes highlights filter tabs
 setTimeout(function () {
   window.fsAttributes = window.fsAttributes || [];
   window.fsAttributes.push([
     "cmsfilter",
     function (filterInstances) {
-      // Check if there are multiple filter instances
       if (filterInstances.length > 1) {
-        // Target the second filter instance (index 1)
         const secondFilterInstance = filterInstances[1];
-
-        // Log filtersData for second filter instance
         const filtersData = secondFilterInstance.filtersData;
 
         let resultsArray = [];
 
-        // Loop through filtersData and gather filter values and results
         filtersData.forEach(function (element) {
           const elements = element.elements;
           elements.forEach(function (element) {
@@ -599,9 +549,7 @@ setTimeout(function () {
           });
         });
 
-        // Loop through the filters and update the radios
         resultsArray.forEach(function (filter) {
-          // Find the label elements containing the filter text
           var elements = Array.from(
             document.querySelectorAll(".form_pill-tab_wrap")
           ).filter(function (element) {
@@ -613,9 +561,7 @@ setTimeout(function () {
           });
 
           elements.forEach(function (element) {
-            // Check if the element is a label and add/remove radio-disabled class from the parent wrapper
             if (element.tagName === "LABEL") {
-              // If the filter has no results, disable the entire label
               if (filter.filterResults === 0) {
                 element.classList.add("radio-disabled");
               } else {
@@ -629,8 +575,7 @@ setTimeout(function () {
   ]);
 }, 100);
 
-// FIXED BUTTONS WHILE SCROLLING ON MOBILE
-
+// Controls fixed buttons visibility while scrolling on mobile
 ScrollTrigger.create({
   trigger: ".packages_wrap",
   start: "bottom top",
@@ -684,12 +629,10 @@ if (window.innerWidth <= 767 && btnWrap) {
   });
 }
 
-// CMS NEST FUNCTION
-
+// Fetches and injects nested CMS content
 function cmsNest() {
   const items = document.querySelectorAll("[data-cms-nest^='item']");
 
-  // If no CMS nest items found, dispatch event immediately
   if (items.length === 0) {
     document.dispatchEvent(
       new CustomEvent("cmsNestComplete", { detail: { found: false } })
@@ -703,7 +646,6 @@ function cmsNest() {
   items.forEach((item) => {
     const link = item.querySelector("[data-cms-nest='link']");
     if (!link) {
-      // Silently handle missing link
       pendingFetches--;
       if (pendingFetches === 0) {
         document.dispatchEvent(
@@ -717,7 +659,6 @@ function cmsNest() {
 
     const href = link.getAttribute("href");
     if (!href) {
-      // Silently handle missing href
       pendingFetches--;
       if (pendingFetches === 0) {
         document.dispatchEvent(
@@ -732,7 +673,6 @@ function cmsNest() {
     try {
       const url = new URL(href, window.location.origin);
       if (url.hostname !== window.location.hostname) {
-        // Silently handle cross-origin URLs
         pendingFetches--;
         if (pendingFetches === 0) {
           document.dispatchEvent(
@@ -752,14 +692,12 @@ function cmsNest() {
             "text/html"
           );
 
-          // Get all dropzones within this item
           const dropzones = item.querySelectorAll(
             "[data-cms-nest^='dropzone-']"
           );
           let foundContent = false;
 
           dropzones.forEach((dropzone) => {
-            // Extract the number from the dropzone (e.g., "dropzone-2" -> "2")
             const dropzoneNum = dropzone
               .getAttribute("data-cms-nest")
               .split("-")[1];
@@ -772,10 +710,8 @@ function cmsNest() {
               foundContent = true;
               contentFound = true;
             }
-            // Silently handle missing targets - no console warning
           });
 
-          // Dispatch event for this specific item completion
           item.dispatchEvent(
             new CustomEvent("cmsNestItemComplete", {
               detail: { found: foundContent },
@@ -793,7 +729,6 @@ function cmsNest() {
           }
         })
         .catch(() => {
-          // Silently handle fetch errors
           pendingFetches--;
           if (pendingFetches === 0) {
             document.dispatchEvent(
@@ -804,7 +739,6 @@ function cmsNest() {
           }
         });
     } catch (error) {
-      // Silently handle URL parsing errors
       pendingFetches--;
       if (pendingFetches === 0) {
         document.dispatchEvent(
@@ -817,7 +751,7 @@ function cmsNest() {
   });
 }
 
-// HIDE EMPTY FEATURED AMENITIES DIVS IN PACKAGE MODAL
+// Hides empty featured amenities divs in package modal
 function hideEmptyDivs() {
   const modalWrap = document.querySelector(".package_modal_wrap");
   if (!modalWrap) return;
@@ -831,7 +765,7 @@ function hideEmptyDivs() {
   });
 }
 
-// ADJUST HOTEL STARS
+// Adjusts hotel star rating display
 function adjustHotelStars() {
   const starWraps = document.querySelectorAll(".package_hotel_star_wrap");
 
@@ -850,26 +784,19 @@ function adjustHotelStars() {
   });
 }
 
-// PACKAGE MODAL CONTENT RETRIEVAL
-
-// Get elements to use
+// Package modal content management
 const cardsSelector = ".packages_card";
 const contentSelector = ".package_contain";
 
-// Get cards and panel elements
 const packageModal = document.querySelector(".package_modal");
 const packageModalTarget = packageModal?.querySelector(".package_modal_wrap");
 
-// Store for pre-fetched content
 const contentCache = new Map();
-// Store for pending fetches
 const pendingFetches = new Map();
-// Queue for URLs waiting to be fetched
 const prefetchQueue = [];
-// Maximum number of concurrent prefetches
 const MAX_CONCURRENT_PREFETCHES = 4;
 
-// ANIMATION STATE MANAGER
+// Animation state manager for package modals
 class AnimationStateManager {
   constructor(modalTarget) {
     this.modalTarget = modalTarget;
@@ -898,7 +825,6 @@ class AnimationStateManager {
     const elements = this.getElements();
     console.log('[AnimationManager] Setting initial state');
     
-    // Set all elements to opacity 0 first
     const allElements = [
       elements.headingWrap,
       ...(elements.contentChildren || []),
@@ -908,7 +834,6 @@ class AnimationStateManager {
     
     gsap.set(allElements, { opacity: 0 });
     
-    // Set specific initial states
     if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
     if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
     if (elements.contentGrandchildren?.length) {
@@ -921,7 +846,6 @@ class AnimationStateManager {
     }
     if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
     
-    // Force reflow
     this.modalTarget.offsetHeight;
     console.log('[AnimationManager] Initial state set');
   }
@@ -983,7 +907,6 @@ class AnimationStateManager {
     console.log('[AnimationManager] Starting animation sequence');
     this.setInitialState();
     
-    // Use double RAF to ensure initial state is rendered
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         this.createTimeline();
@@ -1001,14 +924,12 @@ class AnimationStateManager {
   }
 }
 
-// Create a singleton instance for the package modal
 const packageAnimationManager = new AnimationStateManager(packageModalTarget);
 
-// Function to attach event handlers to package cards
+// Attaches event handlers to package cards and initiates prefetching
 const attachPackageCardHandlers = (cards) => {
   if (!cards || !cards.length) return;
   
-  // Convert to array and prioritize visible cards
   const cardsArray = Array.from(cards);
   cardsArray.sort((a, b) => {
     const aVisible = isElementInViewport(a);
@@ -1017,16 +938,12 @@ const attachPackageCardHandlers = (cards) => {
   });
   
   cardsArray.forEach((card) => {
-    // Skip if already processed
     if (card.hasAttribute('data-package-card-initialized')) return;
     
-    // Mark as initialized
     card.setAttribute('data-package-card-initialized', 'true');
     
-    // Add click handler
     card.addEventListener("click", handleCardClick);
     
-    // Start pre-fetch
     const linkElement = card.querySelector(".packages_link");
     if (linkElement) {
       const url = linkElement.getAttribute("href");
@@ -1037,8 +954,12 @@ const attachPackageCardHandlers = (cards) => {
   });
 };
 
-// Function to check if element is in viewport
+// Checks if element is in viewport
 function isElementInViewport(el) {
+  if (typeof Utils !== 'undefined' && Utils.isInViewport) {
+    return Utils.isInViewport(el);
+  }
+  
   const rect = el.getBoundingClientRect();
   return (
     rect.top >= 0 &&
@@ -1048,23 +969,20 @@ function isElementInViewport(el) {
   );
 }
 
-// Function to request content prefetching - either start immediately or queue
+// Manages prefetching of package content
 const prefetchPackageContent = (url) => {
-  // Skip if already cached or fetching
   if (contentCache.has(url) || pendingFetches.has(url)) return;
   
-  // If we're below the concurrent limit, start the fetch
   if (pendingFetches.size < MAX_CONCURRENT_PREFETCHES) {
     startPrefetch(url);
   } else {
-    // Otherwise add to queue for later
     if (!prefetchQueue.includes(url)) {
       prefetchQueue.push(url);
     }
   }
 };
 
-// Function to actually start a prefetch
+// Starts content prefetch
 const startPrefetch = (url) => {
   const fetchPromise = fetchContent(url).then(content => {
     if (content) {
@@ -1072,14 +990,12 @@ const startPrefetch = (url) => {
     }
     pendingFetches.delete(url);
     
-    // Process next queued URL if available
     processNextQueuedFetch();
     
     return content;
   }).catch(error => {
     pendingFetches.delete(url);
     
-    // Process next queued URL even on error
     processNextQueuedFetch();
     
     return null;
@@ -1088,7 +1004,7 @@ const startPrefetch = (url) => {
   pendingFetches.set(url, fetchPromise);
 };
 
-// Function to process the next URL in the prefetch queue
+// Processes next URL in prefetch queue
 const processNextQueuedFetch = () => {
   if (prefetchQueue.length > 0 && pendingFetches.size < MAX_CONCURRENT_PREFETCHES) {
     const nextUrl = prefetchQueue.shift();
@@ -1096,7 +1012,7 @@ const processNextQueuedFetch = () => {
   }
 };
 
-// Memory Management Utilities
+// Memory management for GSAP timelines
 const TimelineManager = {
     timelines: new Set(),
     
@@ -1114,6 +1030,7 @@ const TimelineManager = {
     }
 };
 
+// Event listener management
 const EventManager = {
     listeners: new Map(),
     
@@ -1159,21 +1076,21 @@ const EventManager = {
     }
 };
 
-// Function to check if modal already contains the correct content
+// Checks if modal already contains the correct content
 const isModalContentCorrect = (url) => {
     if (!packageModalTarget) return false;
     const currentUrl = packageModalTarget.getAttribute('data-current-url');
     return currentUrl === url;
 };
 
-// Function to prepare content before DOM insertion
+// Prepares content before DOM insertion
 const prepareContentForInsertion = (contentElement) => {
     contentElement.querySelectorAll('[data-temp-loading]').forEach(el => {
         el.removeAttribute('data-temp-loading');
     });
 };
 
-// Separate function to initialize modal content
+// Initializes modal content with all needed functionality
 const initializeModalContent = async (contentElement) => {
     const initSequence = [
         () => initializePackageAccordion(),
@@ -1195,7 +1112,6 @@ const initializeModalContent = async (contentElement) => {
         }
     ];
 
-    // Execute each initialization step in sequence
     for (const init of initSequence) {
         await new Promise(resolve => requestAnimationFrame(() => {
             init();
@@ -1203,7 +1119,6 @@ const initializeModalContent = async (contentElement) => {
         }));
     }
 
-    // Wait for CMS nest completion
     await new Promise(resolve => {
         document.addEventListener("cmsNestComplete", () => {
             requestAnimationFrame(() => {
@@ -1215,6 +1130,7 @@ const initializeModalContent = async (contentElement) => {
     });
 };
 
+// Creates content animation timeline
 const createContentAnimation = (elements) => {
     const timeline = gsap.timeline({
         paused: true,
@@ -1256,8 +1172,8 @@ const createContentAnimation = (elements) => {
     return timeline;
 };
 
+// Sets initial animation states
 const setInitialStates = (elements) => {
-    // Set all elements to opacity 0 first
     const allElements = [
         elements.headingWrap,
         ...(elements.contentChildren || []),
@@ -1267,7 +1183,6 @@ const setInitialStates = (elements) => {
     
     gsap.set(allElements, { opacity: 0 });
 
-    // Set specific initial states
     const states = {
         headingWrap: { opacity: 0, x: "0.5rem" },
         contentChildren: { opacity: 0, x: "1rem" },
@@ -1281,10 +1196,10 @@ const setInitialStates = (elements) => {
     });
 };
 
+// Populates modal with content and animations
 async function populateModal(content, url) {
     if (!packageModalTarget) return;
     
-    // Cleanup
     TimelineManager.clearAll();
     EventManager.removeAll(packageModalTarget);
     packageModalTarget.innerHTML = "";
@@ -1293,11 +1208,9 @@ async function populateModal(content, url) {
         packageModalTarget.setAttribute('data-current-url', url);
     }
     
-    // Prepare content
     const contentClone = content.cloneNode(true);
     prepareContentForInsertion(contentClone);
     
-    // Get elements and set initial states
     const elements = {
         headingWrap: contentClone.querySelector('.package_heading_wrap'),
         contentChildren: contentClone.querySelectorAll('.package_content > *'),
@@ -1307,12 +1220,10 @@ async function populateModal(content, url) {
     
     setInitialStates(elements);
     
-    // Add to DOM and initialize
     packageModalTarget.appendChild(contentClone);
-    packageModalTarget.offsetHeight; // Force reflow
+    packageModalTarget.offsetHeight;
     await initializeModalContent(contentClone);
     
-    // Create and play animation
     const timeline = createContentAnimation(elements);
     timeline.play();
     
@@ -1489,7 +1400,6 @@ const setupContentProcessor = () => {
                     }
                     
                     if (openTags === 0) {
-                      // Got the full content
                       return html.substring(startIndex, endIndex);
                     }
                   }
@@ -1501,29 +1411,23 @@ const setupContentProcessor = () => {
               }
             };
             
-            // Extract the content based on the selector
             const content = findContent(html, selector);
             
             if (content) {
-              // Basic processing - remove script tags
               let processedContent = content.replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, '');
               
-              // Mark images for optimization
               processedContent = processedContent.replace(/<img([^>]*)>/gi, (match, attributes) => {
                 return '<img' + attributes + ' data-worker-processed="true">';
               });
               
-              // Handle lazy-loaded elements
               processedContent = processedContent.replace(/data-src=/gi, 'data-worker-lazy="true" data-src=');
               
-              // Mark iframes and embeds
               processedContent = processedContent.replace(/<(iframe|embed)([^>]*)>/gi, 
                 (match, tag, attributes) => {
                   return '<' + tag + attributes + ' data-worker-embed="true">';
                 }
               );
               
-              // Return the processed content HTML
               self.postMessage({
                 processedUrl: url,
                 content: processedContent
@@ -1546,45 +1450,36 @@ const setupContentProcessor = () => {
       });
     `;
     
-    // Create a blob URL for the worker
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     const workerUrl = URL.createObjectURL(blob);
     
-    // Create the worker
     window.contentProcessor = new Worker(workerUrl);
     
-    // Set up error handler
     window.contentProcessor.onerror = (error) => {
       window.contentProcessor = null;
       window.contentProcessorReady = false;
     };
     
-    // Clean up the blob URL
     URL.revokeObjectURL(workerUrl);
     
-    // Mark as ready
     window.contentProcessorReady = true;
   } catch (error) {
-    // If web workers aren't supported or fail to initialize
     window.contentProcessor = null;
     window.contentProcessorReady = false;
   }
 };
 
-// Function to handle content population for a URL
+// Handles content population for URL
 const handleContentForUrl = (url) => {
-  // Check if modal already contains the correct content
   if (isModalContentCorrect(url)) {
     return;
   }
   
-  // Check if content is already cached
   if (contentCache.has(url)) {
     populateModal(contentCache.get(url), url);
     return;
   }
   
-  // Check if fetch is in progress
   if (pendingFetches.has(url)) {
     pendingFetches.get(url).then(content => {
       if (content) {
@@ -1594,7 +1489,6 @@ const handleContentForUrl = (url) => {
     return;
   }
   
-  // If not cached or pending, fetch it now
   const fetchPromise = fetchContent(url).then(content => {
     if (content) {
       contentCache.set(url, content);
@@ -1608,9 +1502,8 @@ const handleContentForUrl = (url) => {
   pendingFetches.set(url, fetchPromise);
 };
 
-// Function to handle card click
+// Handles package card click events
 const handleCardClick = (event) => {
-  // Prevent default behavior to avoid page navigation
   event.preventDefault();
   
   const card = event.currentTarget;
@@ -1620,21 +1513,17 @@ const handleCardClick = (event) => {
   const url = linkElement.getAttribute("href");
   if (!url) return;
   
-  // First trigger the modal open animation immediately
-  // This ensures the animation begins right away without waiting for content
   openModalForUrl(url);
 };
 
-// Function to trigger the modal opening
+// Triggers modal opening and content loading
 const openModalForUrl = async (url) => {
-  // Create a promise that resolves when the modal animation completes
   const modalAnimationComplete = new Promise(resolve => {
     document.addEventListener('packageModalAnimationComplete', () => {
       resolve();
     }, { once: true });
   });
   
-  // Immediately trigger modal animation
   const btn = document.createElement('button');
   btn.setAttribute('data-modal-open', 'package');
   btn.style.position = 'absolute';
@@ -1643,16 +1532,13 @@ const openModalForUrl = async (url) => {
   document.body.appendChild(btn);
   btn.click();
   
-  // Clean up button in next frame
   requestAnimationFrame(() => {
     document.body.removeChild(btn);
   });
 
-  // Then handle content population
   if (!isModalContentCorrect(url)) {
     let content = null;
     
-    // Try to get content from cache or pending fetches
     try {
       if (contentCache.has(url)) {
         content = contentCache.get(url);
@@ -1671,15 +1557,12 @@ const openModalForUrl = async (url) => {
     }
 
     if (content) {
-      // Clear and populate modal
       packageModalTarget.innerHTML = "";
       packageModalTarget.setAttribute('data-current-url', url);
       
-      // Clone and prepare content
       const contentClone = content.cloneNode(true);
       prepareContentForInsertion(contentClone);
       
-      // Set initial animation states before adding to DOM
       const elements = {
         headingWrap: contentClone.querySelector('.package_heading_wrap'),
         contentChildren: contentClone.querySelectorAll('.package_content > *'),
@@ -1687,9 +1570,7 @@ const openModalForUrl = async (url) => {
         btnWrap: contentClone.querySelector('.package_btn_wrap')
       };
       
-      // Set initial states with GSAP.set
       const setInitialStates = () => {
-        // First set all elements to opacity 0
         gsap.set([
           elements.headingWrap, 
           ...elements.contentChildren, 
@@ -1697,7 +1578,6 @@ const openModalForUrl = async (url) => {
           elements.btnWrap
         ].filter(Boolean), { opacity: 0 });
         
-        // Then set specific initial states
         if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
         if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
         if (elements.contentGrandchildren?.length) {
@@ -1710,29 +1590,21 @@ const openModalForUrl = async (url) => {
         }
         if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
         
-        // Force a reflow
         packageModalTarget.offsetHeight;
       };
       
-      // Add to DOM and set initial states
       packageModalTarget.appendChild(contentClone);
       
-      // Set initial states immediately and force a reflow
       setInitialStates();
 
-      // Initialize content and set up animation
       requestAnimationFrame(() => {
         initializeModalContent(contentClone);
         
-        // Ensure initial states are maintained
         setInitialStates();
         
-        // Wait for modal animation to complete before starting content animation
         modalAnimationComplete.then(() => {
-          // Double RAF to ensure initial states are rendered
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              // Ensure initial states one last time before animating
               setInitialStates();
               
               const contentTl = gsap.timeline();
@@ -1782,7 +1654,6 @@ const openModalForUrl = async (url) => {
       });
     }
   } else {
-    // For existing content, just reset and replay animation
     const elements = {
       headingWrap: packageModalTarget.querySelector('.package_heading_wrap'),
       contentChildren: packageModalTarget.querySelectorAll('.package_content > *'),
@@ -1790,9 +1661,7 @@ const openModalForUrl = async (url) => {
       btnWrap: packageModalTarget.querySelector('.package_btn_wrap')
     };
     
-    // Create a function to set initial states
     const setInitialStates = () => {
-      // First set all elements to opacity 0
       gsap.set([
         elements.headingWrap, 
         ...elements.contentChildren, 
@@ -1800,7 +1669,6 @@ const openModalForUrl = async (url) => {
         elements.btnWrap
       ].filter(Boolean), { opacity: 0 });
       
-      // Then set specific initial states
       if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
       if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
       if (elements.contentGrandchildren?.length) {
@@ -1813,19 +1681,14 @@ const openModalForUrl = async (url) => {
       }
       if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
       
-      // Force a reflow
       packageModalTarget.offsetHeight;
     };
     
-    // Set initial states immediately
     setInitialStates();
     
-    // Wait for modal animation to complete before starting content animation
     modalAnimationComplete.then(() => {
-      // Double RAF to ensure initial states are rendered
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          // Ensure initial states one last time before animating
           setInitialStates();
           
           const contentTl = gsap.timeline();
@@ -1875,7 +1738,7 @@ const openModalForUrl = async (url) => {
   }
 };
 
-// Initialize existing package cards on page load
+// Initialize package cards on page load
 document.addEventListener('DOMContentLoaded', () => {
   if (packageModalTarget) {
     const packageCards = document.querySelectorAll(cardsSelector);
@@ -1883,23 +1746,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 }, { passive: true });
 
-// Create a more efficient MutationObserver to watch for new package cards added to the DOM
+// Observer for new package cards added to the DOM
 const packageCardObserver = new MutationObserver((mutations) => {
-  // Process in a separate task to avoid blocking rendering
   setTimeout(() => {
     let newCards = [];
     
-    // First collect all new cards
     for (const mutation of mutations) {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            // Check if the added node is a package card
             if (node.matches && node.matches(cardsSelector)) {
               newCards.push(node);
             }
             
-            // Check for package cards inside the added node
             if (node.querySelectorAll) {
               const nestedCards = node.querySelectorAll(cardsSelector);
               if (nestedCards.length > 0) {
@@ -1911,37 +1770,34 @@ const packageCardObserver = new MutationObserver((mutations) => {
       }
     }
     
-    // Then process all the new cards in a batch
     if (newCards.length > 0) {
       attachPackageCardHandlers(newCards);
     }
   }, 0);
 });
 
-// Start observing the document for added package cards with optimized options
+// Start observing for new package cards
 if (packageModalTarget) {
   packageCardObserver.observe(document.body, {
     childList: true,
     subtree: true,
-    attributes: false,  // We don't need to observe attribute changes
-    characterData: false  // We don't need to observe text changes
+    attributes: false,
+    characterData: false
   });
 }
 
-// PACKAGE FORM
+// Initializes and manages package form submission
 const initializePackageForm = () => {
   const form = packageModalTarget.querySelector('#wf-form-Package');
   const submitBtn = packageModalTarget.querySelector('[data-form-submit="package"]');
   const formWrapper = form?.closest('.w-form');
   if (!form || !submitBtn || !formWrapper) return;
 
-  // Add loading state on form submit
   form.addEventListener('submit', () => {
     submitBtn.classList.add('is-loading');
     submitBtn.classList.remove('is-success');
     submitBtn.disabled = true;
     
-    // Update button text and hide icon
     const btnText = submitBtn.querySelector('.btn_push_text');
     const btnIcon = submitBtn.querySelector('.btn_push_icon_mask');
     if (btnText) {
@@ -1951,7 +1807,6 @@ const initializePackageForm = () => {
     if (btnIcon) btnIcon.style.display = 'none';
   });
 
-  // Remove loading state on success or failure
   const stopLoading = (isSuccess = false) => {
     submitBtn.classList.remove('is-loading');
     const btnText = submitBtn.querySelector('.btn_push_text');
@@ -1975,7 +1830,6 @@ const initializePackageForm = () => {
     if (btnIcon) btnIcon.style.display = isSuccess ? 'none' : '';
   };
 
-  // Watch for Webflow's form state changes
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
@@ -1991,14 +1845,12 @@ const initializePackageForm = () => {
     });
   });
 
-  // Start observing the form wrapper for style changes
   observer.observe(formWrapper, {
     attributes: true,
     attributeFilter: ['style'],
     subtree: true
   });
 
-  // Click handler to trigger form submit via hidden button
   submitBtn.addEventListener('click', () => {
     const tempBtn = document.createElement('button');
     tempBtn.type = 'submit';
@@ -2008,7 +1860,6 @@ const initializePackageForm = () => {
     form.removeChild(tempBtn);
   });
 
-  // Webflow re-init with proper error handling
   if (window.Webflow && Webflow.require) {
     try {
       const forms = Webflow.require("forms");
@@ -2021,8 +1872,7 @@ const initializePackageForm = () => {
   }
 };
 
-// MANAGES PACKAGE TAB BUTTONS
-
+// Manages multi-step form tab buttons
 const initializeTabButtons = (scope = document) => {
   const backBtn = scope.querySelector('.package_btn_tab_wrap.is-back');
   const forwardBtn = scope.querySelector('.package_btn_tab_wrap.is-forward');

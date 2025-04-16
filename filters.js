@@ -1,6 +1,6 @@
 // HOMEPAGE FILTER
 
-// Swiper Module
+// Swiper Module for theme filters
 const SwiperModule = (() => {
   let swiper;
 
@@ -17,10 +17,10 @@ const SwiperModule = (() => {
           },
           slidesPerView: "auto",
           slidesPerGroup: 1,
-          watchSlidesProgress: true, // Enhance performance by watching slide visibility
-          resistanceRatio: 0.85, // Resistance when swiping past edge limits
-          freeMode: true, // Allow slides to move freely instead of snapping
-          watchOverflow: true, // Prevent issues when there aren't enough slides to scroll
+          watchSlidesProgress: true,
+          resistanceRatio: 0.85,
+          freeMode: true,
+          watchOverflow: true,
           on: {
             init: updateSwiperClasses,
             slideChange: updateSwiperClasses,
@@ -58,17 +58,17 @@ const SwiperModule = (() => {
     }
   }
 
-  // Debounce function
-  function debounce(func, wait) {
+  window.addEventListener("load", initSwiper);
+  
+  const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
     let timeout;
-    return function (...args) {
+    return function(...args) {
       clearTimeout(timeout);
       timeout = setTimeout(() => func.apply(this, args), wait);
     };
-  }
-
-  window.addEventListener("load", initSwiper);
-  window.addEventListener("resize", debounce(initSwiper, 100));
+  };
+  
+  window.addEventListener("resize", debounceFn(initSwiper, 100));
 
   return {
     initSwiper,
@@ -76,7 +76,7 @@ const SwiperModule = (() => {
   };
 })();
 
-// Underline Module
+// Underline animation for theme filters
 const UnderlineModule = (() => {
   const fillElement = document.createElement("div");
   fillElement.classList.add("form_theme_underline_fill");
@@ -101,7 +101,6 @@ const UnderlineModule = (() => {
     });
   }
 
-  // Event delegation for radio buttons
   document.addEventListener("click", (event) => {
     const radio = event.target.closest(".form_theme-radio_wrap");
     if (!radio) return;
@@ -118,7 +117,6 @@ const UnderlineModule = (() => {
     updateUnderline(radio);
   });
 
-  // Initialize the underline fill position on the first active item (if any)
   function initUnderlinePosition() {
     const initialActive = document.querySelector(
       ".form_theme-radio_wrap.is-active"
@@ -126,7 +124,6 @@ const UnderlineModule = (() => {
     if (initialActive) {
       updateUnderline(initialActive);
     } else {
-      // Initialize the underline fill position on the first child of .form_theme-tab_list
       const tabList = document.querySelector(".form_theme-tab_list");
       if (tabList) {
         const firstTab = tabList.firstElementChild;
@@ -140,19 +137,17 @@ const UnderlineModule = (() => {
     }
   }
 
-  // Debounce function
-  function debounce(func, wait) {
+  const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
     let timeout;
-    return function (...args) {
+    return function(...args) {
       clearTimeout(timeout);
       timeout = setTimeout(() => func.apply(this, args), wait);
     };
-  }
+  };
 
-  // Update underline on window resize
   window.addEventListener(
     "resize",
-    debounce(() => {
+    debounceFn(() => {
       const currentActive = document.querySelector(
         ".form_theme-radio_wrap.is-active"
       );
@@ -162,7 +157,6 @@ const UnderlineModule = (() => {
     }, 100)
   );
 
-  // Initialize the underline position on DOMContentLoaded
   document.addEventListener("DOMContentLoaded", initUnderlinePosition);
 
   return {
@@ -170,7 +164,7 @@ const UnderlineModule = (() => {
   };
 })();
 
-// Filter Module
+// Filter Module for managing active filters and their display
 const FilterModule = (() => {
   let activeFilters = {};
   let previousActiveFilters = {};
@@ -208,7 +202,6 @@ const FilterModule = (() => {
     const viewportWidth =
       window.innerWidth || document.documentElement.clientWidth;
 
-    // Update text and classes for elements with data-active-filters within filtersElement
     filtersElement
       .querySelectorAll("[data-active-filters]")
       .forEach((element) => {
@@ -221,7 +214,6 @@ const FilterModule = (() => {
           .map((item) => item.displayValue)
           .join(", ");
 
-        // Set default text if no active filters
         const defaultText = {
           area: "Anywhere",
           months: "Anytime",
@@ -231,11 +223,9 @@ const FilterModule = (() => {
         element.textContent =
           activeFiltersText || defaultText[filterGroup] || "";
 
-        // Toggle .is-active class
         element.classList.toggle("is-active", filterValues.length > 0);
       });
 
-    // Update visibility of individual clear buttons within filtersElement
     filtersElement.querySelectorAll("[data-filter-clear]").forEach((button) => {
       const filterGroup = button
         .getAttribute("data-filter-clear")
@@ -243,20 +233,16 @@ const FilterModule = (() => {
       const hasActiveFilters =
         activeFilters[filterGroup] && activeFilters[filterGroup].length > 0;
 
-      // Check for [data-clear-filter-btn="true"] and device width
       const isClearFilterBtn =
         button.getAttribute("data-clear-filter-btn") === "true";
 
       if (isClearFilterBtn && viewportWidth <= 991) {
-        // On devices 991px and down, always hide the button
         button.style.display = "none";
       } else {
-        // On devices 992px and up, or if [data-clear-filter-btn] is not "true"
         button.style.display = hasActiveFilters ? "flex" : "none";
       }
     });
 
-    // Update global clear-all button within filtersElement
     const clearAllButton = filtersElement.querySelector(
       '[data-filter-clear-all="true"]'
     );
@@ -272,13 +258,11 @@ const FilterModule = (() => {
 
   async function resetSelectedFilters(filterInstance, filtersElement) {
     const promises = [
-      // Reset Area, Months, and Category filters
       filterInstance.resetFilters(["area"]),
       filterInstance.resetFilters(["months"]),
       filterInstance.resetFilters(["category"]),
     ];
 
-    // Set Theme filter to "All Experiences" if not already set
     const themeFilter = filterInstance.filtersData.find(
       (filter) => filter.originalFilterKeys[0].toLowerCase() === "theme"
     );
@@ -293,13 +277,11 @@ const FilterModule = (() => {
 
         if (allExperiencesElement) {
           allExperiencesElement.element.checked = true;
-          // Add is-active class to the corresponding radio wrap
           const radioWrap = allExperiencesElement.element.closest(
             ".form_theme-radio_wrap"
           );
           if (radioWrap) {
             radioWrap.classList.add("is-active");
-            // Remove is-active from other radio wraps
             document
               .querySelectorAll(".form_theme-radio_wrap.is-active")
               .forEach((wrap) => {
@@ -307,16 +289,13 @@ const FilterModule = (() => {
                   wrap.classList.remove("is-active");
                 }
               });
-            // Update the underline fill position
             UnderlineModule.updateUnderline(radioWrap);
           }
 
-          // Update filter data and apply filters
           await filterInstance.storeFiltersData();
           await filterInstance.applyFilters();
         }
       } else {
-        // If "All Experiences" is already active, ensure is-active class is set
         const allExperiencesElement = themeFilter.elements.find(
           (element) => element.value === "All Experiences"
         );
@@ -336,18 +315,15 @@ const FilterModule = (() => {
     updateActiveFilters(filterInstance);
     updateActiveFiltersDisplay(filtersElement);
 
-    // Adjust swiper or scroll position based on viewport width
     const viewportWidth =
       window.innerWidth || document.documentElement.clientWidth;
 
     if (viewportWidth >= 992) {
-      // Devices 992px and above
       const swiper = SwiperModule.getSwiper();
       if (swiper) {
         swiper.slideTo(0);
       }
     } else {
-      // Devices 991px and below
       const tabList = document.querySelector(".form_theme-tab_list");
       if (tabList) {
         tabList.scrollLeft = 0;
@@ -379,13 +355,11 @@ const FilterModule = (() => {
 
           if (allExperiencesElement) {
             allExperiencesElement.element.checked = true;
-            // Add is-active class to the corresponding radio wrap
             const radioWrap = allExperiencesElement.element.closest(
               ".form_theme-radio_wrap"
             );
             if (radioWrap) {
               radioWrap.classList.add("is-active");
-              // Remove is-active from other radio wraps
               document
                 .querySelectorAll(".form_theme-radio_wrap.is-active")
                 .forEach((wrap) => {
@@ -393,7 +367,6 @@ const FilterModule = (() => {
                     wrap.classList.remove("is-active");
                   }
                 });
-              // Update the underline fill position
               UnderlineModule.updateUnderline(radioWrap);
             }
 
@@ -402,18 +375,15 @@ const FilterModule = (() => {
             updateActiveFilters(filterInstance);
             updateActiveFiltersDisplay(filtersElement);
 
-            // Adjust swiper or scroll position based on viewport width
             const viewportWidth =
               window.innerWidth || document.documentElement.clientWidth;
 
             if (viewportWidth >= 992) {
-              // Devices 992px and above
               const swiper = SwiperModule.getSwiper();
               if (swiper) {
                 swiper.slideTo(0);
               }
             } else {
-              // Devices 991px and below
               const tabList = document.querySelector(".form_theme-tab_list");
               if (tabList) {
                 tabList.scrollLeft = 0;
@@ -426,7 +396,6 @@ const FilterModule = (() => {
   }
 
   function onFiltersUpdate(filterInstance, filtersElement) {
-    // Store previous active filters for comparison
     const prevFilters = {};
     ["area", "months", "category"].forEach((group) => {
       prevFilters[group] = (previousActiveFilters[group] || []).map(
@@ -437,7 +406,6 @@ const FilterModule = (() => {
     updateActiveFilters(filterInstance);
     updateActiveFiltersDisplay(filtersElement);
 
-    // Compare current and previous filters
     const filtersChanged = ["area", "months", "category"].some((group) => {
       const prevValues = prevFilters[group] || [];
       const currentValues = (activeFilters[group] || []).map(
@@ -450,7 +418,6 @@ const FilterModule = (() => {
       checkAndSetThemeToAllExperiences(filterInstance, filtersElement);
     }
 
-    // Update previousActiveFilters with current values
     previousActiveFilters = {};
     Object.keys(activeFilters).forEach((group) => {
       previousActiveFilters[group] = activeFilters[group].map((item) => ({
@@ -518,18 +485,17 @@ const FilterModule = (() => {
       onFiltersUpdate(targetFilterInstance, filtersElement);
     });
 
-    // Debounce function
-    function debounce(func, wait) {
+    const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
       let timeout;
-      return function (...args) {
+      return function(...args) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
       };
-    }
+    };
 
     window.addEventListener(
       "resize",
-      debounce(() => {
+      debounceFn(() => {
         updateActiveFiltersDisplay(filtersElement);
       }, 100)
     );
@@ -540,7 +506,7 @@ const FilterModule = (() => {
   };
 })();
 
-// Initialize FilterModule
+// Initialize FilterModule with the filter instances
 window.fsAttributes = window.fsAttributes || [];
 window.fsAttributes.push([
   "cmsfilter",
@@ -549,104 +515,93 @@ window.fsAttributes.push([
   },
 ]);
 
-// ScrollTrigger Module
+// ScrollTrigger Module for handling scroll-based effects
 const ScrollTriggerModule = (() => {
   const filterElement = document.querySelector(".filter_btn_contain");
   const filterHeight = filterElement ? filterElement.offsetHeight : 0;
 
-  // Get the height of the navbar once
-  const navbar = document.querySelector(".nav_main_contain");
-  const navbarHeight = navbar ? navbar.offsetHeight : 0;
+  // Use the global NavScrollTrigger if available
+  if (typeof window.NavScrollTrigger === 'undefined') {
+    // If global module isn't available, implement locally
+    const navbar = document.querySelector(".nav_main_contain");
+    const navbarHeight = navbar ? navbar.offsetHeight : 0;
 
-  // Handle media queries
-  const mmSecond = gsap.matchMedia();
+    const mmSecond = gsap.matchMedia();
 
-  // Navbar scroll-trigger animation for devices above 480px
-  mmSecond.add("(min-width: 480px) and (max-width: 1215px)", () => {
-    ScrollTrigger.create({
-      trigger: ".page_main",
-      start: `top+=${navbarHeight}px top`,
-      onEnter: () => {
-        gsap.to(".nav_main_contain", {
-          yPercent: -100,
-          duration: 0.7,
-          ease: "power2.out",
-        });
-      },
-      onLeaveBack: () => {
-        gsap.to(".nav_main_contain", {
-          yPercent: 0,
-          duration: 0.3,
-          ease: "power2.out",
-        });
-      },
+    mmSecond.add("(min-width: 480px) and (max-width: 1215px)", () => {
+      ScrollTrigger.create({
+        trigger: ".page_main",
+        start: `top+=${navbarHeight}px top`,
+        onEnter: () => {
+          gsap.to(".nav_main_contain", {
+            yPercent: -100,
+            duration: 0.7,
+            ease: "power2.out",
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(".nav_main_contain", {
+            yPercent: 0,
+            duration: 0.3,
+            ease: "power2.out",
+          });
+        },
+      });
     });
-  });
 
-  // Navbar opacity change for screens 1215px and above
-  mmSecond.add("(min-width: 1215px)", () => {
-    ScrollTrigger.create({
-      trigger: ".page_main",
-      start: `top+=5px top`,
-      onEnter: () => {
-        gsap.to(".nav_main_link_wrap", {
-          opacity: 0,
-          pointerEvents: "none",
-          duration: 0.2,
-          ease: "power2.out",
-        });
-      },
-      onLeaveBack: () => {
-        gsap.to(".nav_main_link_wrap", {
-          opacity: 1,
-          pointerEvents: "auto",
-          duration: 0.1,
-          ease: "power2.out",
-        });
-      },
+    mmSecond.add("(min-width: 1215px)", () => {
+      ScrollTrigger.create({
+        trigger: ".page_main",
+        start: `top+=5px top`,
+        onEnter: () => {
+          gsap.to(".nav_main_link_wrap", {
+            opacity: 0,
+            pointerEvents: "none",
+            duration: 0.2,
+            ease: "power2.out",
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(".nav_main_link_wrap", {
+            opacity: 1,
+            pointerEvents: "auto",
+            duration: 0.1,
+            ease: "power2.out",
+          });
+        },
+      });
     });
-  });
+  }
 
-  // HERO CONTENT OPACITY FADE
-  // Create a media query for devices 992px and above
+  // Hero content opacity fade effect
   const mediaQuery = window.matchMedia("(min-width: 992px)");
+  let scrollHandler = null;
 
-  let scrollHandler = null; // Variable to store the event listener reference
-
-  // Function to run the scroll effect
   function scrollEffect() {
     const content = document.querySelector("[data-scroll-element='content']");
     const trigger = document.querySelector("[data-scroll-element='trigger']");
 
-    if (!content || !trigger) return; // Prevent errors if elements are missing
+    if (!content || !trigger) return;
 
-    // Get bounding rectangles for both content and trigger
     const contentRect = content.getBoundingClientRect();
     const triggerRect = trigger.getBoundingClientRect();
 
-    // Adjust fade start by 120px above the original fadeStart position
-    const fadeStart = contentRect.bottom + 150; // Start 150px before the original position
-    const fadeEnd = contentRect.top + 100; // When fully faded (trigger reaches top of content)
+    const fadeStart = contentRect.bottom + 150;
+    const fadeEnd = contentRect.top + 100;
 
-    // Calculate the scroll progress based on the trigger's position relative to content
     let progress = (fadeStart - triggerRect.top) / (fadeStart - fadeEnd);
-    progress = Math.min(Math.max(progress, 0), 1); // Clamp between 0 and 1
+    progress = Math.min(Math.max(progress, 0), 1);
 
-    // Apply opacity, which decreases as the trigger gets closer
     gsap.to(content, { opacity: 1 - progress, duration: 0.1, ease: "none" });
-
   }
 
-  // Function to handle media query changes
   function handleMediaChange(e) {
     if (e.matches) {
-      // Screen is 992px or above, add the event listener if not already added
       if (!scrollHandler) {
         scrollHandler = () => scrollEffect();
         window.addEventListener("scroll", scrollHandler);
       }
     } else {
-      // Screen is below 992px, remove the event listener if it exists
       if (scrollHandler) {
         window.removeEventListener("scroll", scrollHandler);
         scrollHandler = null;
@@ -654,13 +609,8 @@ const ScrollTriggerModule = (() => {
     }
   }
 
-  // Run the media query check initially and also when the screen size changes
   mediaQuery.addEventListener("change", handleMediaChange);
-  handleMediaChange(mediaQuery); // Initial check
-
-  // Run the media query check initially and also when the screen size changes
-  mediaQuery.addEventListener("change", handleMediaChange);
-  handleMediaChange(mediaQuery); // Initial check
+  handleMediaChange(mediaQuery);
 
   // Theme sticky styling
   ScrollTrigger.create({
@@ -671,7 +621,7 @@ const ScrollTriggerModule = (() => {
     onLeaveBack: () => gsap.set(".form_theme_underline", { opacity: 0 }),
   });
 
-  // ScrollTrigger for sticky filter nav
+  // Sticky filter nav
   const filterTl = gsap.timeline({
     scrollTrigger: {
       trigger: ".filter_main_sticky",
@@ -685,22 +635,22 @@ const ScrollTriggerModule = (() => {
   filterTl.to(".filter_btn_contain", { top: "0rem", ease: "none" });
 })();
 
-// Scroll Anchor Module
+// Handle filter section scrolling
 const ScrollAnchorModule = (() => {
   document.addEventListener("DOMContentLoaded", () => {
     const filterElements = document.querySelectorAll(
       ".form_theme-radio_wrap, .form_filter-check_wrap"
     );
 
-    function debounce(func, delay) {
+    const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, delay) {
       let timer;
-      return function (...args) {
+      return function(...args) {
         clearTimeout(timer);
         timer = setTimeout(() => func.apply(this, args), delay);
       };
-    }
+    };
 
-    const handleFilterClick = debounce(function () {
+    const handleFilterClick = debounceFn(function() {
       const target = document.getElementById("filter-section");
       if (!target) return;
       const targetPosition =
@@ -720,16 +670,14 @@ const ScrollAnchorModule = (() => {
   });
 })();
 
-// Filter Rows Module
+// Handle filter row activation
 const FilterRowsModule = (() => {
   function activateFilter(targetAttribute) {
-    // Find the currently active row and remove 'is-active' class
     const activeRow = document.querySelector("[data-filter-row].is-active");
     if (activeRow) {
       activeRow.classList.remove("is-active");
     }
 
-    // Add 'is-active' class to the matching [data-filter-row] element
     const targetRow = document.querySelector(
       `[data-filter-row="${targetAttribute}"]`
     );
@@ -738,7 +686,6 @@ const FilterRowsModule = (() => {
     }
   }
 
-  // Use event delegation to handle clicks on [data-filter-row] and [data-filter-button] elements
   document.addEventListener("click", (event) => {
     const element = event.target.closest(
       "[data-filter-row], [data-filter-button]"
@@ -754,21 +701,14 @@ const FilterRowsModule = (() => {
   });
 })();
 
-// HANDLE CLEAR FILTER CLICKS OVER FILTER BTNS
+// Prevent click propagation on clear filter buttons
 document.querySelectorAll('[data-clear-filter-btn="true"]').forEach((btn) => {
   btn.addEventListener("click", (event) => {
     event.stopPropagation();
   });
 });
 
-document.addEventListener("click", (event) => {
-  const element = event.target.closest(
-    "[data-filter-row], [data-filter-button]"
-  );
-});
-
-// TOGGLE VISIBILITY ON RESULTS COUNT
-
+// Toggle visibility based on results count
 const resultsCount = document.querySelector(
   '[fs-cmsfilter-element="results-count-2"]'
 );

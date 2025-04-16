@@ -1,49 +1,67 @@
-// Set experience card fixture bg color
-// Function to set the background color
+// Set background color from data attributes
 const setBgColor = (element) => {
   const bgColor = element.dataset.bgColor || "#333333"; // Fallback to #333333
   element.style.backgroundColor = bgColor;
 };
 
-// Initially set background color for existing elements
 document.querySelectorAll("[data-bg-color]").forEach(setBgColor);
 
+// Global Utilities Module
+const Utils = (() => {
+  const debounce = (func, wait = 200) => {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  };
 
-// Create a MutationObserver to watch for added nodes
+  const isInViewport = (element) => {
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    return (
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+  };
+
+  return {
+    debounce,
+    isInViewport
+  };
+})();
+
+// Watch for elements with data-bg-color added dynamically
 const observer = new MutationObserver((mutations) => {
   for (const { addedNodes } of mutations) {
     for (const node of addedNodes) {
       if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
-      // Check if the added node has the data-bg-color attribute
       if (node.hasAttribute("data-bg-color")) {
         setBgColor(node);
       }
 
-      // Check for any descendant elements that have the data-bg-color attribute
       node.querySelectorAll("[data-bg-color]").forEach(setBgColor);
     }
   }
 });
 
-// Start observing the document body for added nodes
 observer.observe(document.body, { childList: true, subtree: true });
 
-// Create SVG elements from CMS paragraphs
+// Parse and fix SVG code from CMS
 function insertSVGFromCMS(container = document) {
   container.querySelectorAll(".svg-code").forEach((element) => {
     const svgCode = element.textContent;
     if (!svgCode) return;
     
     try {
-      // Parse SVG
       const parser = new DOMParser();
       const doc = parser.parseFromString(svgCode, 'image/svg+xml');
       const svg = doc.querySelector('svg');
       
       if (svg && doc.querySelector('parsererror') === null) {
-        // Instead of changing values, just remove problematic attributes
-        // This lets the container control sizing naturally
         const invalidValueAttrs = Array.from(svg.attributes)
           .filter(attr => (attr.name === 'width' || attr.name === 'height') && attr.value === 'auto');
         
@@ -51,22 +69,19 @@ function insertSVGFromCMS(container = document) {
           svg.removeAttribute(attr.name);
         });
         
-        // Clone the fixed SVG to insert it
         const fixedSvg = svg.cloneNode(true);
         element.insertAdjacentElement("afterend", document.importNode(fixedSvg, true));
       } else {
-        // Fallback: create wrapper with default fix
         const wrapper = document.createElement('div');
         wrapper.innerHTML = svgCode.replace(/\s(width|height)="auto"/g, '');
         element.insertAdjacentElement("afterend", wrapper.firstElementChild);
       }
     } catch (e) {
-      // Last resort: try direct insertion with cleaned string
       try {
         const cleanSvg = svgCode.replace(/\s(width|height)="auto"/g, '');
         element.insertAdjacentHTML("afterend", cleanSvg);
       } catch (err) {
-        // Silent fallback - avoid breaking the page
+        // Silent fallback to avoid breaking the page
       }
     }
   });
@@ -74,9 +89,7 @@ function insertSVGFromCMS(container = document) {
 
 insertSVGFromCMS();
 
-// LENIS SMOOTH SCROLLING
-
-// Initialize a new Lenis instance for smooth scrolling
+// Initialize smooth scrolling
 const lenis = new Lenis({
   lerp: 0.15,
   smoothWheel: true,
@@ -85,30 +98,23 @@ const lenis = new Lenis({
   prevent: (node) => node.closest(".u-modal-prevent-scroll") !== null,
 });
 
-// Synchronize Lenis scrolling with GSAP's ScrollTrigger plugin
 lenis.on("scroll", ScrollTrigger.update);
 gsap.ticker.add((time) => lenis.raf(time * 1000));
 gsap.ticker.lagSmoothing(0);
 
-// FINSWEET ATTRIBUTES
-
-// Enable Finsweet Attributes to work together
+// Initialize Finsweet Attributes
 document.addEventListener("DOMContentLoaded", function () {
   window.fsAttributes = window.fsAttributes || [];
   
-  // Handle CMS Load completion for dynamic package cards
   window.fsAttributes.push([
     "cmsload",
     (listInstances) => {
-      // Find the package card list instance if it exists
       const packageLoadInstance = listInstances.find(instance => 
         instance.el && instance.el.getAttribute('fs-cmsload-element') === 'list-2'
       );
       
       if (packageLoadInstance) {
-        // Listen for when new items are loaded
         packageLoadInstance.on('renderitems', (renderedItems) => {
-          // Find package cards in the rendered items
           const newPackageCards = [];
           renderedItems.forEach(item => {
             const packageCards = item.querySelectorAll('.packages_card');
@@ -117,7 +123,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           });
           
-          // Initialize newly added package cards if the function exists
           if (typeof attachPackageCardHandlers === 'function' && newPackageCards.length > 0) {
             attachPackageCardHandlers(newPackageCards);
           }
@@ -134,8 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
   ]);
 });
 
-// FORM COUNTER
-
+// Initialize form field counters
 const initializeCountersInScope = (scope = document) => {
   scope.querySelectorAll('.form_field_counter_wrap').forEach(wrapper => {
     const input = wrapper.querySelector('.form_field_input.is-counter');
@@ -156,9 +160,7 @@ const initializeCountersInScope = (scope = document) => {
 
 document.addEventListener('DOMContentLoaded', () => initializeCountersInScope());
 
-// PARALLAX ANIMATIONS
-
-// Initialize timelines conditionally
+// Parallax animations setup
 const homeHeroWrap = document.querySelector(".hero_home_wrap");
 const catHeroWrap = document.querySelector(".hero_cat_wrap");
 const ctaContent = document.querySelector(".cta_content");
@@ -166,7 +168,6 @@ const expGallery = document.querySelector(".gallery_img");
 const videoElement = document.querySelector(".video_gallery_player");
 const posterElement = document.querySelector(".video_gallery_poster");
 
-// Get combined top-padding of .exp_content + .gallery_wrap for gallery parallax offset
 const getPaddingTop = el =>
   parseFloat(getComputedStyle(el).paddingTop) || 0;
 const expContent = document.querySelector(".exp_content");
@@ -175,7 +176,6 @@ const expContentPadding = expContent ? getPaddingTop(expContent) : 0;
 const galleryWrapPadding = galleryWrap ? getPaddingTop(galleryWrap) : 0;
 const totalGalleryOffset = expContentPadding + galleryWrapPadding;
 
-// Home video parallax trigger
 let homeHeroParallax;
 if (homeHeroWrap) {
   homeHeroParallax = gsap.timeline({
@@ -188,7 +188,6 @@ if (homeHeroWrap) {
   });
 }
 
-// Category hero parallax trigger
 let catHeroParallax;
 if (catHeroWrap) {
   catHeroParallax = gsap.timeline({
@@ -201,7 +200,6 @@ if (catHeroWrap) {
   });
 }
 
-// Footer CTA parallax trigger
 let ctaParallax;
 if (ctaContent) {
   ctaParallax = gsap.timeline({
@@ -214,7 +212,6 @@ if (ctaContent) {
   });
 }
 
-// Exp Gallery parallax trigger
 let expGalleryParallax;
 if (expGallery) {
   expGalleryParallax = gsap.timeline({
@@ -227,7 +224,6 @@ if (expGallery) {
   });
 }
 
-// Video poster parallax trigger
 let videoPosterParallax;
 if (videoElement && posterElement) {
   videoPosterParallax = gsap.timeline({
@@ -240,10 +236,8 @@ if (videoElement && posterElement) {
   });
 }
 
-// Handle media queries
+// Enable parallax for devices above 480px
 let mm = gsap.matchMedia();
-
-// Parallax for CTA & Hero on devices above 480px
 mm.add("(min-width: 480px)", () => {
   if (homeHeroParallax) {
     homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
@@ -269,16 +263,12 @@ const autoplayVideos = new WeakSet(); // Tracks videos that were autoplaying
 function updateLiveChatVisibility() {
   const anyModalOpen = Object.values(modalStates).some((state) => state);
   
-  // Only proceed if LiveChatWidget exists
   if (!window.LiveChatWidget) return;
 
-  // Try to safely get widget state
   try {
-    // Check if widget is ready by testing the get method
     if (typeof window.LiveChatWidget.get === 'function') {
       const state = window.LiveChatWidget.get("state");
       
-      // Only modify visibility if widget is in a visible state
       if (state && (state.visibility === "maximized" || state.visibility === "minimized")) {
         if (anyModalOpen) {
           window.LiveChatWidget.call("hide");
@@ -287,7 +277,6 @@ function updateLiveChatVisibility() {
         }
       }
     } else {
-      // If widget isn't ready, set up a one-time retry
       requestAnimationFrame(() => {
         if (typeof window.LiveChatWidget.get === 'function') {
           updateLiveChatVisibility();
@@ -295,8 +284,7 @@ function updateLiveChatVisibility() {
       });
     }
   } catch (e) {
-    // Silently handle any LiveChat errors
-    // This prevents console spam while the widget is initializing
+    // Silently handle LiveChat errors during initialization
   }
 }
 
@@ -325,7 +313,6 @@ function handleVideosOnModalOpen(modalGroup) {
     return;
   }
 
-  // Process videos on page
   document.querySelectorAll("video").forEach((video) => {
     const isInModal = video.closest(
       `[data-modal-element='content'][data-modal-group='${modalGroup}']`
@@ -338,13 +325,11 @@ function handleVideosOnModalOpen(modalGroup) {
     }
   });
 
-  // Play videos inside the modal
   const modalVideos = document.querySelectorAll(
     `[data-modal-element='content'][data-modal-group='${modalGroup}'] video`
   );
   
   modalVideos.forEach((video) => {
-    // Don't autoplay videos in the package modal
     if (modalGroup !== 'package') {
       video.play().catch(err => {});
     }
@@ -356,7 +341,6 @@ function handleVideosOnModalClose(modalGroup) {
     return;
   }
   
-  // Process videos for modal close
   document.querySelectorAll("video").forEach((video) => {
     const isInModal = video.closest(
       `[data-modal-element='content'][data-modal-group='${modalGroup}']`
@@ -382,9 +366,7 @@ document.addEventListener("click", (event) => {
     modalToggleBtn.getAttribute("data-modal-close");
   const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
   
-  // Check if this is a tray-type modal - declare once at the beginning
   const isTrayModal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}'][data-modal-type='tray']`) !== null;
-  // Identify which specific tray modal we're dealing with
   const trayModalType = isTrayModal ? modalGroup : null;
 
   let modalTl = gsap.timeline({
@@ -420,9 +402,7 @@ document.addEventListener("click", (event) => {
       });
       
     if (isTrayModal) {        
-      // Different animations based on tray modal type
       if (trayModalType === 'nav') {
-        // Nav tray animation
         modalTl
           // BG & Tray
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
@@ -442,44 +422,33 @@ document.addEventListener("click", (event) => {
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
           .to(".nav_modal_close_mob", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
 
-          // 1st wave - Upcoming
+          // Content animations with staggered timing
           .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
           .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.30)
-          // 2nd wave - Upcoming
           .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
           .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
           .to(".menu_calendar_list", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.45)
           .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}, 0.5)
-
-          // 1st wave - Contact
           .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
           .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
-          // 2nd wave - Contact
           .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.45)
-          
-           // 1st wave - Trending
-           .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-           .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, 0.35)
-          // 2nd wave - Trending
+          .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+          .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, 0.35)
           .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
           .to("[menu-category-label='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.4) 
           .to("[menu-category-cms-list='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.42)
           .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.44)
-          // 3rd wave - Trending
           .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46)
           .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.46) 
           .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.48)
           .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.5)
-          // 4th wave - Trending
           .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
           .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.52) 
           .to("[menu-category-cms-list='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.54)
           .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.56);
 
       } else if (trayModalType === 'package') {
-        // Package tray animation
         modalTl
-          // BG & Tray
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
             opacity: 1, 
             duration: 0.3, 
@@ -492,16 +461,12 @@ document.addEventListener("click", (event) => {
               duration: 0.35, 
               ease: "power4.Out"
             }, 0.1 )
-          // Adding content animation with timing offsets as requested
           .add(() => {
-            // Dispatch a custom event that will be caught by the content animation logic
             document.dispatchEvent(new CustomEvent('packageModalAnimationComplete'));
-          }, 0.35); // This callback runs after the tray animation completes
+          }, 0.35);
 
       } else if (trayModalType === 'reviews') {
-        // Reviews tray animation
         modalTl
-          // BG & Tray
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
             opacity: 1, 
             duration: 0.3, 
@@ -514,15 +479,13 @@ document.addEventListener("click", (event) => {
               duration: 0.35, 
               ease: "power4.Out"
             }, 0.1 )
-          // Bar & close buttons
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          // Review list
           .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, 0.35);
           
       }
     } else {
-      // Animate in for regular modals
+      // Regular modal animation
       modalTl
         .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
           opacity: 1, 
@@ -543,9 +506,7 @@ document.addEventListener("click", (event) => {
     modalStates[modalGroup] = false;
     
     if (isTrayModal) {
-      // Different exit animations based on tray modal type
       if (trayModalType === 'nav') {
-        // Nav tray exit animation
         modalTl
           .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -576,9 +537,7 @@ document.addEventListener("click", (event) => {
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
           .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
       } else if (trayModalType === 'package') {
-        // Package tray exit animation
         modalTl
-          // First animate package contents back to initial state
           .to('.package_heading_wrap', { 
             opacity: 0, 
             x: "0.5rem", 
@@ -605,7 +564,6 @@ document.addEventListener("click", (event) => {
             duration: 0.2, 
             ease: "power1.in"
           }, 0)
-          // Then animate the modal out
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
             opacity: 0, 
             duration: 0.3, 
@@ -617,11 +575,9 @@ document.addEventListener("click", (event) => {
             ease: "power1.in" 
           }, 0.1)
           .add(() => {
-            // Dispatch event for any cleanup needed
             document.dispatchEvent(new CustomEvent('packageModalClosed'));
           });
       } else if (trayModalType === 'reviews') {
-        // Reviews tray exit animation
         modalTl
         .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)  
         .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
@@ -631,7 +587,7 @@ document.addEventListener("click", (event) => {
         .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
       }
     } else {
-      // Animate out for regular modals
+      // Regular modal exit animation
       modalTl
         .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
           opacity: 0, 
@@ -650,9 +606,7 @@ document.addEventListener("click", (event) => {
   toggleBodyScrollAndAnimate(modalGroup);
 });
 
-//NAVIGATION FUNCTIONALITY & ANIMTATIONS
-
-// Applies .is-active class to .form_search_list when it gains focus
+// Add focus styles to search input
 document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.querySelector(".form_field_input.is-search");
   const parentList = searchInput?.closest(".form_search_list");
@@ -668,8 +622,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// TAB SWITCH ANIMATION
-// === Shared tab logic available everywhere ===
+// Tab switch animation system
 const initializeTabGroup = (group, root = document) => {
   const tabs = root.querySelectorAll(
     `[data-tab-element="tab"][data-tab-group="${group}"]`
@@ -769,13 +722,11 @@ const initializeTabsInScope = (root = document) => {
   tabGroups.forEach((group) => initializeTabGroup(group, root));
 };
 
-// === Global page-load init ===
 document.addEventListener("DOMContentLoaded", () => {
-  initializeTabsInScope(); // initializes tabs in global page
+  initializeTabsInScope();
 });
 
-//MENU SEARCH BUTTON
-// Utility function to wait for the upcoming tab with retries
+// Wait for upcoming tab with retries
 async function getUpcomingTab(retries = 5, delay = 100) {
   while (retries > 0) {
     const tab = document.querySelector(
@@ -788,7 +739,7 @@ async function getUpcomingTab(retries = 5, delay = 100) {
   return null;
 }
 
-// Event listener for modal button clicks and modal open completion
+// Handle menu navigation button clicks
 document.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-target-button]");
   if (!button) return;
@@ -798,7 +749,6 @@ document.addEventListener("click", async (event) => {
 
   if (modalGroup !== "nav") return;
 
-  // Define modal animation with `onComplete` dispatch
   const modalTl = gsap.timeline({
     onComplete: () => {
       document.dispatchEvent(
@@ -807,7 +757,6 @@ document.addEventListener("click", async (event) => {
     },
   });
 
-  // Handle "menu-search" behavior (existing)
   if (targetValue === "menu-search") {
     const targetAnchor = document.querySelector(
       `[data-target-anchor="${targetValue}"]`
@@ -828,10 +777,8 @@ document.addEventListener("click", async (event) => {
           upcomingTab.click();
         }
 
-        // Smooth scroll to anchor
         targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
 
-        // Focus input field after scroll
         setTimeout(() => {
           targetField.focus();
           targetField.setSelectionRange(
@@ -844,7 +791,6 @@ document.addEventListener("click", async (event) => {
     );
   }
 
-  // Handle "menu-contact" behavior (new optimized integration)
   if (targetValue === "menu-contact") {
     document.addEventListener(
       "modalOpenComplete",
@@ -864,8 +810,8 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+// Paragraph toggle system
 (function setupParagraphToggles() {
-  // Define the initialization function globally
   window.setupParagraphToggles = function (scope = document) {
     const classSets = [
       {
@@ -880,7 +826,6 @@ document.addEventListener("click", async (event) => {
       },
     ];
 
-    // Handle initial setup of buttons (hiding if not needed)
     classSets.forEach(({ wrap, para, btn }) => {
       const items = scope.querySelectorAll(wrap);
 
@@ -904,15 +849,12 @@ document.addEventListener("click", async (event) => {
           return el.scrollHeight > el.clientHeight;
         }
 
-        // Only hide the button if the paragraph is not clamped
         if (!isClamped(paraElement)) toggleBtn.classList.add("is-hidden");
       });
     });
   };
 
-  // Set up global event delegation for ALL toggle buttons
   document.addEventListener("click", function (event) {
-    // Check if button click matches any of our button classes
     classSets = [
       {
         btn: ".g_para_clamped_btn",
@@ -924,12 +866,10 @@ document.addEventListener("click", async (event) => {
       },
     ];
 
-    // Loop through our class sets to find which one was clicked
     for (const classSet of classSets) {
       const toggleBtn = event.target.closest(classSet.btn);
 
       if (toggleBtn) {
-        // Found a matching button
         const wrapElement = toggleBtn.closest(
           ".g_para_clamped_wrap, .g_para_hover_wrap"
         );
@@ -938,22 +878,20 @@ document.addEventListener("click", async (event) => {
         const paraElement = wrapElement.querySelector(classSet.para);
         if (!paraElement) continue;
 
-        // Toggle the expanded state
         paraElement.classList.toggle("is-expanded");
         toggleBtn.innerText = paraElement.classList.contains("is-expanded")
           ? "show less"
           : "read more";
 
-        break; // Exit the loop once we've handled the click
+        break;
       }
     }
   });
 
-  // Immediately invoke the initial setup function
   window.setupParagraphToggles();
 })();
 
-// Adjust exp card review stars based on score
+// Set review stars based on score
 document.addEventListener("DOMContentLoaded", function () {
   const starWraps = document.querySelectorAll(".card_review_star_wrap");
 
@@ -972,7 +910,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Accordion click
+// Toggle accordion on click
 document.addEventListener("click", function (event) {
   const accordion = event.target.closest(".accordion_wrap");
   if (accordion) {
@@ -980,14 +918,13 @@ document.addEventListener("click", function (event) {
   }
 });
 
-// Function to initialize the inclusion accordion functionality
+// Initialize package accordion
 function initializePackageAccordion() {
   const accordionHeaders = document.querySelectorAll(
     ".package_accordion_header"
   );
   accordionHeaders.forEach((header) => {
     header.addEventListener("click", function () {
-      // Find the parent accordion element and toggle its class
       const parentAccordion = header.closest(".package_accordion");
       if (parentAccordion) {
         parentAccordion.classList.toggle("is-active");
@@ -996,11 +933,11 @@ function initializePackageAccordion() {
   });
 }
 
-//OPEN LIVE CHAT
+// Open LiveChat when button clicked
 (() => {
   const openChatButtons = document.querySelectorAll('[data-live-chat="open"]');
 
-  if (!openChatButtons.length) return; // Exit if no matching buttons
+  if (!openChatButtons.length) return;
 
   openChatButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -1009,4 +946,69 @@ function initializePackageAccordion() {
       }
     });
   });
+})();
+
+// Global ScrollTrigger Module for Navbar Animations
+window.NavScrollTrigger = (() => {
+  const initNavbarScrollEffects = () => {
+    const mmSecond = gsap.matchMedia();
+
+    mmSecond.add("(min-width: 480px) and (max-width: 1215px)", () => {
+      ScrollTrigger.create({
+        trigger: ".page_main",
+        start: `top+=${document.querySelector(".nav_main_contain")?.offsetHeight || 0}px top`,
+        onEnter: () => {
+          gsap.to(".nav_main_contain", {
+            yPercent: -100,
+            duration: 0.7,
+            ease: "power2.out",
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(".nav_main_contain", {
+            yPercent: 0,
+            duration: 0.3,
+            ease: "power2.out",
+          });
+        },
+      });
+
+      return () => {
+        // Cleanup function for when matchMedia conditions change
+      };
+    });
+
+    mmSecond.add("(min-width: 1215px)", () => {
+      ScrollTrigger.create({
+        trigger: ".page_main",
+        start: `top+=5px top`,
+        onEnter: () => {
+          gsap.to(".nav_main_link_wrap", {
+            opacity: 0,
+            pointerEvents: "none",
+            duration: 0.2,
+            ease: "power2.out",
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(".nav_main_link_wrap", {
+            opacity: 1,
+            pointerEvents: "auto",
+            duration: 0.1,
+            ease: "power2.out",
+          });
+        },
+      });
+
+      return () => {
+        // Cleanup function for when matchMedia conditions change
+      };
+    });
+  };
+
+  document.addEventListener("DOMContentLoaded", initNavbarScrollEffects);
+
+  return {
+    init: initNavbarScrollEffects
+  };
 })();
