@@ -1,27 +1,10 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-
 # OS files
 .DS_Store
-
-# Build directory
-dist/
-
-# Editor directories and files
-.idea/
-.vscode/
-*.swp
-*.swo
 
 # Logs
 logs
 *.log
 
-# Coverage directory
-coverage/
-.nyc_output/
-
-# Temporary files
-tmp/
-temp/ 
+# Cursor files
+.cursorrules
+mcp.json
