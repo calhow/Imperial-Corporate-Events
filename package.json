@@ -1,0 +1,29 @@
+{
+  "name": "imperial-corporate-events",
+  "version": "1.0.0",
+  "description": "UI components for Imperial Corporate Events",
+  "main": "main.js",
+  "files": [
+    "main.js",
+    "experience.js",
+    "category.js",
+    "filters.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/calhow/Imperial-Corporate-Events.git"
+  },
+  "homepage": "https://github.com/calhow/Imperial-Corporate-Events",
+  "bugs": {
+    "url": "https://github.com/calhow/Imperial-Corporate-Events/issues"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "imperial",
+    "events"
+  ],
+  "author": "Imperial Corporate Events",
+  "license": "MIT"
+} 
