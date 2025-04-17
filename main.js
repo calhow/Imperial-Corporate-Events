@@ -167,6 +167,8 @@ const ctaContent = document.querySelector(".cta_content");
 const expGallery = document.querySelector(".gallery_img");
 const videoElement = document.querySelector(".video_gallery_player");
 const posterElement = document.querySelector(".video_gallery_poster");
+const testimonialThumb = document.querySelector(".testimonial_thumb_img");
+const testimonialBg = document.querySelector(".testimonial_content_bg-img");
 
 const getPaddingTop = el =>
   parseFloat(getComputedStyle(el).paddingTop) || 0;
@@ -194,6 +196,30 @@ if (catHeroWrap) {
     scrollTrigger: {
       trigger: ".hero_cat_wrap",
       start: "top top",
+      end: "bottom top",
+      scrub: true,
+    },
+  });
+}
+
+let testimonialThumbParallax;
+if (testimonialThumb) {
+  testimonialThumbParallax = gsap.timeline({
+    scrollTrigger: {
+      trigger: ".testimonial_thumb_img",
+      start: "top bottom",
+      end: "bottom top",
+      scrub: true,
+    },
+  });
+}
+
+let testimonialBgParallax;
+if (testimonialBg) {
+  testimonialBgParallax = gsap.timeline({
+    scrollTrigger: {
+      trigger: ".testimonial_content_bg-img",
+      start: "top bottom",
       end: "bottom top",
       scrub: true,
     },
@@ -236,15 +262,21 @@ if (videoElement && posterElement) {
   });
 }
 
-// Enable parallax for devices above 480px
+// Enable parallax for devices above 479px
 let mm = gsap.matchMedia();
-mm.add("(min-width: 480px)", () => {
+mm.add("(min-width: 479px)", () => {
   if (homeHeroParallax) {
     homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
-  }
-  if (catHeroParallax) {
-    catHeroParallax.to(".hero_cat_img", { y: "-4rem" });
-  }
+    }
+    if (catHeroParallax) {
+      catHeroParallax.to(".hero_cat_img", { y: "-4rem" });
+    }
+    if (testimonialThumbParallax) {
+      testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
+    }
+    if (testimonialBgParallax) {
+      testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
+    }
   if (expGalleryParallax) {
     expGalleryParallax.to(".gallery_img", { y: "3rem" });
   }
@@ -1012,3 +1044,100 @@ window.NavScrollTrigger = (() => {
     init: initNavbarScrollEffects
   };
 })();
+
+// CMS Filter Feature Toggle Manager
+const CMSFilterManager = (() => {
+  // Core state references
+  let filterInstance = null;
+  let lastFiltersActive = false;
+  
+  // Element selectors
+  const SELECTORS = {
+    featuredCheckbox: 'input[data-name="Featured Checkbox"]',
+    searchInput: '[fs-cmsfilter-field="name, category, competition, destination"]',
+    categorySelect: '[fs-cmsfilter-field="category"]'
+  };
+
+  // Initializes filter toggle functionality with Finsweet CMS Filter
+  const setupFeaturedFilterToggle = (filterInstances) => {
+    filterInstance = filterInstances[0];
+    if (!filterInstance) return;
+    
+    const featuredCheckbox = document.querySelector(SELECTORS.featuredCheckbox);
+    if (!featuredCheckbox) return;
+    
+    const debouncedUpdate = Utils.debounce(() => updateFeaturedFilter(featuredCheckbox), 50);
+    
+    // Set up all required event listeners
+    filterInstance.listInstance.on('renderitems', debouncedUpdate);
+    filterInstance.listInstance.on('change', debouncedUpdate);
+    
+    const searchInput = document.querySelector(SELECTORS.searchInput);
+    const categorySelect = document.querySelector(SELECTORS.categorySelect);
+    
+    if (searchInput) searchInput.addEventListener('input', debouncedUpdate);
+    if (categorySelect) categorySelect.addEventListener('change', debouncedUpdate);
+    
+    updateFeaturedFilter(featuredCheckbox);
+  };
+  
+  // Updates featured filter state based on other active filters
+  const updateFeaturedFilter = (checkbox) => {
+    if (!filterInstance || !checkbox) return;
+    
+    const hasActiveFilters = isAnyFilterActive();
+    
+    if (hasActiveFilters !== lastFiltersActive) {
+      const shouldBeChecked = !hasActiveFilters;
+      
+      if (checkbox.checked !== shouldBeChecked) {
+        simulateClick(checkbox);
+      }
+      
+      lastFiltersActive = hasActiveFilters;
+    }
+  };
+  
+  // Checks if any non-featured filters are currently active
+  const isAnyFilterActive = () => {
+    const hasActiveFilterValues = filterInstance.filtersData.some(filter => 
+      !filter.originalFilterKeys.includes('featured') && 
+      filter.values?.length > 0
+    );
+    
+    if (hasActiveFilterValues) return true;
+    
+    const searchInput = document.querySelector(SELECTORS.searchInput);
+    const categorySelect = document.querySelector(SELECTORS.categorySelect);
+    
+    return (searchInput && searchInput.value.trim() !== '') || 
+           (categorySelect && categorySelect.value !== '');
+  };
+  
+  // Simulates a mouse click on the specified element
+  const simulateClick = (element) => {
+    if (!element) return;
+    
+    try {
+      element.dispatchEvent(new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+      }));
+    } catch (error) {
+      const evt = document.createEvent('MouseEvents');
+      evt.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+      element.dispatchEvent(evt);
+    }
+  };
+  
+  return {
+    init: () => {
+      window.fsAttributes = window.fsAttributes || [];
+      window.fsAttributes.push(['cmsfilter', setupFeaturedFilterToggle]);
+    }
+  };
+})();
+
+// Initialize the CMS Filter Manager
+document.addEventListener('DOMContentLoaded', CMSFilterManager.init);

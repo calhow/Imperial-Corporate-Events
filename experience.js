@@ -1,48 +1,63 @@
 // Sets experience background image from gallery or video poster
 const setExpBackgroundImage = () => {
-  const videoPosterElements = document.getElementsByClassName('video_gallery_poster');
-  const hasVideoPoster = videoPosterElements.length > 0;
-  
-  const galleryImgElements = document.getElementsByClassName('gallery_img');
-  
-  let sourceElement = null;
-  let imageUrl = null;
-  
-  if (hasVideoPoster) {
-    const videoPoster = videoPosterElements[0];
+  // Find source element in priority order
+  const getSourceElement = () => {
+    // 1. Team logo with valid image URL
+    const teamLogo = document.querySelector('.gallery_home-team-logo');
+    if (teamLogo) {
+      const logoSrc = teamLogo.currentSrc || teamLogo.src;
+      if (logoSrc && 
+          logoSrc.trim() !== '' && 
+          !logoSrc.includes('/experience/') &&
+          /\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(logoSrc)) {
+        return teamLogo;
+      }
+    }
+    
+    // 2. Video poster with valid background image
+    const videoPoster = document.querySelector('.video_gallery_poster');
     if (videoPoster) {
       const bgImage = getComputedStyle(videoPoster).backgroundImage;
       if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
-        sourceElement = videoPoster;
+        return videoPoster;
       }
     }
-  }
+    
+    // 3. First gallery image
+    return document.querySelector('.gallery_img');
+  };
   
-  if (!sourceElement && galleryImgElements.length > 0) {
-    sourceElement = galleryImgElements[0];
-  }
-  
-  if (!sourceElement) return;
-  
-  if (sourceElement.tagName === 'IMG') {
-    imageUrl = sourceElement.currentSrc || sourceElement.src;
-  } else {
-    const bgImage = getComputedStyle(sourceElement).backgroundImage;
+  // Extract image URL from source element
+  const getImageUrl = (element) => {
+    if (!element) return null;
+    
+    if (element.tagName === 'IMG') {
+      return element.currentSrc || element.src;
+    }
+    
+    const bgImage = getComputedStyle(element).backgroundImage;
     if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
       const urlMatch = bgImage.split('"');
-      imageUrl = urlMatch.length > 1 ? urlMatch[1] : bgImage.substring(4, bgImage.length - 1);
+      return urlMatch.length > 1 ? urlMatch[1] : bgImage.substring(4, bgImage.length - 1);
     }
-  }
+    
+    return null;
+  };
   
-  if (!imageUrl) return;
+  // Set image source on all target elements
+  const setBackgroundImages = (url) => {
+    if (!url) return;
+    
+    const targetImages = document.getElementsByClassName('exp_bg_img');
+    for (let i = 0; i < targetImages.length; i++) {
+      targetImages[i].src = url;
+    }
+  };
   
-  const expBgImgs = document.getElementsByClassName('exp_bg_img');
-  const len = expBgImgs.length;
-  if (len === 0) return;
-  
-  for (let i = 0; i < len; i++) {
-    expBgImgs[i].src = imageUrl;
-  }
+  // Execute the image setting pipeline
+  const sourceElement = getSourceElement();
+  const imageUrl = getImageUrl(sourceElement);
+  setBackgroundImages(imageUrl);
 };
 
 if (document.readyState !== 'loading') {
