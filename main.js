@@ -391,7 +391,9 @@ document.addEventListener("click", (event) => {
   const modalToggleBtn = event.target.closest(
     "[data-modal-open], [data-modal-close]"
   );
-  if (!modalToggleBtn) return;
+  if (!modalToggleBtn) {
+    return;
+  }
 
   const modalGroup =
     modalToggleBtn.getAttribute("data-modal-open") ||
@@ -406,6 +408,50 @@ document.addEventListener("click", (event) => {
       if (isOpening) {
         updateLiveChatVisibility();
         handleVideosOnModalOpen(modalGroup);
+        
+        // Initialize paragraph toggles for modal content
+        requestAnimationFrame(() => {
+          // Different handling based on modal type
+          if (trayModalType === 'reviews') {
+            // For reviews tray modal, we need to target the reviews list specifically
+            const reviewsModalWrap = document.querySelector('.reviews_modal_wrap');
+            const reviewsList = document.querySelector('.reviews_modal_review_list');
+            
+            if (reviewsModalWrap && typeof window.setupParagraphToggles === 'function') {
+              // Process the entire reviews modal first
+              window.setupParagraphToggles(reviewsModalWrap);
+              
+              // Then explicitly process the reviews list and individual reviews
+              if (reviewsList) {
+                window.setupParagraphToggles(reviewsList);
+                
+                // Process each individual review item to ensure proper handling
+                const reviewItems = reviewsList.children;
+                if (reviewItems && reviewItems.length > 0) {
+                  Array.from(reviewItems).forEach(item => {
+                    window.setupParagraphToggles(item);
+                  });
+                }
+              }
+              
+              // Observe paragraphs for resize events
+              if (typeof window.observeParagraphsForResize === 'function') {
+                window.observeParagraphsForResize(reviewsModalWrap);
+              }
+            }
+          } else {
+            // For standard modals, just process the content container
+            const modalContent = document.querySelector(`[data-modal-element='content'][data-modal-group='${modalGroup}']`);
+            if (modalContent && typeof window.setupParagraphToggles === 'function') {
+              window.setupParagraphToggles(modalContent);
+              
+              // Observe paragraphs for resize events
+              if (typeof window.observeParagraphsForResize === 'function') {
+                window.observeParagraphsForResize(modalContent);
+              }
+            }
+          }
+        });
       }
     },
     onComplete: () => {
@@ -433,7 +479,7 @@ document.addEventListener("click", (event) => {
         display: "inline-flex"
       });
       
-    if (isTrayModal) {        
+    if (isTrayModal) {
       if (trayModalType === 'nav') {
         modalTl
           // BG & Tray
@@ -514,7 +560,6 @@ document.addEventListener("click", (event) => {
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
           .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, 0.35);
-          
       }
     } else {
       // Regular modal animation
@@ -659,19 +704,25 @@ const initializeTabGroup = (group, root = document) => {
   const tabs = root.querySelectorAll(
     `[data-tab-element="tab"][data-tab-group="${group}"]`
   );
-  if (tabs.length === 0) return;
+  if (tabs.length === 0) {
+    return;
+  }
 
   const contentElements = root.querySelectorAll(
     `[data-tab-element="content"][data-tab-group="${group}"]`
   );
-  if (contentElements.length === 0) return;
+  if (contentElements.length === 0) {
+    return;
+  }
 
   const contentsContainer = contentElements[0].parentElement;
 
   const parent = root.querySelector(
     `[data-tab-element="tab-wrap"][data-tab-group="${group}"]`
   );
-  if (!parent) return;
+  if (!parent) {
+    return;
+  }
 
   const tabMode = parent.getAttribute("data-tab-mode");
 
@@ -721,7 +772,9 @@ const initializeTabGroup = (group, root = document) => {
     tab.dataset.index = index;
 
     tab.addEventListener("click", () => {
-      if (tab.classList.contains("is-active")) return;
+      if (tab.classList.contains("is-active")) {
+        return;
+      }
 
       tabs.forEach((t) => t.classList.remove("is-active"));
       tab.classList.add("is-active");
@@ -774,12 +827,16 @@ async function getUpcomingTab(retries = 5, delay = 100) {
 // Handle menu navigation button clicks
 document.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-target-button]");
-  if (!button) return;
+  if (!button) {
+    return;
+  }
 
   const targetValue = button.getAttribute("data-target-button");
   const modalGroup = button.getAttribute("data-modal-open");
 
-  if (modalGroup !== "nav") return;
+  if (modalGroup !== "nav") {
+    return;
+  }
 
   const modalTl = gsap.timeline({
     onComplete: () => {
@@ -797,12 +854,16 @@ document.addEventListener("click", async (event) => {
       `[data-target-field="${targetValue}"]`
     );
 
-    if (!targetAnchor || !targetField) return;
+    if (!targetAnchor || !targetField) {
+      return;
+    }
 
     document.addEventListener(
       "modalOpenComplete",
       async (event) => {
-        if (event.detail !== modalGroup) return;
+        if (event.detail !== modalGroup) {
+          return;
+        }
 
         const upcomingTab = await getUpcomingTab();
         if (upcomingTab && !upcomingTab.classList.contains("is-active")) {
@@ -827,7 +888,9 @@ document.addEventListener("click", async (event) => {
     document.addEventListener(
       "modalOpenComplete",
       (event) => {
-        if (event.detail !== modalGroup) return;
+        if (event.detail !== modalGroup) {
+          return;
+        }
 
         const contactTab = document.querySelector(
           `[data-tab-element="tab"][data-tab-match="contact"][data-tab-group="menu"]`
@@ -844,83 +907,165 @@ document.addEventListener("click", async (event) => {
 
 // Paragraph toggle system
 (function setupParagraphToggles() {
-  window.setupParagraphToggles = function (scope = document) {
-    const classSets = [
-      {
-        wrap: ".g_para_clamped_wrap",
-        para: ".g_para_clamped",
-        btn: ".g_para_clamped_btn",
-      },
-      {
-        wrap: ".g_para_hover_wrap",
-        para: ".g_para_hover",
-        btn: ".g_para_hover_btn",
-      },
-    ];
-
-    classSets.forEach(({ wrap, para, btn }) => {
-      const items = scope.querySelectorAll(wrap);
-
-      items.forEach(function (wrapElement) {
-        const paraElement = wrapElement.querySelector(para);
-        const toggleBtn = wrapElement.querySelector(btn);
-        const modalElement = wrapElement.closest(
-          '[data-modal-element="modal"]'
-        );
-
-        function isClamped(el) {
-          if (
-            modalElement &&
-            window.getComputedStyle(modalElement).display === "none"
-          ) {
-            modalElement.style.display = "block";
-            const result = el.scrollHeight > el.clientHeight;
-            modalElement.style.display = "none";
-            return result;
+  // Store paragraph clamp states to avoid repeated calculations
+  const clampStateCache = new WeakMap();
+  
+  // Simple function to check if element is clamped
+  const isClamped = (el) => {
+    // Return cached result if available
+    if (clampStateCache.has(el)) {
+      return clampStateCache.get(el);
+    }
+    
+    // Perform the measurement
+    const result = el.scrollHeight > el.clientHeight;
+    clampStateCache.set(el, result);
+    return result;
+  };
+  
+  // Process a single paragraph toggle
+  const processToggle = (wrapElement) => {
+    const isClampedType = wrapElement.classList.contains('g_para_clamped_wrap');
+    const paraElement = wrapElement.querySelector(
+      isClampedType ? '.g_para_clamped' : '.g_para_hover'
+    );
+    const toggleBtn = wrapElement.querySelector(
+      isClampedType ? '.g_para_clamped_btn' : '.g_para_hover_btn'
+    );
+    
+    if (!paraElement || !toggleBtn) return;
+    
+    // Check if paragraph needs the toggle button
+    if (!isClamped(paraElement)) {
+      toggleBtn.classList.add("is-hidden");
+    } else {
+      toggleBtn.classList.remove("is-hidden");
+    }
+  };
+  
+  // Main function to process toggles in any container
+  window.setupParagraphToggles = function(container = document) {
+    // Find all toggle elements in the container
+    const clampedWrappers = container.querySelectorAll('.g_para_clamped_wrap');
+    const hoverWrappers = container.querySelectorAll('.g_para_hover_wrap');
+    
+    const total = clampedWrappers.length + hoverWrappers.length;
+    
+    // If no toggles found in direct children but container has children, try processing them
+    if (total === 0 && container !== document && container.children && container.children.length > 0) {
+      const children = Array.from(container.children);
+      
+      // Recursively process each child container
+      requestAnimationFrame(() => {
+        children.forEach(child => {
+          if (child.nodeType === Node.ELEMENT_NODE) {
+            window.setupParagraphToggles(child);
           }
-          return el.scrollHeight > el.clientHeight;
-        }
-
-        if (!isClamped(paraElement)) toggleBtn.classList.add("is-hidden");
+        });
       });
+      return;
+    }
+    
+    // Process each wrapper
+    requestAnimationFrame(() => {
+      clampedWrappers.forEach(processToggle);
+      hoverWrappers.forEach(processToggle);
     });
   };
-
-  document.addEventListener("click", function (event) {
-    classSets = [
-      {
-        btn: ".g_para_clamped_btn",
-        para: ".g_para_clamped",
-      },
-      {
-        btn: ".g_para_hover_btn",
-        para: ".g_para_hover",
-      },
-    ];
-
-    for (const classSet of classSets) {
-      const toggleBtn = event.target.closest(classSet.btn);
-
-      if (toggleBtn) {
-        const wrapElement = toggleBtn.closest(
-          ".g_para_clamped_wrap, .g_para_hover_wrap"
-        );
-        if (!wrapElement) continue;
-
-        const paraElement = wrapElement.querySelector(classSet.para);
-        if (!paraElement) continue;
-
-        paraElement.classList.toggle("is-expanded");
-        toggleBtn.innerText = paraElement.classList.contains("is-expanded")
-          ? "show less"
-          : "read more";
-
-        break;
+  
+  // Handle toggle button clicks
+  document.addEventListener("click", function(event) {
+    // Check if click was on a toggle button
+    const toggleBtn = event.target.closest(".g_para_clamped_btn, .g_para_hover_btn");
+    if (!toggleBtn) {
+      return;
+    }
+    
+    // Find parent and paragraph element
+    const wrapElement = toggleBtn.closest(".g_para_clamped_wrap, .g_para_hover_wrap");
+    if (!wrapElement) {
+      return;
+    }
+    
+    // Determine which type of paragraph we're dealing with
+    const isClampedType = toggleBtn.classList.contains('g_para_clamped_btn');
+    const paraElement = wrapElement.querySelector(
+      isClampedType ? '.g_para_clamped' : '.g_para_hover'
+    );
+    
+    if (!paraElement) {
+      return;
+    }
+    
+    // Toggle expanded state
+    paraElement.classList.toggle("is-expanded");
+    toggleBtn.innerText = paraElement.classList.contains("is-expanded")
+      ? "show less"
+      : "read more";
+  });
+  
+  // Set up ResizeObserver to invalidate cache on resize
+  if ('ResizeObserver' in window) {
+    // Create a single observer to monitor all paragraph elements 
+    const resizeObserver = new ResizeObserver((entries) => {
+      // Only invalidate cache for elements that changed
+      entries.forEach(entry => {
+        if (clampStateCache.has(entry.target)) {
+          clampStateCache.delete(entry.target);
+          
+          // Find the paragraph's wrapper element
+          const wrapElement = entry.target.closest('.g_para_clamped_wrap, .g_para_hover_wrap');
+          if (wrapElement) {
+            // Re-process the toggle for the resized element
+            processToggle(wrapElement);
+          }
+        }
+      });
+    });
+    
+    // Function to observe paragraph elements
+    const observeParagraphs = (container = document) => {
+      // Find paragraph elements to observe
+      const clampedParagraphs = container.querySelectorAll('.g_para_clamped');
+      const hoverParagraphs = container.querySelectorAll('.g_para_hover');
+      
+      // Observe each paragraph element
+      clampedParagraphs.forEach(para => resizeObserver.observe(para));
+      hoverParagraphs.forEach(para => resizeObserver.observe(para));
+    };
+    
+    // Observe paragraphs in the document
+    observeParagraphs();
+    
+    // Also observe body for overall layout changes
+    resizeObserver.observe(document.body);
+    
+    // Add the observer function to the window for use with modals
+    window.observeParagraphsForResize = observeParagraphs;
+  }
+  
+  // Handle click on reviews to ensure they're processed
+  document.addEventListener("click", function(event) {
+    const reviewItem = event.target.closest(".reviews_modal_review_item, .review-contain");
+    if (reviewItem) {
+      // Check if this review has any unprocessed paragraph toggles
+      const unprocessedToggles = reviewItem.querySelectorAll('.g_para_clamped_wrap, .g_para_hover_wrap');
+      if (unprocessedToggles.length > 0) {
+        window.setupParagraphToggles(reviewItem);
       }
     }
   });
-
-  window.setupParagraphToggles();
+  
+  // Defer initial setup to idle time
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => {
+      window.setupParagraphToggles();
+    });
+  } else {
+    setTimeout(() => {
+      window.setupParagraphToggles();
+    }, 100);
+  }
 })();
 
 // Set review stars based on score
@@ -1061,10 +1206,14 @@ const CMSFilterManager = (() => {
   // Initializes filter toggle functionality with Finsweet CMS Filter
   const setupFeaturedFilterToggle = (filterInstances) => {
     filterInstance = filterInstances[0];
-    if (!filterInstance) return;
+    if (!filterInstance) {
+      return;
+    }
     
     const featuredCheckbox = document.querySelector(SELECTORS.featuredCheckbox);
-    if (!featuredCheckbox) return;
+    if (!featuredCheckbox) {
+      return;
+    }
     
     const debouncedUpdate = Utils.debounce(() => updateFeaturedFilter(featuredCheckbox), 50);
     
@@ -1083,7 +1232,9 @@ const CMSFilterManager = (() => {
   
   // Updates featured filter state based on other active filters
   const updateFeaturedFilter = (checkbox) => {
-    if (!filterInstance || !checkbox) return;
+    if (!filterInstance || !checkbox) {
+      return;
+    }
     
     const hasActiveFilters = isAnyFilterActive();
     
@@ -1105,18 +1256,23 @@ const CMSFilterManager = (() => {
       filter.values?.length > 0
     );
     
-    if (hasActiveFilterValues) return true;
+    if (hasActiveFilterValues) {
+      return true;
+    }
     
     const searchInput = document.querySelector(SELECTORS.searchInput);
     const categorySelect = document.querySelector(SELECTORS.categorySelect);
     
-    return (searchInput && searchInput.value.trim() !== '') || 
+    const result = (searchInput && searchInput.value.trim() !== '') || 
            (categorySelect && categorySelect.value !== '');
+    return result;
   };
   
   // Simulates a mouse click on the specified element
   const simulateClick = (element) => {
-    if (!element) return;
+    if (!element) {
+      return;
+    }
     
     try {
       element.dispatchEvent(new MouseEvent('click', {

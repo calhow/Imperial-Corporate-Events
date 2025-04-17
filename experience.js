@@ -1109,7 +1109,17 @@ const prepareContentForInsertion = (contentElement) => {
 const initializeModalContent = async (contentElement) => {
     const initSequence = [
         () => initializePackageAccordion(),
-        () => setupParagraphToggles(packageModalTarget),
+        // Setup paragraph toggles for the package modal content
+        () => {
+            if (packageModalTarget && typeof window.setupParagraphToggles === 'function') {
+                window.setupParagraphToggles(packageModalTarget);
+                
+                // Observe paragraphs for resize events
+                if (typeof window.observeParagraphsForResize === 'function') {
+                    window.observeParagraphsForResize(packageModalTarget);
+                }
+            }
+        },
         () => {
             initializeGallerySwipers();
             adjustHotelStars();
