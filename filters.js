@@ -602,11 +602,11 @@ const ScrollTriggerModule = (() => {
     toggleActions: "play none reverse none",
     onEnter: () => {
       gsap.set(".form_theme_underline", { opacity: 1 });
-      gsap.to(".filter_main_blur", { opacity: 1, duration: 0.7, ease: "power4.out" });
+      gsap.to(".filter_main_blur", { opacity: 1});
     },
     onLeaveBack: () => {
       gsap.set(".form_theme_underline", { opacity: 0 });
-      gsap.to(".filter_main_blur", { opacity: 0, duration: 0.5, ease: "power4.out" });
+      gsap.to(".filter_main_blur", { opacity: 0});
     },
   });
 
