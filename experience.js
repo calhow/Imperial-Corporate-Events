@@ -658,7 +658,7 @@ function cmsNest() {
   let pendingFetches = items.length;
   let contentFound = false;
 
-  items.forEach((item) => {
+  items.forEach((item, index) => {
     const link = item.querySelector("[data-cms-nest='link']");
     if (!link) {
       pendingFetches--;
@@ -712,7 +712,7 @@ function cmsNest() {
           );
           let foundContent = false;
 
-          dropzones.forEach((dropzone) => {
+          dropzones.forEach((dropzone, dzIndex) => {
             const dropzoneNum = dropzone
               .getAttribute("data-cms-nest")
               .split("-")[1];
@@ -743,7 +743,7 @@ function cmsNest() {
             );
           }
         })
-        .catch(() => {
+        .catch((error) => {
           pendingFetches--;
           if (pendingFetches === 0) {
             document.dispatchEvent(
@@ -1105,6 +1105,28 @@ const prepareContentForInsertion = (contentElement) => {
     });
 };
 
+// Check for and pre-process SVG elements before CMS nesting
+const processSVGElements = (container) => {
+    if (!container) {
+        return false;
+    }
+    
+    const svgElements = container.querySelectorAll(".svg-code");
+    
+    if (svgElements.length > 0) {
+        svgElements.forEach((element) => {
+            const content = element.textContent;
+            if (!content) return;
+            
+            // Add a data attribute to mark this element as needing processing
+            element.setAttribute('data-svg-needs-processing', 'true');
+        });
+        return true;
+    }
+    
+    return false;
+};
+
 // Initializes modal content with all needed functionality
 const initializeModalContent = async (contentElement) => {
     const initSequence = [
@@ -1131,6 +1153,9 @@ const initializeModalContent = async (contentElement) => {
             initializeTabButtons(packageModalTarget);
         },
         () => {
+            // Check for SVG elements before CMS nesting
+            processSVGElements(packageModalTarget);
+            
             packageModalTarget.querySelectorAll('.video_contain')
                 .forEach(container => VideoManager.setupVideo(container));
             cmsNest();
@@ -1145,13 +1170,47 @@ const initializeModalContent = async (contentElement) => {
     }
 
     await new Promise(resolve => {
-        document.addEventListener("cmsNestComplete", () => {
+        let eventFired = false;
+        
+        document.addEventListener("cmsNestComplete", (event) => {
+            eventFired = true;
+            
             requestAnimationFrame(() => {
                 insertSVGFromCMS(packageModalTarget);
                 hideEmptyDivs();
                 resolve();
             });
         }, { once: true });
+        
+        // Add a safety fallback in case the event never fires
+        setTimeout(() => {
+            if (!eventFired) {
+                if (packageModalTarget) {
+                    // First check for elements specifically marked for processing
+                    const markedElements = packageModalTarget.querySelectorAll("[data-svg-needs-processing='true']");
+                    
+                    // Then check for standard svg-code elements
+                    const svgElements = packageModalTarget.querySelectorAll(".svg-code");
+                    
+                    // Also check for SVG elements that might be inside other containers
+                    const potentialContainers = packageModalTarget.querySelectorAll('[data-cms-nest^="dropzone-"]');
+                    let nestedSvgCount = 0;
+                    
+                    potentialContainers.forEach(container => {
+                        const nestedSvgs = container.querySelectorAll(".svg-code");
+                        nestedSvgCount += nestedSvgs.length;
+                    });
+                    
+                    if (markedElements.length > 0 || svgElements.length > 0 || nestedSvgCount > 0) {
+                        insertSVGFromCMS(packageModalTarget);
+                    }
+                    
+                    hideEmptyDivs();
+                }
+                
+                resolve();
+            }
+        }, 5000);
     });
 };
 
@@ -1917,3 +1976,58 @@ const initializeTabButtons = (scope = document) => {
     forwardBtn.classList.remove('is-hidden');
   });
 };
+
+// Fix tab highlight position after modal animation completes
+document.addEventListener("packageModalAnimationComplete", () => {
+  setTimeout(() => {
+    const packageModalTarget = document.querySelector('[data-modal-element="tray-contain"][data-modal-group="package"]');
+    if (!packageModalTarget) return;
+    
+    // Get all tab groups in the modal
+    const tabGroups = new Set();
+    packageModalTarget.querySelectorAll('[data-tab-element="tab"]').forEach(tab => {
+      if (tab.dataset.tabGroup) {
+        tabGroups.add(tab.dataset.tabGroup);
+      }
+    });
+    
+    // For each tab group, recalculate highlight positions
+    tabGroups.forEach(group => {
+      const tabWrap = packageModalTarget.querySelector(`[data-tab-element="tab-wrap"][data-tab-group="${group}"]`);
+      if (!tabWrap) return;
+      
+      const tabMode = tabWrap.getAttribute("data-tab-mode");
+      if (tabMode !== "highlight") return;
+      
+      const highlight = tabWrap.querySelector('.g_switch_tabs_highlight');
+      if (!highlight) return;
+      
+      const tabs = packageModalTarget.querySelectorAll(`[data-tab-element="tab"][data-tab-group="${group}"]`);
+      if (!tabs.length) return;
+      
+      // Find visible tabs
+      const visibleTabs = Array.from(tabs).filter(tab => 
+        !tab.classList.contains('w-condition-invisible') && 
+        tab.offsetWidth > 0 && 
+        tab.offsetHeight > 0
+      );
+      
+      if (!visibleTabs.length) return;
+      
+      // Get current active tab or first visible tab
+      const activeTab = Array.from(visibleTabs).find(tab => tab.classList.contains("is-active")) || visibleTabs[0];
+      
+      // If no tab is active, activate the first visible one
+      if (!activeTab.classList.contains("is-active")) {
+        tabs.forEach(tab => tab.classList.remove("is-active"));
+        activeTab.classList.add("is-active");
+      }
+      
+      // Position the highlight
+      highlight.style.top = `${activeTab.offsetTop}px`;
+      highlight.style.left = `${activeTab.offsetLeft}px`;
+      highlight.style.width = `${activeTab.offsetWidth}px`;
+      highlight.style.height = `${activeTab.offsetHeight}px`;
+    });
+  }, 100);
+});

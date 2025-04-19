@@ -52,16 +52,25 @@ observer.observe(document.body, { childList: true, subtree: true });
 
 // Parse and fix SVG code from CMS
 function insertSVGFromCMS(container = document) {
-  container.querySelectorAll(".svg-code").forEach((element) => {
+  // Find both standard SVG code elements and specially marked ones
+  const svgElements = container.querySelectorAll(".svg-code, [data-svg-needs-processing='true']");
+  let processedCount = 0;
+  
+  svgElements.forEach((element, index) => {
     const svgCode = element.textContent;
-    if (!svgCode) return;
+    
+    // Skip if no content or already processed
+    if (!svgCode || element.hasAttribute('data-svg-processed')) {
+      return;
+    }
     
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(svgCode, 'image/svg+xml');
       const svg = doc.querySelector('svg');
+      const hasParserError = doc.querySelector('parsererror') !== null;
       
-      if (svg && doc.querySelector('parsererror') === null) {
+      if (svg && !hasParserError) {
         const invalidValueAttrs = Array.from(svg.attributes)
           .filter(attr => (attr.name === 'width' || attr.name === 'height') && attr.value === 'auto');
         
@@ -71,20 +80,36 @@ function insertSVGFromCMS(container = document) {
         
         const fixedSvg = svg.cloneNode(true);
         element.insertAdjacentElement("afterend", document.importNode(fixedSvg, true));
+        processedCount++;
       } else {
         const wrapper = document.createElement('div');
-        wrapper.innerHTML = svgCode.replace(/\s(width|height)="auto"/g, '');
-        element.insertAdjacentElement("afterend", wrapper.firstElementChild);
+        const cleanedSvgCode = svgCode.replace(/\s(width|height)="auto"/g, '');
+        wrapper.innerHTML = cleanedSvgCode;
+        
+        if (wrapper.firstElementChild) {
+          element.insertAdjacentElement("afterend", wrapper.firstElementChild);
+          processedCount++;
+        } else {
+          element.insertAdjacentHTML("afterend", cleanedSvgCode);
+          processedCount++;
+        }
       }
+      
+      // Mark as processed to avoid duplicate processing
+      element.setAttribute('data-svg-processed', 'true');
+      
     } catch (e) {
       try {
         const cleanSvg = svgCode.replace(/\s(width|height)="auto"/g, '');
         element.insertAdjacentHTML("afterend", cleanSvg);
+        element.setAttribute('data-svg-processed', 'true');
+        processedCount++;
       } catch (err) {
         // Silent fallback to avoid breaking the page
       }
     }
   });
+  return processedCount;
 }
 
 insertSVGFromCMS();
@@ -744,7 +769,10 @@ const initializeTabGroup = (group, root = document) => {
     highlight.style.height = `${target.offsetHeight}px`;
   };
 
-  tabs[0].classList.add("is-active");
+  // Find any active tab or default to first tab
+  const activeTab = Array.from(tabs).find(tab => tab.classList.contains("is-active")) || tabs[0];
+  tabs.forEach(t => t.classList.remove("is-active"));
+  activeTab.classList.add("is-active");
 
   const isInModal =
     parent.closest('.u-modal-prevent-scroll[data-modal-element="modal"]') !==
@@ -757,13 +785,21 @@ const initializeTabGroup = (group, root = document) => {
         if (modalOpenBtn) {
           const modalGroup = modalOpenBtn.getAttribute("data-modal-open");
           if (parent.closest(`[data-modal-group='${modalGroup}']`)) {
-            setTimeout(() => positionHighlight(tabs[0]), 50);
+            setTimeout(() => {
+              // Find the currently active tab for this group
+              const currentActiveTab = Array.from(tabs).find(tab => tab.classList.contains("is-active"));
+              if (currentActiveTab) {
+                positionHighlight(currentActiveTab);
+              } else {
+                positionHighlight(tabs[0]);
+              }
+            }, 50);
           }
         }
       });
     } else {
       window.addEventListener("load", () => {
-        positionHighlight(tabs[0]);
+        positionHighlight(activeTab);
       });
     }
   }

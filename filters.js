@@ -577,23 +577,6 @@ const ScrollTriggerModule = (() => {
   const mediaQuery = window.matchMedia("(min-width: 992px)");
   let scrollHandler = null;
 
-  function scrollEffect() {
-    const content = document.querySelector("[data-scroll-element='content']");
-    const trigger = document.querySelector("[data-scroll-element='trigger']");
-
-    if (!content || !trigger) return;
-
-    const contentRect = content.getBoundingClientRect();
-    const triggerRect = trigger.getBoundingClientRect();
-
-    const fadeStart = contentRect.bottom + 150;
-    const fadeEnd = contentRect.top + 100;
-
-    let progress = (fadeStart - triggerRect.top) / (fadeStart - fadeEnd);
-    progress = Math.min(Math.max(progress, 0), 1);
-
-    gsap.to(content, { opacity: 1 - progress, duration: 0.1, ease: "none" });
-  }
 
   function handleMediaChange(e) {
     if (e.matches) {
@@ -614,25 +597,40 @@ const ScrollTriggerModule = (() => {
 
   // Theme sticky styling
   ScrollTrigger.create({
-    trigger: ".theme_wrap",
-    start: "top top",
+    trigger: "#filter-section",
+    start: "top +1px",
     toggleActions: "play none reverse none",
-    onEnter: () => gsap.set(".form_theme_underline", { opacity: 1 }),
-    onLeaveBack: () => gsap.set(".form_theme_underline", { opacity: 0 }),
-  });
-
-  // Sticky filter nav
-  const filterTl = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".filter_main_sticky",
-      start: `top top+=${filterHeight}px`,
-      end: "top top",
-      scrub: true,
-      toggleActions: "play none reverse none",
+    onEnter: () => {
+      gsap.set(".form_theme_underline", { opacity: 1 });
+      gsap.to(".filter_main_blur", { opacity: 1, duration: 0.7, ease: "power4.out" });
+    },
+    onLeaveBack: () => {
+      gsap.set(".form_theme_underline", { opacity: 0 });
+      gsap.to(".filter_main_blur", { opacity: 0, duration: 0.5, ease: "power4.out" });
     },
   });
 
-  filterTl.to(".filter_btn_contain", { top: "0rem", ease: "none" });
+  // Theme wrap max-width animation
+  ScrollTrigger.create({
+    trigger: "#filter-section",
+    start: "top +1px",
+    toggleActions: "play none reverse none",
+    onEnter: () => {
+      gsap.to(".form_theme_wrap", { 
+        maxWidth: "100%", 
+        duration: 0.7, 
+        ease: "power4.out" 
+      });
+    },
+    onLeaveBack: () => {
+      gsap.to(".form_theme_wrap", { 
+        maxWidth: "48rem", 
+        duration: 0.5, 
+        ease: "power4.out" 
+      });
+    },
+  });
+
 })();
 
 // Handle filter section scrolling
