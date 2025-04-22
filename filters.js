@@ -76,6 +76,7 @@ const SwiperModule = (() => {
   };
 })();
 
+
 // Underline animation for theme filters
 const UnderlineModule = (() => {
   const fillElement = document.createElement("div");
@@ -573,62 +574,47 @@ const ScrollTriggerModule = (() => {
     });
   }
 
-  // Hero content opacity fade effect
-  const mediaQuery = window.matchMedia("(min-width: 992px)");
-  let scrollHandler = null;
-
-
-  function handleMediaChange(e) {
-    if (e.matches) {
-      if (!scrollHandler) {
-        scrollHandler = () => scrollEffect();
-        window.addEventListener("scroll", scrollHandler);
-      }
-    } else {
-      if (scrollHandler) {
-        window.removeEventListener("scroll", scrollHandler);
-        scrollHandler = null;
-      }
-    }
-  }
-
-  mediaQuery.addEventListener("change", handleMediaChange);
-  handleMediaChange(mediaQuery);
 
   // Theme sticky styling
-  ScrollTrigger.create({
-    trigger: "#filter-section",
-    start: "top +1px",
-    toggleActions: "play none reverse none",
-    onEnter: () => {
-      gsap.set(".form_theme_underline", { opacity: 1 });
-      gsap.to(".filter_main_blur", { opacity: 1, duration: 0.7, ease: "power4.out" });
-    },
-    onLeaveBack: () => {
-      gsap.set(".form_theme_underline", { opacity: 0 });
-      gsap.to(".filter_main_blur", { opacity: 0, duration: 0.5, ease: "power4.out" });
-    },
-  });
+  gsap.matchMedia().add("(min-width: 480px)", () => {
+    ScrollTrigger.create({
+      trigger: "#filter-section",
+      start: "top +1px",
+      toggleActions: "play none reverse none",
+      onEnter: () => {
+        gsap.set(".form_theme_underline", { opacity: 1 });
+        gsap.to(".filter_main_blur", { opacity: 1, duration: 0.5, ease: "power4.out" });
+      },
+      onLeaveBack: () => {
+        gsap.set(".form_theme_underline", { opacity: 0 });
+        gsap.to(".filter_main_blur", { opacity: 0, duration: 0.3, ease: "power4.out" });
+      },
+    });
 
-  // Theme wrap max-width animation
-  ScrollTrigger.create({
-    trigger: "#filter-section",
-    start: "top +1px",
-    toggleActions: "play none reverse none",
-    onEnter: () => {
-      gsap.to(".form_theme_wrap", { 
-        maxWidth: "100%", 
-        duration: 0.7, 
-        ease: "power4.out" 
-      });
-    },
-    onLeaveBack: () => {
-      gsap.to(".form_theme_wrap", { 
-        maxWidth: "48rem", 
-        duration: 0.5, 
-        ease: "power4.out" 
-      });
-    },
+    // Theme wrap max-width animation
+    ScrollTrigger.create({
+      trigger: "#filter-section",
+      start: "top +1px",
+      toggleActions: "play none reverse none",
+      onEnter: () => {
+        gsap.to(".form_theme_wrap", { 
+          maxWidth: "100%", 
+          duration: 0.7, 
+          ease: "power4.out" 
+        });
+      },
+      onLeaveBack: () => {
+        gsap.to(".form_theme_wrap", { 
+          maxWidth: "48rem", 
+          duration: 0.5, 
+          ease: "power4.out" 
+        });
+      },
+    });
+    
+    return () => {
+      // Cleanup when context is invalidated
+    };
   });
 
 })();
@@ -725,3 +711,4 @@ if (resultsCount && filterCount && pagination) {
 
   toggleVisibility();
 }
+

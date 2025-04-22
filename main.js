@@ -309,7 +309,7 @@ mm.add("(min-width: 479px)", () => {
     videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
   }
   if (ctaParallax) {
-    ctaParallax.to(".cta_bg_img", { y: "10rem" });
+    ctaParallax.to(".cta_bg_img", { y: "6rem" });
   }
 });
 
@@ -1333,3 +1333,29 @@ const CMSFilterManager = (() => {
 
 // Initialize the CMS Filter Manager
 document.addEventListener('DOMContentLoaded', CMSFilterManager.init);
+
+// Separate initialization script for footer-cta swiper
+const initializeFooterCtaSwiper = () => {
+  // Initialize footer CTA swiper
+  const footerSwiper = new Swiper(".swiper.is-footer-cta", {
+    speed: 500,
+    slidesPerView: "auto",
+    spaceBetween: 0,
+    autoplay: {
+      delay: 5000,
+      disableOnInteraction: false
+    },
+    loop: true,
+    effect: "fade",
+    fadeEffect: {
+      crossFade: true
+    }
+  });
+  
+  return {
+    instance: footerSwiper
+  };
+};
+
+// Initialize the footer CTA swiper independently
+const footerCtaSwiperController = initializeFooterCtaSwiper();
