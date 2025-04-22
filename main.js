@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => initializeCountersInScope())
 // Parallax animations setup
 const homeHeroWrap = document.querySelector(".hero_home_wrap");
 const catHeroImg = document.querySelector(".cat_hero_img");
-const ctaContent = document.querySelector(".cta_content");
+const ctaContent = document.querySelector(".cta_bg_img");
 const expGallery = document.querySelector(".gallery_img");
 const videoElement = document.querySelector(".video_gallery_player");
 const posterElement = document.querySelector(".video_gallery_poster");
@@ -255,7 +255,7 @@ let ctaParallax;
 if (ctaContent) {
   ctaParallax = gsap.timeline({
     scrollTrigger: {
-      trigger: ".cta_content",
+      trigger: ".cta_bg_img",
       start: "top bottom",
       end: "bottom top",
       scrub: true,
