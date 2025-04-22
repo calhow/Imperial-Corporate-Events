@@ -288,27 +288,30 @@ if (videoElement && posterElement) {
 }
 
 // Enable parallax for devices above 479px
-if (homeHeroParallax) {
-  homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
-}
-if (catHeroParallax) {
-  catHeroParallax.to(".cat_hero_img", { y: "3rem" });
-}
-if (testimonialThumbParallax) {
-  testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
-}
-if (testimonialBgParallax) {
-  testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
-}
-if (expGalleryParallax) {
-  expGalleryParallax.to(".gallery_img", { y: "3rem" });
-}
-if (videoPosterParallax) {
-  videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
-}
-if (ctaParallax) {
-  ctaParallax.to(".cta_bg_img", { y: "6rem" });
-}
+let mm = gsap.matchMedia();
+mm.add("(min-width: 479px)", () => {
+  if (homeHeroParallax) {
+    homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
+    }
+    if (catHeroParallax) {
+      catHeroParallax.to(".cat_hero_img", { y: "3rem" });
+    }
+    if (testimonialThumbParallax) {
+      testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
+    }
+    if (testimonialBgParallax) {
+      testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
+    }
+  if (expGalleryParallax) {
+    expGalleryParallax.to(".gallery_img", { y: "3rem" });
+  }
+  if (videoPosterParallax) {
+    videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
+  }
+  if (ctaParallax) {
+    ctaParallax.to(".cta_bg_img", { y: "6rem" });
+  }
+});
 
 // MODAL ANIMATION
 const modalStates = {}; // Tracks state for each modal group
