@@ -203,113 +203,101 @@ const expContentPadding = expContent ? getPaddingTop(expContent) : 0;
 const galleryWrapPadding = galleryWrap ? getPaddingTop(galleryWrap) : 0;
 const totalGalleryOffset = expContentPadding + galleryWrapPadding;
 
+// Create variables but don't initialize them outside the media query
 let homeHeroParallax;
-if (homeHeroWrap) {
-  homeHeroParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".hero_home_wrap",
-      start: "top top",
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
-
 let catHeroParallax;
-if (catHeroImg) {
-  catHeroParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".cat_hero_img",
-      start: "top top",
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
-
 let testimonialThumbParallax;
-if (testimonialThumb) {
-  testimonialThumbParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".testimonial_thumb_img",
-      start: "top bottom",
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
-
 let testimonialBgParallax;
-if (testimonialBg) {
-  testimonialBgParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".testimonial_content_bg-img",
-      start: "top bottom",
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
-
 let ctaParallax;
-if (ctaContent) {
-  ctaParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".cta_bg_img",
-      start: "top bottom",
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
-
 let expGalleryParallax;
-if (expGallery) {
-  expGalleryParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: ".gallery_img",
-      start: `top ${totalGalleryOffset}px`, 
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
-
 let videoPosterParallax;
-if (videoElement && posterElement) {
-  videoPosterParallax = gsap.timeline({
-    scrollTrigger: {
-      trigger: videoElement,
-      start: `top ${totalGalleryOffset}px`,
-      end: "bottom top",
-      scrub: true,
-    },
-  });
-}
 
 // Enable parallax for devices above 479px
 let mm = gsap.matchMedia();
 mm.add("(min-width: 479px)", () => {
-  if (homeHeroParallax) {
+  // Initialize all parallax timelines inside the media query
+  if (homeHeroWrap) {
+    homeHeroParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".hero_home_wrap",
+        start: "top top",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
     homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
-    }
-    if (catHeroParallax) {
-      catHeroParallax.to(".cat_hero_img", { y: "3rem" });
-    }
-    if (testimonialThumbParallax) {
-      testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
-    }
-    if (testimonialBgParallax) {
-      testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
-    }
-  if (expGalleryParallax) {
+  }
+  
+  if (catHeroImg) {
+    catHeroParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".cat_hero_img",
+        start: "top top",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    catHeroParallax.to(".cat_hero_img", { y: "3rem" });
+  }
+  
+  if (testimonialThumb) {
+    testimonialThumbParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".testimonial_thumb_img",
+        start: "top bottom",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
+  }
+  
+  if (testimonialBg) {
+    testimonialBgParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".testimonial_content_bg-img",
+        start: "top bottom",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
+  }
+  
+  if (ctaContent) {
+    ctaParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".cta_bg_img",
+        start: "top bottom",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    ctaParallax.to(".cta_bg_img", { y: "6rem" });
+  }
+  
+  if (expGallery) {
+    expGalleryParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".gallery_img",
+        start: `top ${totalGalleryOffset}px`, 
+        end: "bottom top",
+        scrub: true,
+      },
+    });
     expGalleryParallax.to(".gallery_img", { y: "3rem" });
   }
-  if (videoPosterParallax) {
+  
+  if (videoElement && posterElement) {
+    videoPosterParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: videoElement,
+        start: `top ${totalGalleryOffset}px`,
+        end: "bottom top",
+        scrub: true,
+      },
+    });
     videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
-  }
-  if (ctaParallax) {
-    ctaParallax.to(".cta_bg_img", { y: "6rem" });
   }
 });
 
