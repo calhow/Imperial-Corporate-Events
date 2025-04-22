@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => initializeCountersInScope())
 
 // Parallax animations setup
 const homeHeroWrap = document.querySelector(".hero_home_wrap");
-const catHeroWrap = document.querySelector(".hero_cat_wrap");
+const catHeroImg = document.querySelector(".cat_hero_img");
 const ctaContent = document.querySelector(".cta_content");
 const expGallery = document.querySelector(".gallery_img");
 const videoElement = document.querySelector(".video_gallery_player");
@@ -216,10 +216,10 @@ if (homeHeroWrap) {
 }
 
 let catHeroParallax;
-if (catHeroWrap) {
+if (catHeroImg) {
   catHeroParallax = gsap.timeline({
     scrollTrigger: {
-      trigger: ".hero_cat_wrap",
+      trigger: ".cat_hero_img",
       start: "top top",
       end: "bottom top",
       scrub: true,
@@ -288,30 +288,27 @@ if (videoElement && posterElement) {
 }
 
 // Enable parallax for devices above 479px
-let mm = gsap.matchMedia();
-mm.add("(min-width: 479px)", () => {
-  if (homeHeroParallax) {
-    homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
-    }
-    if (catHeroParallax) {
-      catHeroParallax.to(".hero_cat_img", { y: "-4rem" });
-    }
-    if (testimonialThumbParallax) {
-      testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
-    }
-    if (testimonialBgParallax) {
-      testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
-    }
-  if (expGalleryParallax) {
-    expGalleryParallax.to(".gallery_img", { y: "3rem" });
-  }
-  if (videoPosterParallax) {
-    videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
-  }
-  if (ctaParallax) {
-    ctaParallax.to(".cta_bg_img", { y: "6rem" });
-  }
-});
+if (homeHeroParallax) {
+  homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
+}
+if (catHeroParallax) {
+  catHeroParallax.to(".cat_hero_img", { y: "3rem" });
+}
+if (testimonialThumbParallax) {
+  testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
+}
+if (testimonialBgParallax) {
+  testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
+}
+if (expGalleryParallax) {
+  expGalleryParallax.to(".gallery_img", { y: "3rem" });
+}
+if (videoPosterParallax) {
+  videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
+}
+if (ctaParallax) {
+  ctaParallax.to(".cta_bg_img", { y: "6rem" });
+}
 
 // MODAL ANIMATION
 const modalStates = {}; // Tracks state for each modal group
