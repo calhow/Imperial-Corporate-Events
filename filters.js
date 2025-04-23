@@ -726,3 +726,41 @@ if (resultsCount && filterCount && pagination) {
   toggleVisibility();
 }
 
+
+// Parallax animations setup
+const homeHeroWrap = document.querySelector(".hero_home_wrap");
+const ctaContent = document.querySelector(".cta_bg_img");
+
+// Create variables but don't initialize them outside the media query
+let homeHeroParallax;
+let ctaParallax;
+
+// Enable parallax for devices above 479px
+let parallaxMediaMatcher = gsap.matchMedia();
+parallaxMediaMatcher.add("(min-width: 479px)", () => {
+  // Initialize all parallax timelines inside the media query
+  if (homeHeroWrap) {
+    homeHeroParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".hero_home_wrap",
+        start: "top top",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
+  }
+
+  if (ctaContent) {
+    ctaParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".cta_bg_img",
+        start: "top bottom",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    ctaParallax.to(".cta_bg_img", { y: "6rem" });
+  }
+  
+});

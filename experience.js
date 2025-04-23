@@ -1,5 +1,8 @@
 // Sets experience background image from gallery or video poster
 const setExpBackgroundImage = () => {
+  // Skip if screen width is below 678px
+  if (window.innerWidth < 678) return;
+  
   // Find source element in priority order
   const getSourceElement = () => {
     // 1. Team logo with valid image URL
@@ -57,6 +60,25 @@ const setExpBackgroundImage = () => {
   setBackgroundImages(imageUrl);
 };
 
+// Debounce function
+const debounce = (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+});
+
+// Handle window resize events for background images
+const handleBackgroundImageOnResize = debounce(() => {
+  // Only run when crossing the 678px threshold
+  setExpBackgroundImage();
+}, 250);
+
+// Add resize event listener
+window.addEventListener('resize', handleBackgroundImageOnResize);
+
+// Initialize on page load, respecting the screen size condition
 if (document.readyState !== 'loading') {
   setExpBackgroundImage();
 } else {
@@ -158,15 +180,6 @@ const manageSwipers = () => {
     }
   }
 };
-
-// Debounce function
-const debounce = (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-});
 
 window.addEventListener("resize", debounce(manageSwipers, 200));
 
@@ -1076,7 +1089,6 @@ class AnimationStateManager {
     this.timeline = null;
     this.elements = null;
     this.isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
-    console.log('[AnimationManager] Initialized with modal target:', !!modalTarget);
     
     // Clear blur filters when viewport size changes
     this.handleResize = this.handleResize.bind(this);
@@ -1090,12 +1102,6 @@ class AnimationStateManager {
       contentGrandchildren: this.modalTarget.querySelectorAll('.package_content > * > *'),
       btnWrap: this.modalTarget.querySelector('.package_btn_wrap')
     };
-    console.log('[AnimationManager] Found elements:', {
-      hasHeadingWrap: !!this.elements.headingWrap,
-      contentChildrenCount: this.elements.contentChildren?.length,
-      contentGrandchildrenCount: this.elements.contentGrandchildren?.length,
-      hasButtonWrap: !!this.elements.btnWrap
-    });
     return this.elements;
   }
   
@@ -1112,7 +1118,6 @@ class AnimationStateManager {
 
   setInitialState() {
     const elements = this.getElements();
-    console.log('[AnimationManager] Setting initial state');
     
     const allElements = [
       elements.headingWrap,
@@ -1138,15 +1143,13 @@ class AnimationStateManager {
     if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
     
     this.modalTarget.offsetHeight;
-    console.log('[AnimationManager] Initial state set');
   }
 
   createTimeline() {
-    console.log('[AnimationManager] Creating timeline');
     const elements = this.getElements();
     this.timeline = gsap.timeline({
       onComplete: () => {
-        console.log('[AnimationManager] Timeline completed');
+        // Timeline completed
       }
     });
 
@@ -1196,12 +1199,10 @@ class AnimationStateManager {
       }, 0);
     }
     
-    console.log('[AnimationManager] Timeline created');
     return this.timeline;
   }
 
   animate() {
-    console.log('[AnimationManager] Starting animation sequence');
     this.setInitialState();
     
     requestAnimationFrame(() => {
@@ -1212,7 +1213,6 @@ class AnimationStateManager {
   }
 
   cleanup() {
-    console.log('[AnimationManager] Cleaning up');
     if (this.timeline) {
       this.timeline.kill();
       this.timeline = null;
@@ -2331,3 +2331,78 @@ document.addEventListener("packageModalAnimationComplete", () => {
   }, 100);
 });
 
+
+// Parallax animations setup
+const expGallery = document.querySelector(".gallery_img");
+const videoElement = document.querySelector(".video_gallery_player");
+const posterElement = document.querySelector(".video_gallery_poster");
+const testimonialThumb = document.querySelector(".testimonial_thumb_img");
+const testimonialBg = document.querySelector(".testimonial_content_bg-img");
+
+const getPaddingTop = el =>
+  parseFloat(getComputedStyle(el).paddingTop) || 0;
+const expContent = document.querySelector(".exp_content");
+const galleryWrap = document.querySelector(".gallery_wrap");
+const expContentPadding = expContent ? getPaddingTop(expContent) : 0;
+const galleryWrapPadding = galleryWrap ? getPaddingTop(galleryWrap) : 0;
+const totalGalleryOffset = expContentPadding + galleryWrapPadding;
+
+// Create variables but don't initialize them outside the media query
+let testimonialThumbParallax;
+let testimonialBgParallax;
+let expGalleryParallax;
+let videoPosterParallax;
+
+// Enable parallax for devices above 479px
+let expMediaMatcher = gsap.matchMedia();
+expMediaMatcher.add("(min-width: 479px)", () => {
+  
+  
+  if (testimonialThumb) {
+    testimonialThumbParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".testimonial_thumb_img",
+        start: "top bottom",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
+  }
+  
+  if (testimonialBg) {
+    testimonialBgParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".testimonial_content_bg-img",
+        start: "top bottom",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
+  }
+  
+  if (expGallery) {
+    expGalleryParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".gallery_img",
+        start: `top ${totalGalleryOffset}px`, 
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    expGalleryParallax.to(".gallery_img", { y: "3rem" });
+  }
+  
+  if (videoElement && posterElement) {
+    videoPosterParallax = gsap.timeline({
+      scrollTrigger: {
+        trigger: videoElement,
+        start: `top ${totalGalleryOffset}px`,
+        end: "bottom top",
+        scrub: true,
+      },
+    });
+    videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
+  }
+});

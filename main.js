@@ -200,121 +200,6 @@ const initializeCountersInScope = (scope = document) => {
 
 document.addEventListener('DOMContentLoaded', () => initializeCountersInScope());
 
-// Parallax animations setup
-const homeHeroWrap = document.querySelector(".hero_home_wrap");
-const catHeroImg = document.querySelector(".cat_hero_img");
-const ctaContent = document.querySelector(".cta_bg_img");
-const expGallery = document.querySelector(".gallery_img");
-const videoElement = document.querySelector(".video_gallery_player");
-const posterElement = document.querySelector(".video_gallery_poster");
-const testimonialThumb = document.querySelector(".testimonial_thumb_img");
-const testimonialBg = document.querySelector(".testimonial_content_bg-img");
-
-const getPaddingTop = el =>
-  parseFloat(getComputedStyle(el).paddingTop) || 0;
-const expContent = document.querySelector(".exp_content");
-const galleryWrap = document.querySelector(".gallery_wrap");
-const expContentPadding = expContent ? getPaddingTop(expContent) : 0;
-const galleryWrapPadding = galleryWrap ? getPaddingTop(galleryWrap) : 0;
-const totalGalleryOffset = expContentPadding + galleryWrapPadding;
-
-// Create variables but don't initialize them outside the media query
-let homeHeroParallax;
-let catHeroParallax;
-let testimonialThumbParallax;
-let testimonialBgParallax;
-let ctaParallax;
-let expGalleryParallax;
-let videoPosterParallax;
-
-// Enable parallax for devices above 479px
-let mm = gsap.matchMedia();
-mm.add("(min-width: 479px)", () => {
-  // Initialize all parallax timelines inside the media query
-  if (homeHeroWrap) {
-    homeHeroParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".hero_home_wrap",
-        start: "top top",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
-  }
-  
-  if (catHeroImg) {
-    catHeroParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".cat_hero_img",
-        start: "top top",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    catHeroParallax.to(".cat_hero_img", { y: "3rem" });
-  }
-  
-  if (testimonialThumb) {
-    testimonialThumbParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".testimonial_thumb_img",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
-  }
-  
-  if (testimonialBg) {
-    testimonialBgParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".testimonial_content_bg-img",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
-  }
-  
-  if (ctaContent) {
-    ctaParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".cta_bg_img",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    ctaParallax.to(".cta_bg_img", { y: "6rem" });
-  }
-  
-  if (expGallery) {
-    expGalleryParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".gallery_img",
-        start: `top ${totalGalleryOffset}px`, 
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    expGalleryParallax.to(".gallery_img", { y: "3rem" });
-  }
-  
-  if (videoElement && posterElement) {
-    videoPosterParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: videoElement,
-        start: `top ${totalGalleryOffset}px`,
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
-  }
-});
 
 // MODAL ANIMATION
 const modalStates = {}; // Tracks state for each modal group
@@ -1007,14 +892,12 @@ document.addEventListener("click", async (event) => {
   // Store paragraph clamp states to avoid repeated calculations
   const clampStateCache = new WeakMap();
   
-  // Simple function to check if element is clamped
+  // Check if element is clamped
   const isClamped = (el) => {
-    // Return cached result if available
     if (clampStateCache.has(el)) {
       return clampStateCache.get(el);
     }
     
-    // Perform the measurement
     const result = el.scrollHeight > el.clientHeight;
     clampStateCache.set(el, result);
     return result;
@@ -1032,11 +915,15 @@ document.addEventListener("click", async (event) => {
     
     if (!paraElement || !toggleBtn) return;
     
-    // Check if paragraph needs the toggle button
-    if (!isClamped(paraElement)) {
-      toggleBtn.classList.add("is-hidden");
-    } else {
+    // Get expanded state
+    const isExpanded = paraElement.classList.contains('is-expanded');
+    
+    // Show button if expanded or clamped
+    if (isExpanded || isClamped(paraElement)) {
       toggleBtn.classList.remove("is-hidden");
+      toggleBtn.innerText = isExpanded ? "show less" : "read more";
+    } else {
+      toggleBtn.classList.add("is-hidden");
     }
   };
   
@@ -1096,14 +983,15 @@ document.addEventListener("click", async (event) => {
     
     // Toggle expanded state
     paraElement.classList.toggle("is-expanded");
-    toggleBtn.innerText = paraElement.classList.contains("is-expanded")
-      ? "show less"
-      : "read more";
+    const isNowExpanded = paraElement.classList.contains("is-expanded");
+    
+    // Set button text based on expanded state
+    toggleBtn.innerText = isNowExpanded ? "show less" : "read more";
   });
   
   // Set up ResizeObserver to invalidate cache on resize
   if ('ResizeObserver' in window) {
-    // Create a single observer to monitor all paragraph elements 
+    // Create a single observer for all paragraph elements 
     const resizeObserver = new ResizeObserver((entries) => {
       // Only invalidate cache for elements that changed
       entries.forEach(entry => {
@@ -1113,7 +1001,6 @@ document.addEventListener("click", async (event) => {
           // Find the paragraph's wrapper element
           const wrapElement = entry.target.closest('.g_para_clamped_wrap, .g_para_hover_wrap');
           if (wrapElement) {
-            // Re-process the toggle for the resized element
             processToggle(wrapElement);
           }
         }
@@ -1225,9 +1112,9 @@ function initializePackageAccordion() {
 // Global ScrollTrigger Module for Navbar Animations
 window.NavScrollTrigger = (() => {
   const initNavbarScrollEffects = () => {
-    const mmSecond = gsap.matchMedia();
+    const navMediaMatcher = gsap.matchMedia();
 
-    mmSecond.add("(min-width: 480px) and (max-width: 1215px)", () => {
+    navMediaMatcher.add("(min-width: 480px) and (max-width: 1215px)", () => {
       ScrollTrigger.create({
         trigger: ".page_main",
         start: `top+=${document.querySelector(".nav_main_contain")?.offsetHeight || 0}px top`,
@@ -1252,7 +1139,7 @@ window.NavScrollTrigger = (() => {
       };
     });
 
-    mmSecond.add("(min-width: 1215px)", () => {
+    navMediaMatcher.add("(min-width: 1215px)", () => {
       ScrollTrigger.create({
         trigger: ".page_main",
         start: `top+=5px top`,
