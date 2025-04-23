@@ -14,11 +14,14 @@ const setExpBackgroundImage = () => {
       }
     }
     
-    // 2. Video poster with valid background image
+    // 2. Video poster with valid src attribute
     const videoPoster = document.querySelector('.video_gallery_poster');
     if (videoPoster) {
-      const bgImage = getComputedStyle(videoPoster).backgroundImage;
-      if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
+      const posterSrc = videoPoster.currentSrc || videoPoster.src;
+      if (posterSrc && 
+          posterSrc.trim() !== '' && 
+          !posterSrc.includes('placeholder') &&
+          /\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(posterSrc)) {
         return videoPoster;
       }
     }
@@ -368,8 +371,7 @@ const prepareGalleryVideoSlide = () => {
   if (!videoElement) return false;
   
   const src = videoElement.getAttribute("src") || "";
-  const poster = videoElement.getAttribute("poster") || "";
-  if (!src.trim() || !poster.trim()) return false;
+  if (!src.trim()) return false;
   
   const swiperWrapper = document.querySelector(".swiper.is-gallery .swiper-wrapper");
   if (!swiperWrapper) return false;
