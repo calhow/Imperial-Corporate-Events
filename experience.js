@@ -591,58 +591,174 @@ setTimeout(function () {
 }, 100);
 
 // Controls fixed buttons visibility while scrolling on mobile
-ScrollTrigger.create({
-  trigger: ".packages_wrap",
-  start: "bottom top",
-  onEnter: () => {
-    document.querySelector(".exp_btn_wrap.is-fixed").classList.add("is-active");
-  },
-  onLeaveBack: () => {
-    document
-      .querySelector(".exp_btn_wrap.is-fixed")
-      .classList.remove("is-active");
-  },
-});
+(() => {
+  // Skip on desktop
+  if (window.innerWidth > 767) return;
+  
+  const btnWrap = document.querySelector(".exp_btn_wrap.is-fixed");
+  if (!btnWrap) return;
 
-ScrollTrigger.create({
-  trigger: ".footer_wrap",
-  start: "top bottom",
-  onEnter: () => {
-    document
-      .querySelector(".exp_btn_wrap.is-fixed")
-      .classList.remove("is-active");
-  },
-  onLeaveBack: () => {
-    document.querySelector(".exp_btn_wrap.is-fixed").classList.add("is-active");
-  },
-});
-
-let lastScrollTop = 0;
-const btnWrap = document.querySelector(".exp_btn_wrap.is-fixed");
-
-const throttleInterval = 300;
-let lastCallTime = 0;
-
-if (window.innerWidth <= 767 && btnWrap) {
-  window.addEventListener("scroll", () => {
-    const currentTime = new Date().getTime();
-
-    if (currentTime - lastCallTime > throttleInterval) {
-      lastCallTime = currentTime;
-
-      const currentScrollTop =
-        window.scrollY || document.documentElement.scrollTop;
-
-      if (currentScrollTop > lastScrollTop) {
-        btnWrap.classList.remove("is-upscroll");
-      } else if (currentScrollTop < lastScrollTop) {
-        btnWrap.classList.add("is-upscroll");
-      }
-
-      lastScrollTop = currentScrollTop <= 0 ? 0 : currentScrollTop;
+  // Shared state
+  const state = {
+    lastScrollY: window.scrollY || 0,
+    isScrollingUp: false,
+    scrollingDown: true,
+    throttleTimer: null,
+    isInCriticalZone: false
+  };
+  
+  // Critical zone size (area near packages section requiring careful control)
+  const CRITICAL_ZONE_SIZE = 300;
+  
+  // Central button visibility control
+  const setButtonVisibility = (isVisible) => {
+    const currentlyVisible = btnWrap.classList.contains("is-active");
+    
+    if (currentlyVisible !== isVisible) {
+      btnWrap.classList.toggle("is-active", isVisible);
     }
+    
+    if (isVisible) {
+      const shouldHaveUpscrollClass = state.isScrollingUp;
+      const hasUpscrollClass = btnWrap.classList.contains("is-upscroll");
+      
+      if (hasUpscrollClass !== shouldHaveUpscrollClass) {
+        btnWrap.classList.toggle("is-upscroll", shouldHaveUpscrollClass);
+      }
+    }
+  };
+  
+  // Use IntersectionObserver for efficient position tracking
+  if ('IntersectionObserver' in window) {
+    // Track packages section visibility
+    const packagesObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        const boundingRect = entry.boundingClientRect;
+        
+        // If packages section is above viewport, potentially show button
+        if (!entry.isIntersecting && boundingRect.bottom < 0) {
+          setTimeout(() => {
+            if (!btnWrap.classList.contains("is-active")) {
+              setButtonVisibility(true);
+            }
+          }, 150);
+        }
+      });
+    }, {
+      threshold: 0,
+      rootMargin: "0px 0px -100% 0px"
+    });
+    
+    // Track footer section visibility
+    const footerObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        // When footer comes into view, hide button
+        if (entry.isIntersecting) {
+          setButtonVisibility(false);
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: "-10px 0px 0px 0px"
+    });
+    
+    // Start observing
+    const packages = document.querySelector(".packages_wrap");
+    const footer = document.querySelector(".footer_wrap");
+    
+    if (packages) packagesObserver.observe(packages);
+    if (footer) footerObserver.observe(footer);
+    
+    // Clean up on viewport size change
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    mediaQuery.addEventListener('change', e => {
+      if (e.matches) {
+        packagesObserver.disconnect();
+        footerObserver.disconnect();
+      }
+    });
+  }
+  
+  // ScrollTrigger for main visibility control
+  ScrollTrigger.create({
+    trigger: ".packages_wrap",
+    start: "bottom top",
+    onEnter: () => {
+      setButtonVisibility(true);
+      state.isInCriticalZone = false;
+    },
+    onLeaveBack: () => {
+      setButtonVisibility(false);
+      state.isInCriticalZone = true;
+    },
+    markers: false
   });
-}
+  
+  ScrollTrigger.create({
+    trigger: ".footer_wrap",
+    start: "top bottom",
+    onEnter: () => {
+      setButtonVisibility(false);
+      state.isInCriticalZone = false;
+    },
+    onLeaveBack: () => {
+      const packagesEl = document.querySelector(".packages_wrap");
+      if (packagesEl) {
+        const packagesRect = packagesEl.getBoundingClientRect();
+        
+        if (packagesRect.bottom < 0) {
+          setButtonVisibility(true);
+        }
+      }
+      
+      state.isInCriticalZone = false;
+    },
+    markers: false
+  });
+  
+  // Optimized scroll listener
+  window.addEventListener("scroll", () => {
+    const currentY = window.scrollY;
+    
+    // Update scroll direction state immediately
+    state.isScrollingUp = currentY < state.lastScrollY;
+    state.scrollingDown = currentY > state.lastScrollY;
+    
+    // Throttle expensive operations
+    if (!state.throttleTimer) {
+      state.throttleTimer = setTimeout(() => {
+        state.throttleTimer = null;
+        
+        // Critical zone handling
+        if (state.isInCriticalZone) {
+          const packagesEl = document.querySelector(".packages_wrap");
+          
+          if (packagesEl) {
+            const packagesRect = packagesEl.getBoundingClientRect();
+            const isButtonActive = btnWrap.classList.contains("is-active");
+            
+            // Suppress button in critical zone
+            if (isButtonActive) {
+              if (!state.isScrollingUp && packagesRect.bottom >= -CRITICAL_ZONE_SIZE) {
+                setButtonVisibility(false);
+              } else if (state.isScrollingUp && packagesRect.bottom > -CRITICAL_ZONE_SIZE * 2) {
+                setButtonVisibility(false);
+              }
+            }
+          }
+        }
+        
+        // Update scroll direction class only when button is active
+        if (btnWrap.classList.contains("is-active")) {
+          btnWrap.classList.toggle("is-upscroll", state.isScrollingUp);
+        }
+        
+        // Update last scroll position
+        state.lastScrollY = currentY <= 0 ? 0 : currentY;
+      }, 100);
+    }
+  }, { passive: true });
+})();
 
 // Fetches and injects nested CMS content
 function cmsNest() {
@@ -655,115 +771,261 @@ function cmsNest() {
     return;
   }
 
-  let pendingFetches = items.length;
+  // Create a content cache namespace
+  const CACHE_PREFIX = 'cms_nest_cache_';
+  const CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour in milliseconds
+  const isMobile = window.innerWidth < 768;
+  
+  // Check if we can use localStorage
+  const storageAvailable = (() => {
+    try {
+      const test = '__storage_test__';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+  
+  // Get cached content
+  const getCachedContent = (url) => {
+    if (!storageAvailable) return null;
+    
+    try {
+      const cacheKey = CACHE_PREFIX + url;
+      const cachedData = localStorage.getItem(cacheKey);
+      
+      if (!cachedData) return null;
+      
+      const { timestamp, content } = JSON.parse(cachedData);
+      
+      // Check if cache is still valid
+      if (Date.now() - timestamp < CACHE_EXPIRY) {
+        return content;
+      } else {
+        // Clear expired cache
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  };
+  
+  // Set content in cache
+  const setCachedContent = (url, content) => {
+    if (!storageAvailable) return;
+    
+    try {
+      const cacheKey = CACHE_PREFIX + url;
+      const cacheData = {
+        timestamp: Date.now(),
+        content
+      };
+      
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    } catch (e) {
+      // Handle quota exceeded or other storage errors
+      try {
+        // If we've exceeded quota, clear older caches
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key.startsWith(CACHE_PREFIX)) {
+            keysToRemove.push(key);
+          }
+        }
+        
+        // Sort by timestamp and remove older ones first
+        keysToRemove.sort((a, b) => {
+          const aData = JSON.parse(localStorage.getItem(a));
+          const bData = JSON.parse(localStorage.getItem(b));
+          return aData.timestamp - bData.timestamp;
+        });
+        
+        // Remove the oldest 50% of cached items
+        const removeCount = Math.ceil(keysToRemove.length / 2);
+        for (let i = 0; i < removeCount; i++) {
+          localStorage.removeItem(keysToRemove[i]);
+        }
+        
+        // Try again
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      } catch (e2) {
+        // If still failing, give up on caching for now
+      }
+    }
+  };
+  
+  // Convert the items to an array for batch processing
+  const itemsArray = Array.from(items);
   let contentFound = false;
-
-  items.forEach((item, index) => {
+  let processedCount = 0;
+  
+  // Create a queue system
+  const queue = [];
+  const BATCH_SIZE = isMobile ? 2 : 4; // Process fewer items at once on mobile
+  let isProcessing = false;
+  
+  // Process dropzones with DocumentFragment
+  const processDropzones = (item, parsedContent) => {
+    const dropzones = item.querySelectorAll("[data-cms-nest^='dropzone-']");
+    let foundContent = false;
+    
+    // Create a document fragment to minimize reflows
+    dropzones.forEach((dropzone) => {
+      const dropzoneNum = dropzone
+        .getAttribute("data-cms-nest")
+        .split("-")[1];
+      const targetSelector = `[data-cms-nest='target-${dropzoneNum}']`;
+      const target = parsedContent.querySelector(targetSelector);
+      
+      if (target) {
+        // Use document fragment to batch DOM operations
+        const fragment = document.createDocumentFragment();
+        fragment.appendChild(target.cloneNode(true));
+        
+        // Clear and append in one operation
+        dropzone.innerHTML = "";
+        dropzone.appendChild(fragment);
+        
+        foundContent = true;
+        contentFound = true;
+      }
+    });
+    
+    return foundContent;
+  };
+  
+  // Process a batch of items from the queue
+  const processBatch = async () => {
+    if (isProcessing || queue.length === 0) return;
+    
+    isProcessing = true;
+    const batch = queue.splice(0, BATCH_SIZE);
+    const batchPromises = [];
+    
+    for (const { item, href } of batch) {
+      const promise = new Promise(async (resolve) => {
+        try {
+          // First check cache
+          const cachedContent = getCachedContent(href);
+          
+          if (cachedContent) {
+            // Parse cached content
+            const parser = new DOMParser();
+            const parsedContent = parser.parseFromString(cachedContent, "text/html");
+            
+            // Process with the cached content
+            const foundContent = processDropzones(item, parsedContent);
+            
+            item.dispatchEvent(
+              new CustomEvent("cmsNestItemComplete", {
+                detail: { found: foundContent, fromCache: true },
+                bubbles: true,
+              })
+            );
+            
+            processedCount++;
+            resolve();
+            return;
+          }
+          
+          // If not cached, fetch from network
+          const url = new URL(href, window.location.origin);
+          if (url.hostname !== window.location.hostname) {
+            processedCount++;
+            resolve();
+            return;
+          }
+          
+          try {
+            const response = await fetchWithTimeout(href, {}, 5e3);
+            const html = await response.text();
+            
+            // Cache the result
+            setCachedContent(href, html);
+            
+            const parser = new DOMParser();
+            const parsedContent = parser.parseFromString(html, "text/html");
+            
+            // Process the dropzones
+            const foundContent = processDropzones(item, parsedContent);
+            
+            item.dispatchEvent(
+              new CustomEvent("cmsNestItemComplete", {
+                detail: { found: foundContent, fromCache: false },
+                bubbles: true,
+              })
+            );
+            
+            processedCount++;
+            resolve();
+          } catch (error) {
+            processedCount++;
+            resolve();
+          }
+        } catch (error) {
+          processedCount++;
+          resolve();
+        }
+      });
+      
+      batchPromises.push(promise);
+    }
+    
+    // Wait for all items in the batch to complete
+    await Promise.all(batchPromises);
+    
+    // Process the next batch or complete
+    isProcessing = false;
+    
+    if (queue.length > 0) {
+      // Use requestIdleCallback if available, or setTimeout to not block the main thread
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(() => processBatch());
+      } else {
+        setTimeout(() => processBatch(), 0);
+      }
+    } else if (processedCount >= itemsArray.length) {
+      // All items are processed
+      document.dispatchEvent(
+        new CustomEvent("cmsNestComplete", {
+          detail: { found: contentFound },
+        })
+      );
+    }
+  };
+  
+  // Populate the queue and start processing
+  itemsArray.forEach((item) => {
     const link = item.querySelector("[data-cms-nest='link']");
     if (!link) {
-      pendingFetches--;
-      if (pendingFetches === 0) {
-        document.dispatchEvent(
-          new CustomEvent("cmsNestComplete", {
-            detail: { found: contentFound },
-          })
-        );
-      }
+      processedCount++;
       return;
     }
-
+    
     const href = link.getAttribute("href");
     if (!href) {
-      pendingFetches--;
-      if (pendingFetches === 0) {
-        document.dispatchEvent(
-          new CustomEvent("cmsNestComplete", {
-            detail: { found: contentFound },
-          })
-        );
-      }
+      processedCount++;
       return;
     }
-
-    try {
-      const url = new URL(href, window.location.origin);
-      if (url.hostname !== window.location.hostname) {
-        pendingFetches--;
-        if (pendingFetches === 0) {
-          document.dispatchEvent(
-            new CustomEvent("cmsNestComplete", {
-              detail: { found: contentFound },
-            })
-          );
-        }
-        return;
-      }
-
-      fetchWithTimeout(href, {}, 5e3)
-        .then((response) => response.text())
-        .then((html) => {
-          const parsedContent = new DOMParser().parseFromString(
-            html,
-            "text/html"
-          );
-
-          const dropzones = item.querySelectorAll(
-            "[data-cms-nest^='dropzone-']"
-          );
-          let foundContent = false;
-
-          dropzones.forEach((dropzone, dzIndex) => {
-            const dropzoneNum = dropzone
-              .getAttribute("data-cms-nest")
-              .split("-")[1];
-            const targetSelector = `[data-cms-nest='target-${dropzoneNum}']`;
-
-            const target = parsedContent.querySelector(targetSelector);
-            if (target) {
-              dropzone.innerHTML = "";
-              dropzone.appendChild(target);
-              foundContent = true;
-              contentFound = true;
-            }
-          });
-
-          item.dispatchEvent(
-            new CustomEvent("cmsNestItemComplete", {
-              detail: { found: foundContent },
-              bubbles: true,
-            })
-          );
-
-          pendingFetches--;
-          if (pendingFetches === 0) {
-            document.dispatchEvent(
-              new CustomEvent("cmsNestComplete", {
-                detail: { found: contentFound },
-              })
-            );
-          }
-        })
-        .catch((error) => {
-          pendingFetches--;
-          if (pendingFetches === 0) {
-            document.dispatchEvent(
-              new CustomEvent("cmsNestComplete", {
-                detail: { found: contentFound },
-              })
-            );
-          }
-        });
-    } catch (error) {
-      pendingFetches--;
-      if (pendingFetches === 0) {
-        document.dispatchEvent(
-          new CustomEvent("cmsNestComplete", {
-            detail: { found: contentFound },
-          })
-        );
-      }
-    }
+    
+    // Add to queue
+    queue.push({ item, href });
   });
+  
+  // Start processing batches
+  if (queue.length > 0) {
+    processBatch();
+  } else {
+    document.dispatchEvent(
+      new CustomEvent("cmsNestComplete", {
+        detail: { found: contentFound },
+      })
+    );
+  }
 }
 
 // Hides empty featured amenities divs in package modal
