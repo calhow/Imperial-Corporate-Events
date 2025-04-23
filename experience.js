@@ -1079,7 +1079,12 @@ class AnimationStateManager {
     this.modalTarget = modalTarget;
     this.timeline = null;
     this.elements = null;
+    this.isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
     console.log('[AnimationManager] Initialized with modal target:', !!modalTarget);
+    
+    // Clear blur filters when viewport size changes
+    this.handleResize = this.handleResize.bind(this);
+    window.addEventListener('resize', this.handleResize);
   }
 
   getElements() {
@@ -1096,6 +1101,17 @@ class AnimationStateManager {
       hasButtonWrap: !!this.elements.btnWrap
     });
     return this.elements;
+  }
+  
+  handleResize() {
+    // Update mobile status
+    const wasMobile = this.isMobile;
+    this.isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
+    
+    // If device switched to mobile, clear any blur filters
+    if (!wasMobile && this.isMobile && this.elements?.contentGrandchildren?.length) {
+      gsap.set(this.elements.contentGrandchildren, { filter: "none" });
+    }
   }
 
   setInitialState() {
@@ -1114,12 +1130,14 @@ class AnimationStateManager {
     if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
     if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
     if (elements.contentGrandchildren?.length) {
-      gsap.set(elements.contentGrandchildren, { 
-        opacity: 0, 
-        x: "0.125rem", 
-        y: "-0.25rem", 
-        filter: "blur(2px)" 
-      });
+      const props = { opacity: 0, x: "0.125rem", y: "-0.25rem" };
+      
+      // Only add blur effect for non-mobile devices
+      if (!this.isMobile) {
+        props.filter = "blur(2px)";
+      }
+      
+      gsap.set(elements.contentGrandchildren, props);
     }
     if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
     
@@ -1156,15 +1174,21 @@ class AnimationStateManager {
     }
 
     if (elements.contentGrandchildren?.length) {
-      this.timeline.to(elements.contentGrandchildren, {
+      const props = {
         opacity: 1,
         x: "0rem",
         y: "0rem",
-        filter: "blur(0rem)",
         duration: 0.2,
         ease: "power1.out",
         stagger: 0.015
-      }, 0);
+      };
+      
+      // Only add blur effect for non-mobile devices
+      if (!this.isMobile) {
+        props.filter = "blur(0rem)";
+      }
+      
+      this.timeline.to(elements.contentGrandchildren, props, 0);
     }
 
     if (elements.btnWrap) {
@@ -1197,6 +1221,7 @@ class AnimationStateManager {
       this.timeline.kill();
       this.timeline = null;
     }
+    window.removeEventListener('resize', this.handleResize);
     this.elements = null;
   }
 }
@@ -1476,6 +1501,38 @@ const initializeModalContent = async (contentElement) => {
     });
 };
 
+// Sets initial animation states
+const setInitialStates = (elements) => {
+    const allElements = [
+        elements.headingWrap,
+        ...(elements.contentChildren || []),
+        ...(elements.contentGrandchildren || []),
+        elements.btnWrap
+    ].filter(Boolean);
+    
+    gsap.set(allElements, { opacity: 0 });
+
+    const isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
+
+    // Base states for all elements
+    const states = {
+        headingWrap: { opacity: 0, x: "0.5rem" },
+        contentChildren: { opacity: 0, x: "1rem" },
+        contentGrandchildren: { opacity: 0, x: "0.125rem", y: "-0.25rem" },
+        btnWrap: { opacity: 0, x: "0.5rem" }
+    };
+    
+    // Add blur only for non-mobile
+    if (!isMobile) {
+        states.contentGrandchildren.filter = "blur(2px)";
+    }
+
+    Object.entries(states).forEach(([key, props]) => {
+        const target = elements[key];
+        if (target) gsap.set(target, props);
+    });
+};
+
 // Creates content animation timeline
 const createContentAnimation = (elements) => {
     const timeline = gsap.timeline({
@@ -1483,6 +1540,9 @@ const createContentAnimation = (elements) => {
         onComplete: () => TimelineManager.remove(timeline)
     });
 
+    const isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
+    
+    // Base animations
     const animations = [
         {
             targets: elements.headingWrap,
@@ -1495,7 +1555,7 @@ const createContentAnimation = (elements) => {
         },
         {
             targets: elements.contentGrandchildren,
-            props: { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)" },
+            props: { opacity: 1, x: "0rem", y: "0rem" },
             stagger: 0.015
         },
         {
@@ -1503,6 +1563,11 @@ const createContentAnimation = (elements) => {
             props: { opacity: 1, x: "0rem" }
         }
     ];
+    
+    // Add blur only for non-mobile
+    if (!isMobile && animations[2].props) {
+        animations[2].props.filter = "blur(0rem)";
+    }
 
     animations.forEach(({ targets, props, stagger }) => {
         if (!targets) return;
@@ -1516,30 +1581,6 @@ const createContentAnimation = (elements) => {
 
     TimelineManager.add(timeline);
     return timeline;
-};
-
-// Sets initial animation states
-const setInitialStates = (elements) => {
-    const allElements = [
-        elements.headingWrap,
-        ...(elements.contentChildren || []),
-        ...(elements.contentGrandchildren || []),
-        elements.btnWrap
-    ].filter(Boolean);
-    
-    gsap.set(allElements, { opacity: 0 });
-
-    const states = {
-        headingWrap: { opacity: 0, x: "0.5rem" },
-        contentChildren: { opacity: 0, x: "1rem" },
-        contentGrandchildren: { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)" },
-        btnWrap: { opacity: 0, x: "0.5rem" }
-    };
-
-    Object.entries(states).forEach(([key, props]) => {
-        const target = elements[key];
-        if (target) gsap.set(target, props);
-    });
 };
 
 // Populates modal with content and animations

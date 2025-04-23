@@ -577,17 +577,31 @@ const ScrollTriggerModule = (() => {
 
   // Theme sticky styling
   gsap.matchMedia().add("(min-width: 480px)", () => {
+    const isMobile = () => window.innerWidth <= 767;
+    
     ScrollTrigger.create({
       trigger: "#filter-section",
       start: "top +1px",
       toggleActions: "play none reverse none",
       onEnter: () => {
         gsap.set(".form_theme_underline", { opacity: 1 });
-        gsap.to(".filter_main_blur", { opacity: 1, duration: 0.5, ease: "power4.out" });
+        // Skip blur animation on mobile for performance
+        if (!isMobile()) {
+          gsap.to(".filter_main_blur", { opacity: 1, duration: 0.5, ease: "power4.out" });
+        } else {
+          // Alternative animation for mobile - just set opacity without blur
+          gsap.set(".filter_main_blur", { opacity: 1 });
+        }
       },
       onLeaveBack: () => {
         gsap.set(".form_theme_underline", { opacity: 0 });
-        gsap.to(".filter_main_blur", { opacity: 0, duration: 0.3, ease: "power4.out" });
+        // Skip blur animation on mobile for performance
+        if (!isMobile()) {
+          gsap.to(".filter_main_blur", { opacity: 0, duration: 0.3, ease: "power4.out" });
+        } else {
+          // Alternative animation for mobile - just set opacity without blur
+          gsap.set(".filter_main_blur", { opacity: 0 });
+        }
       },
     });
 

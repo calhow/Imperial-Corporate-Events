@@ -26,10 +26,25 @@ const Utils = (() => {
       rect.right <= (window.innerWidth || document.documentElement.clientWidth)
     );
   };
+  
+  // Device detection utility
+  const isMobile = () => window.innerWidth <= 767;
+  
+  // Create animation properties with or without blur based on device
+  const getAnimProps = (props) => {
+    // If we're on mobile, remove filter:blur from animation props
+    if (isMobile() && props.filter && props.filter.includes('blur')) {
+      const { filter, ...otherProps } = props;
+      return otherProps;
+    }
+    return props;
+  };
 
   return {
     debounce,
-    isInViewport
+    isInViewport,
+    isMobile,
+    getAnimProps
   };
 })();
 
@@ -416,6 +431,29 @@ document.addEventListener("click", (event) => {
   const isTrayModal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}'][data-modal-type='tray']`) !== null;
   const trayModalType = isTrayModal ? modalGroup : null;
 
+  // Clear any lingering blur effects on mobile when opening a modal
+  if (isOpening && Utils.isMobile() && (trayModalType === 'nav' || trayModalType === 'reviews')) {
+    const selectors = trayModalType === 'nav' ? [
+      ".menu_link_list > *",
+      ".form_menu_grid > *",
+      ".menu_trending_cms_list > *",
+      ".menu_calendar_list",
+      ".menu_calendar_list_pagination",
+      "[menu-category-pag]",
+      "[menu-category-label]",
+      "[menu-category-cms-list]"
+    ] : [
+      ".reviews_modal_review_list > *"
+    ];
+    
+    selectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length) {
+        gsap.set(elements, { filter: "none" });
+      }
+    });
+  }
+
   let modalTl = gsap.timeline({
     onStart: () => {
       if (isOpening) {
@@ -477,10 +515,14 @@ document.addEventListener("click", (event) => {
         handleVideosOnModalClose(modalGroup);
         updateLiveChatVisibility();
       }
-      gsap.set(
-        `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
-        { filter: "none" }
-      );
+      
+      // Only clear filter if we're not on mobile
+      if (!Utils.isMobile()) {
+        gsap.set(
+          `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
+          { filter: "none" }
+        );
+      }
     }
   });
 
@@ -515,28 +557,28 @@ document.addEventListener("click", (event) => {
 
           // Content animations with staggered timing
           .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.30)
+          .to(".menu_link_list > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }), 0.30)
           .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
           .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to(".menu_calendar_list", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.45)
-          .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}, 0.5)
+          .to(".menu_calendar_list", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.45)
+          .to(".menu_calendar_list_pagination", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}), 0.5)
           .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
+          .to(".form_menu_grid > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }), 0.3)
           .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.45)
           .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }, 0.35)
+          .to(".menu_trending_cms_list > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }), 0.35)
           .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to("[menu-category-label='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.4) 
-          .to("[menu-category-cms-list='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.42)
-          .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.44)
+          .to("[menu-category-label='1']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.4) 
+          .to("[menu-category-cms-list='1']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.42)
+          .to("[menu-category-pag='1']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.44)
           .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46)
-          .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.46) 
-          .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.48)
-          .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.5)
+          .to("[menu-category-label='2']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.46) 
+          .to("[menu-category-cms-list='2']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.48)
+          .to("[menu-category-pag='2']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.5)
           .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
-          .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.52) 
-          .to("[menu-category-cms-list='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }, 0.54)
-          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }, 0.56);
+          .to("[menu-category-label='3']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.52) 
+          .to("[menu-category-cms-list='3']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.54)
+          .to("[menu-category-pag='3']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.56);
 
       } else if (trayModalType === 'package') {
         modalTl
@@ -572,7 +614,7 @@ document.addEventListener("click", (event) => {
             }, 0.1 )
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }, 0.35);
+          .to(".reviews_modal_review_list > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }), 0.35);
       }
     } else {
       // Regular modal animation
@@ -601,26 +643,26 @@ document.addEventListener("click", (event) => {
           .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_link_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".form_menu_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_link_list > *", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to(".form_menu_grid > *", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to(".menu_trending_cms_list > *", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
           .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_calendar_list", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_calendar_list", Utils.getAnimProps({ opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to(".menu_calendar_list_pagination", Utils.getAnimProps({ opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
           .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='3']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0) 
-          .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0) 
-          .to("[menu-category-label='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-cms-list='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-cms-list='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0) 
-          .to("[menu-category-cms-list='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-pag='1']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-pag='2']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-pag='3']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-label='1']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-label='2']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0) 
+          .to("[menu-category-label='3']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-cms-list='1']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-cms-list='2']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0) 
+          .to("[menu-category-cms-list='3']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
           .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -640,14 +682,14 @@ document.addEventListener("click", (event) => {
             duration: 0.2, 
             ease: "power1.in"
           }, 0)
-          .to('.package_content > * > *', { 
+          .to('.package_content > * > *', Utils.getAnimProps({ 
             opacity: 0, 
             x: "0.125rem", 
             y: "-0.25rem", 
             filter: "blur(2px)", 
             duration: 0.2, 
             ease: "power1.in"
-          }, 0)
+          }), 0)
           .to('.package_btn_wrap', { 
             opacity: 0, 
             x: "0.5rem", 
@@ -669,7 +711,7 @@ document.addEventListener("click", (event) => {
           });
       } else if (trayModalType === 'reviews') {
         modalTl
-        .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }, 0)  
+        .to(".reviews_modal_review_list > *", Utils.getAnimProps({ opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)  
         .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
         .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
         .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -710,6 +752,37 @@ document.addEventListener("DOMContentLoaded", () => {
       parentList.classList.remove("is-active");
     });
   }
+  
+  // Handle resize events to ensure blur filters are cleared on mobile
+  const clearBlurOnResize = Utils.debounce(() => {
+    if (Utils.isMobile()) {
+      // Clear blur filters from all modal content elements
+      const modalContentElements = [
+        // Nav modal elements
+        ".menu_link_list > *",
+        ".form_menu_grid > *",
+        ".menu_trending_cms_list > *",
+        ".menu_calendar_list",
+        ".menu_calendar_list_pagination",
+        "[menu-category-pag]",
+        "[menu-category-label]",
+        "[menu-category-cms-list]",
+        // Review modal elements
+        ".reviews_modal_review_list > *",
+        // Package modal elements
+        ".package_content > * > *"
+      ];
+      
+      modalContentElements.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length) {
+          gsap.set(elements, { filter: "none" });
+        }
+      });
+    }
+  }, 150);
+  
+  window.addEventListener("resize", clearBlurOnResize);
 });
 
 // Tab switch animation system
