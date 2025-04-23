@@ -14,16 +14,10 @@ const setExpBackgroundImage = () => {
       }
     }
     
-    // 2. Video poster with valid src attribute
+    // 2. Video poster with valid image src
     const videoPoster = document.querySelector('.video_gallery_poster');
-    if (videoPoster) {
-      const posterSrc = videoPoster.currentSrc || videoPoster.src;
-      if (posterSrc && 
-          posterSrc.trim() !== '' && 
-          !posterSrc.includes('placeholder') &&
-          /\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(posterSrc)) {
-        return videoPoster;
-      }
+    if (videoPoster && (videoPoster.currentSrc || videoPoster.src)) {
+      return videoPoster;
     }
     
     // 3. First gallery image
