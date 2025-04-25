@@ -577,7 +577,6 @@ const ScrollTriggerModule = (() => {
 
   // Theme sticky styling
   gsap.matchMedia().add("(min-width: 480px)", () => {
-    const isMobile = () => window.innerWidth <= 767;
     
     ScrollTrigger.create({
       trigger: "#filter-section",
@@ -585,23 +584,9 @@ const ScrollTriggerModule = (() => {
       toggleActions: "play none reverse none",
       onEnter: () => {
         gsap.set(".form_theme_underline", { opacity: 1 });
-        // Skip blur animation on mobile for performance
-        if (!isMobile()) {
-          gsap.to(".filter_main_blur", { opacity: 1, duration: 0.5, ease: "power4.out" });
-        } else {
-          // Alternative animation for mobile - just set opacity without blur
-          gsap.set(".filter_main_blur", { opacity: 1 });
-        }
       },
       onLeaveBack: () => {
         gsap.set(".form_theme_underline", { opacity: 0 });
-        // Skip blur animation on mobile for performance
-        if (!isMobile()) {
-          gsap.to(".filter_main_blur", { opacity: 0, duration: 0.3, ease: "power4.out" });
-        } else {
-          // Alternative animation for mobile - just set opacity without blur
-          gsap.set(".filter_main_blur", { opacity: 0 });
-        }
       },
     });
 
@@ -729,11 +714,9 @@ if (resultsCount && filterCount && pagination) {
 
 // Parallax animations setup
 const homeHeroWrap = document.querySelector(".hero_home_wrap");
-const ctaContent = document.querySelector(".cta_bg_img");
 
 // Create variables but don't initialize them outside the media query
 let homeHeroParallax;
-let ctaParallax;
 
 // Enable parallax for devices above 479px
 let parallaxMediaMatcher = gsap.matchMedia();
@@ -748,19 +731,27 @@ parallaxMediaMatcher.add("(min-width: 479px)", () => {
         scrub: true,
       },
     });
-    homeHeroParallax.to(".hero_home_vid", { y: "10rem" });
-  }
-
-  if (ctaContent) {
-    ctaParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".cta_bg_img",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    ctaParallax.to(".cta_bg_img", { y: "6rem" });
+    homeHeroParallax.to(".hero_home_vid", { y: "20rem" });
   }
   
 });
+
+// Scroll button fade animation
+const ScrollButtonFade = (() => {
+  const scrollBtn = document.querySelector(".hero_scroll-btn_wrap");
+  
+  if (scrollBtn) {
+    gsap.timeline({
+      scrollTrigger: {
+        trigger: ".hero_scroll-btn_wrap",
+        start: "bottom-=24px bottom",
+        end: "bottom top",
+        scrub: true,
+      }
+    }).to(scrollBtn, {
+      opacity: 0,
+      ease: "none"
+    });
+  }
+})();
+

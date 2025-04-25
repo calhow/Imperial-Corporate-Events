@@ -1286,11 +1286,11 @@ document.addEventListener('DOMContentLoaded', CMSFilterManager.init);
 const initializeFooterCtaSwiper = () => {
   // Initialize footer CTA swiper
   const footerSwiper = new Swiper(".swiper.is-footer-cta", {
-    speed: 500,
+    speed: 600,
     slidesPerView: "auto",
     spaceBetween: 0,
     autoplay: {
-      delay: 5000,
+      delay: 6000,
       disableOnInteraction: false
     },
     loop: true,
