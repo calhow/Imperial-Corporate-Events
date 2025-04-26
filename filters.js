@@ -755,3 +755,43 @@ const ScrollButtonFade = (() => {
   }
 })();
 
+
+const initHomeScrollEffects = () => {
+  const filterMediaMatcher = gsap.matchMedia();
+
+  filterMediaMatcher.add("(min-width: 768px)", () => {
+    gsap.set(".home_bg_img_wrap > *", { opacity: 0});
+    
+    setTimeout(() => {
+      ScrollTrigger.create({
+        trigger: ".filter_main_sticky",
+        start: "top top+=30",
+        onEnter: () => {
+          gsap.killTweensOf(".home_bg_img_wrap > *");
+          gsap.to(".home_bg_img_wrap > *", {
+            opacity: 0.3,
+            duration: 1.5, 
+            ease: "power1.out",
+            stagger: 0.2
+          });
+        },
+        onLeaveBack: () => {
+          gsap.killTweensOf(".home_bg_img_wrap > *");
+          gsap.to(".home_bg_img_wrap > *", {
+            opacity: 0,
+            duration: 0.8, 
+            ease: "power1.out"
+          });
+        }
+      });
+    }, 100);
+
+    return () => {};
+  });
+};
+
+document.addEventListener("DOMContentLoaded", initHomeScrollEffects);
+
+window.BackgroundAnimations = {
+  init: initHomeScrollEffects
+};

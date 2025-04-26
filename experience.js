@@ -1,7 +1,5 @@
 // Sets experience background image from gallery or video poster
 const setExpBackgroundImage = () => {
-  // Skip if screen width is below 678px
-  if (window.innerWidth < 678) return;
   
   // Find source element in priority order
   const getSourceElement = () => {

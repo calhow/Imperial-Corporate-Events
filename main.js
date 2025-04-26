@@ -1114,22 +1114,24 @@ window.NavScrollTrigger = (() => {
   const initNavbarScrollEffects = () => {
     const navMediaMatcher = gsap.matchMedia();
 
-    navMediaMatcher.add("(min-width: 480px) and (max-width: 1215px)", () => {
+    navMediaMatcher.add("(max-width: 1290px)", () => {
       ScrollTrigger.create({
         trigger: ".page_main",
-        start: `top+=${document.querySelector(".nav_main_contain")?.offsetHeight || 0}px top`,
+        start: "top top",
         onEnter: () => {
-          gsap.to(".nav_main_contain", {
-            yPercent: -100,
-            duration: 0.7,
-            ease: "power2.out",
+          gsap.to(".nav_main_logo", {
+            opacity: 0,
+            pointerEvents: "none",
+            duration: 0.2,
+            ease: "power1.out",
           });
         },
         onLeaveBack: () => {
-          gsap.to(".nav_main_contain", {
-            yPercent: 0,
-            duration: 0.3,
-            ease: "power2.out",
+          gsap.to(".nav_main_logo", {
+            opacity: 1,
+            pointerEvents: "auto",
+            duration: 0.2,
+            ease: "power1.out",
           });
         },
       });
@@ -1139,31 +1141,26 @@ window.NavScrollTrigger = (() => {
       };
     });
 
-    navMediaMatcher.add("(min-width: 1215px)", () => {
-      ScrollTrigger.create({
-        trigger: ".page_main",
-        start: `top+=5px top`,
-        onEnter: () => {
-          gsap.to(".nav_main_link_wrap", {
-            opacity: 0,
-            pointerEvents: "none",
-            duration: 0.2,
-            ease: "power2.out",
-          });
-        },
-        onLeaveBack: () => {
-          gsap.to(".nav_main_link_wrap", {
-            opacity: 1,
-            pointerEvents: "auto",
-            duration: 0.1,
-            ease: "power2.out",
-          });
-        },
-      });
 
-      return () => {
-        // Cleanup function for when matchMedia conditions change
-      };
+    ScrollTrigger.create({
+      trigger: ".page_main",
+      start: "top top",
+      onEnter: () => {
+        gsap.to(".nav_main_link_wrap", {
+          opacity: 0,
+          pointerEvents: "none",
+          duration: 0.2,
+          ease: "power1.out",
+        });
+      },
+      onLeaveBack: () => {
+        gsap.to(".nav_main_link_wrap", {
+          opacity: 1,
+          pointerEvents: "auto",
+          duration: 0.2,
+          ease: "power1.out",
+        });
+      },
     });
   };
 
@@ -1307,3 +1304,5 @@ const initializeFooterCtaSwiper = () => {
 
 // Initialize the footer CTA swiper independently
 const footerCtaSwiperController = initializeFooterCtaSwiper();
+
+
