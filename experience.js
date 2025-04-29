@@ -1,86 +1,378 @@
-// Sets experience background image from gallery or video poster
-const setExpBackgroundImage = () => {
-  
-  // Find source element in priority order
-  const getSourceElement = () => {
-    // 1. Team logo with valid image URL
-    const teamLogo = document.querySelector('.gallery_home-team-logo');
-    if (teamLogo) {
-      const logoSrc = teamLogo.currentSrc || teamLogo.src;
-      if (logoSrc && 
-          logoSrc.trim() !== '' && 
-          !logoSrc.includes('/experience/') &&
-          /\.(jpg|jpeg|png|gif|svg|webp)(\?.*)?$/i.test(logoSrc)) {
-        return teamLogo;
-      }
-    }
-    
-    // 2. Video poster with valid image src
-    const videoPoster = document.querySelector('.video_gallery_poster');
-    if (videoPoster && (videoPoster.currentSrc || videoPoster.src)) {
-      return videoPoster;
-    }
-    
-    // 3. First gallery image
-    return document.querySelector('.gallery_img');
+// Sets experience background image from gallery or video poster with animations
+const BackgroundImageManager = (() => {
+  // Configuration
+  const config = {
+    animationDuration: 0.6,
+    easing: 'power2.out',
+    targetClass: 'exp_bg_img',
+    containerClass: 'exp_bg_img_wrap',
+    bgImageCount: 8
   };
   
-  // Extract image URL from source element
+  // State
+  let gallerySwiper = null;
+  let isAnimating = false;
+  let direction = 'next';
+  let resizeHandler = null;
+  let originalImages = [];
+  let duplicateImages = [];
+  let animatingIn = true;
+  
+  // Gets the source element from gallery slide
+  const getSourceElement = (slide) => {
+    if (!slide && gallerySwiper) {
+      slide = gallerySwiper.slides[gallerySwiper.activeIndex];
+    }
+    
+    if (!slide) {
+      return document.querySelector('.video_gallery_poster') || null;
+    }
+    
+    return slide.querySelector('.gallery_img') || 
+           slide.querySelector('img') || 
+           slide.querySelector('video');
+  };
+  
+  // Extracts image URL from an element
   const getImageUrl = (element) => {
     if (!element) return null;
     
     if (element.tagName === 'IMG') {
-      return element.currentSrc || element.src;
-    }
-    
-    const bgImage = getComputedStyle(element).backgroundImage;
-    if (bgImage && bgImage !== 'none' && bgImage !== 'url("")') {
-      const urlMatch = bgImage.split('"');
-      return urlMatch.length > 1 ? urlMatch[1] : bgImage.substring(4, bgImage.length - 1);
+      return element.src;
+    } else if (element.tagName === 'VIDEO') {
+      return element.poster || element.querySelector('source')?.getAttribute('poster');
     }
     
     return null;
   };
   
-  // Set image source on all target elements
-  const setBackgroundImages = (url) => {
-    if (!url) return;
+  // Gets container element for background images
+  const getContainerElement = () => document.querySelector(`.${config.containerClass}`);
+  
+  // Finds all original background images
+  const findOriginalImages = () => {
+    const images = [];
+    for (let i = 1; i <= config.bgImageCount; i++) {
+      const img = document.querySelector(`.${config.targetClass}.is-${i}`);
+      if (img) images.push(img);
+    }
+    return images;
+  };
     
-    const targetImages = document.getElementsByClassName('exp_bg_img');
-    for (let i = 0; i < targetImages.length; i++) {
-      targetImages[i].src = url;
+  // Creates duplicate set of images for crossfade animations
+  const createDuplicateImages = () => {
+    document.querySelectorAll(`.${config.targetClass}[data-duplicate="true"]`)
+      .forEach(el => el.parentNode?.removeChild(el));
+    
+    const container = getContainerElement();
+    if (!container || originalImages.length === 0) return [];
+    
+    const duplicates = [];
+    
+    originalImages.forEach((original, index) => {
+      const duplicate = document.createElement('img');
+      
+      // Copy attributes from original
+      for (const attr of original.attributes) {
+        if (attr.name !== 'class' && attr.name !== 'src' && attr.name !== 'style') {
+          duplicate.setAttribute(attr.name, attr.value);
+        }
+      }
+      
+      duplicate.className = original.className;
+      duplicate.setAttribute('data-duplicate', 'true');
+      duplicate.setAttribute('data-original-index', index.toString());
+      duplicate.style.opacity = '0';
+      
+      if (original.src) {
+        duplicate.src = original.src;
+      }
+      
+      container.appendChild(duplicate);
+      duplicates.push(duplicate);
+    });
+    
+    return duplicates;
+  };
+  
+  // Returns target opacity for an element based on CSS
+  const getTargetOpacity = (element) => {
+    const tempEl = document.createElement('img');
+    tempEl.className = element.className;
+    tempEl.style.cssText = "position: absolute; visibility: hidden;";
+    document.body.appendChild(tempEl);
+    
+    const cssOpacity = parseFloat(window.getComputedStyle(tempEl).opacity);
+    document.body.removeChild(tempEl);
+    
+    return isNaN(cssOpacity) ? 1 : cssOpacity;
+  };
+  
+  // Initializes the background image manager
+  const initialize = (swiper) => {
+    if (!swiper) return;
+    
+    cleanup();
+    
+    gallerySwiper = swiper;
+    originalImages = findOriginalImages();
+    
+    if (originalImages.length === 0) return;
+    
+    duplicateImages = createDuplicateImages();
+    
+    const sourceElement = getSourceElement();
+    const imageUrl = getImageUrl(sourceElement);
+    
+    if (imageUrl) {
+      originalImages.forEach(img => {
+        img.src = imageUrl;
+        img.style.opacity = '';
+        img.style.transform = '';
+      });
+      
+      duplicateImages.forEach(img => {
+        img.src = imageUrl;
+        img.style.opacity = '0';
+        img.style.transform = '';
+      });
+    }
+    
+    gallerySwiper.on('slideNextTransitionStart', () => {
+      direction = 'next';
+      handleSlideChange();
+    });
+    
+    gallerySwiper.on('slidePrevTransitionStart', () => {
+      direction = 'prev';
+      handleSlideChange();
+    });
+    
+    gallerySwiper.on('breakpoint', () => {
+      resetAnimation();
+      updateBackgroundImagesFromCurrentSlide();
+    });
+    
+    resizeHandler = debounce(() => {
+      resetAnimation();
+      updateBackgroundImagesFromCurrentSlide();
+    }, 250);
+    
+    window.addEventListener('resize', resizeHandler);
+    window.addEventListener('beforeunload', cleanup, { once: true });
+  };
+  
+  // Cleans up event listeners and resources
+  const cleanup = () => {
+    resetAnimation();
+    
+    if (resizeHandler) {
+      window.removeEventListener('resize', resizeHandler);
+      resizeHandler = null;
+    }
+    
+    originalImages.forEach(img => {
+      img.style.opacity = '';
+      img.style.transform = '';
+      gsap.killTweensOf(img);
+    });
+    
+    duplicateImages.forEach(img => {
+      if (img.parentNode) {
+        img.parentNode.removeChild(img);
+      }
+    });
+    
+    if (gallerySwiper) {
+      gallerySwiper.off('slideNextTransitionStart');
+      gallerySwiper.off('slidePrevTransitionStart');
+      gallerySwiper.off('breakpoint');
+      gallerySwiper = null;
+    }
+    
+    originalImages = [];
+    duplicateImages = [];
+    isAnimating = false;
+    animatingIn = true;
+  };
+  
+  // Resets any in-progress animations
+  const resetAnimation = () => {
+    if (isAnimating) {
+      originalImages.forEach(img => {
+        gsap.killTweensOf(img);
+        img.style.opacity = '';
+        img.style.transform = '';
+      });
+      
+      duplicateImages.forEach(img => {
+        gsap.killTweensOf(img);
+        img.style.opacity = '0';
+        img.style.transform = '';
+      });
+      
+      isAnimating = false;
     }
   };
   
-  // Execute the image setting pipeline
-  const sourceElement = getSourceElement();
-  const imageUrl = getImageUrl(sourceElement);
-  setBackgroundImages(imageUrl);
-};
+  // Handles slide changes and triggers animations
+  const handleSlideChange = () => {
+    if (!gallerySwiper || originalImages.length === 0) return;
+    
+    if (isAnimating) resetAnimation();
+    
+    const activeSlide = gallerySwiper.slides[gallerySwiper.activeIndex];
+    if (!activeSlide) return;
+    
+    const sourceElement = getSourceElement(activeSlide);
+    const imageUrl = getImageUrl(sourceElement);
+    
+    if (!imageUrl) return;
+    
+    if (gallerySwiper.animating && gallerySwiper.swipeDirection) {
+      updateBackgroundImagesFromCurrentSlide();
+      return;
+    }
+    
+    animateBackgroundTransition(imageUrl);
+  };
+  
+  // Animates background image transitions
+  const animateBackgroundTransition = (newImageUrl) => {
+    if (originalImages.length === 0 || duplicateImages.length === 0) return;
+    
+    const currentAnimationRequest = newImageUrl;
+    
+    if (isAnimating) resetAnimation();
+    
+    isAnimating = true;
+    
+    // Determine which set is currently visible and which will animate in
+    let currentSet = animatingIn ? originalImages : duplicateImages;
+    let nextSet = animatingIn ? duplicateImages : originalImages;
+    
+    try {
+      if (nextSet.some(img => !img.parentNode)) {
+        if (animatingIn && duplicateImages.some(img => !img.parentNode)) {
+          duplicateImages = createDuplicateImages();
+          nextSet = animatingIn ? duplicateImages : originalImages;
+        }
+        
+        if (nextSet.some(img => !img.parentNode)) {
+          isAnimating = false;
+          return;
+        }
+      }
+      
+      nextSet.forEach(img => {
+        img.src = newImageUrl;
+        if (img.style.display === 'none') img.style.display = '';
+        img.style.opacity = '0';
+      });
+      
+      // Get target opacities for all next set images
+      const nextSetTargetOpacities = nextSet.map(getTargetOpacity);
+      
+      const tl = gsap.timeline({
+        onComplete: () => {
+          if (currentAnimationRequest === newImageUrl) {
+            setTimeout(() => {
+              if (currentAnimationRequest !== newImageUrl) return;
+              
+              nextSet.forEach(img => img.style.opacity = '');
+              animatingIn = !animatingIn;
+              isAnimating = false;
+            }, 50);
+          } else {
+            isAnimating = false;
+          }
+        }
+      });
+      
+      // Animate current set out
+      currentSet.forEach(img => {
+        tl.to(img, {
+          opacity: 0,
+          duration: config.animationDuration,
+          ease: config.easing,
+          onComplete: () => img.style.opacity = '0'
+        }, 0);
+      });
+      
+      // Animate each next set image to its target CSS opacity
+      nextSet.forEach((img, i) => {
+        tl.to(img, {
+          opacity: nextSetTargetOpacities[i],
+          duration: config.animationDuration,
+          ease: config.easing,
+          onComplete: () => img.style.opacity = ''
+        }, 0);
+      });
+      
+    } catch (error) {
+      isAnimating = false;
+    }
+  };
+  
+  // Updates background images from current slide without animation
+  const updateBackgroundImagesFromCurrentSlide = () => {
+    if (!gallerySwiper || originalImages.length === 0) return;
+    
+    const activeSlide = gallerySwiper.slides[gallerySwiper.activeIndex];
+    if (!activeSlide) return;
+    
+    const sourceElement = getSourceElement(activeSlide);
+    const imageUrl = getImageUrl(sourceElement);
+    
+    if (!imageUrl) return;
+    
+    originalImages.forEach(img => {
+      img.src = imageUrl;
+      img.style.opacity = '';
+    });
+    
+    duplicateImages.forEach(img => {
+      img.src = imageUrl;
+      img.style.opacity = '0';
+    });
+    
+    animatingIn = true;
+  };
+  
+  return {
+    initialize,
+    updateBackgroundImagesFromCurrentSlide,
+    cleanup
+  };
+})();
 
 // Debounce function
-const debounce = (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+const debounce = (typeof Utils !== 'undefined' && Utils.debounce) ? Utils.debounce : function(func, wait) {
   let timeout;
   return (...args) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
-});
+};
 
-// Handle window resize events for background images
-const handleBackgroundImageOnResize = debounce(() => {
-  // Only run when crossing the 678px threshold
-  setExpBackgroundImage();
-}, 250);
+// Add resize event listener for background images
+window.addEventListener('resize', debounce(() => {
+  if (typeof BackgroundImageManager !== 'undefined') {
+    BackgroundImageManager.updateBackgroundImagesFromCurrentSlide();
+  }
+}, 250));
 
-// Add resize event listener
-window.addEventListener('resize', handleBackgroundImageOnResize);
-
-// Initialize on page load, respecting the screen size condition
+// Initialize on page load
 if (document.readyState !== 'loading') {
-  setExpBackgroundImage();
+  if (typeof BackgroundImageManager !== 'undefined') {
+    BackgroundImageManager.updateBackgroundImagesFromCurrentSlide();
+  }
 } else {
-  document.addEventListener('DOMContentLoaded', setExpBackgroundImage, {once: true});
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof BackgroundImageManager !== 'undefined') {
+      BackgroundImageManager.updateBackgroundImagesFromCurrentSlide();
+    }
+  }, {once: true});
 }
 
 const swiperInstances = [];
@@ -183,61 +475,6 @@ window.addEventListener("resize", debounce(manageSwipers, 200));
 
 manageSwipers();
 
-// Handles highlights swiper destruction and recreation during filter changes
-window.fsAttributes = window.fsAttributes || [];
-window.fsAttributes.push([
-  "cmsfilter",
-  (filterInstances) => {
-    const [firstInstance, secondInstance] = filterInstances;
-
-    swiperConfigs.forEach(({ selector, comboClass, slidesPerView }) => {
-      if (comboClass !== "is-highlights") {
-        const swiperInstance = initializeSwiper({
-          selector,
-          comboClass,
-          slidesPerView,
-        });
-
-        swiperInstances.push(swiperInstance);
-      }
-    });
-
-    const triggerRenderItems = () => {
-      if (window.innerWidth < 992) return;
-
-      const highlightsSwiper = swiperInstances.find(
-        (swiper) => swiper.comboClass === "is-highlights"
-      );
-
-      if (highlightsSwiper) {
-        highlightsSwiper.destroy(true, true);
-        swiperInstances.splice(swiperInstances.indexOf(highlightsSwiper), 1);
-      }
-
-      const newHighlightsSwiper = initializeSwiper({
-        selector: ".swiper.is-highlights",
-        comboClass: "is-highlights",
-        slidesPerView: "auto",
-      });
-
-      swiperInstances.push(newHighlightsSwiper);
-    };
-
-    if (secondInstance) {
-      secondInstance.listInstance.on("renderitems", () => {
-        triggerRenderItems();
-      });
-    }
-
-    const onFilterChange = () => {
-      triggerRenderItems();
-    };
-
-    if (secondInstance) {
-      secondInstance.listInstance.on("change", onFilterChange);
-    }
-  },
-]);
 
 // Handles key feature card animation on click
 const cards = document.querySelectorAll(".card_key-feature_wrap");
@@ -392,24 +629,6 @@ const prepareGalleryVideoSlide = () => {
 
 // Unified Swiper utilities
 const SwiperManager = {
-  setupLoopMode(swiper, minSlidesForLoop = 2) {
-    const slideCount = swiper.slides.length;
-    const hasEnoughSlides = slideCount >= minSlidesForLoop;
-    
-    if (hasEnoughSlides) {
-      swiper.params.loop = true;
-      swiper.loopDestroy();
-      swiper.loopCreate();
-      swiper.update();
-      return true;
-    } else {
-      swiper.params.loop = false;
-      swiper.loopDestroy();
-      swiper.update();
-      return false;
-    }
-  },
-  
   toggleNavigationVisibility(swiper, options = {}) {
     const {
       galleryBtnWrap = null,
@@ -457,10 +676,11 @@ const SwiperManager = {
     slideActiveClass: "is-active",
     effect: "fade",
     fadeEffect: { crossFade: true },
-    loop: false,
-    loopedSlides: 1,
+    loop: true,
     preventClicks: false,
     preventClicksPropagation: false,
+    speed: 400,
+    easing: 'ease-out',
     navigation: {
       nextEl: '[data-swiper-button-next="is-gallery"]',
       prevEl: '[data-swiper-button-prev="is-gallery"]',
@@ -473,14 +693,8 @@ const SwiperManager = {
     },
     on: {
       init(swiper) {
-        const loopEnabled = SwiperManager.setupLoopMode(swiper);
-        
         if (videoSlidePrePositioned) {
-          if (loopEnabled) {
-            swiper.slideToLoop(0, 0, false);
-          } else {
-            swiper.slideTo(0, 0, false);
-          }
+          swiper.slideTo(0, 0, false);
         }
         
         SwiperManager.toggleNavigationVisibility(swiper, {
@@ -488,6 +702,9 @@ const SwiperManager = {
           prevBtn: document.querySelector('[data-swiper-button-prev="is-gallery"]'),
           nextBtn: document.querySelector('[data-swiper-button-next="is-gallery"]')
         });
+        
+        // Initialize the background image manager with this swiper
+        BackgroundImageManager.initialize(swiper);
       }
     }
   });
@@ -517,8 +734,7 @@ function initializeGallerySwipers() {
         fadeEffect: {
           crossFade: true,
         },
-        loop: false,
-        loopedSlides: 1,
+        loop: true,
         preventClicks: false,
         preventClicksPropagation: false,
         navigation: {
@@ -533,8 +749,6 @@ function initializeGallerySwipers() {
         },
         on: {
           init: function() {
-            SwiperManager.setupLoopMode(this);
-            
             SwiperManager.toggleNavigationVisibility(this, {
               galleryBtnWrap: gallery.closest(".package_gallery_contain")?.querySelector(".gallery_btn_wrap"),
               prevBtn: document.querySelector(`[data-swiper-button-prev="${uniqueValue}"]`),
@@ -547,55 +761,6 @@ function initializeGallerySwipers() {
   });
 }
 
-// Initializes highlights filter tabs
-setTimeout(function () {
-  window.fsAttributes = window.fsAttributes || [];
-  window.fsAttributes.push([
-    "cmsfilter",
-    function (filterInstances) {
-      if (filterInstances.length > 1) {
-        const secondFilterInstance = filterInstances[1];
-        const filtersData = secondFilterInstance.filtersData;
-
-        let resultsArray = [];
-
-        filtersData.forEach(function (element) {
-          const elements = element.elements;
-          elements.forEach(function (element) {
-            let filterValue = element.value.trim();
-            let resultsNumber = element.resultsCount;
-            resultsArray.push({
-              filterName: filterValue,
-              filterResults: resultsNumber,
-            });
-          });
-        });
-
-        resultsArray.forEach(function (filter) {
-          var elements = Array.from(
-            document.querySelectorAll(".form_pill-tab_wrap")
-          ).filter(function (element) {
-            return (
-              element
-                .querySelector(".form_pill-tab_label")
-                .textContent.trim() === filter.filterName
-            );
-          });
-
-          elements.forEach(function (element) {
-            if (element.tagName === "LABEL") {
-              if (filter.filterResults === 0) {
-                element.classList.add("radio-disabled");
-              } else {
-                element.classList.remove("radio-disabled");
-              }
-            }
-          });
-        });
-      }
-    },
-  ]);
-}, 100);
 
 // Controls fixed buttons visibility while scrolling on mobile
 (() => {

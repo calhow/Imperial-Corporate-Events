@@ -312,11 +312,9 @@ if (typeof window.NavScrollTrigger !== 'undefined') {
 
 // Parallax animations setup
 const catHeroImg = document.querySelector(".cat_hero_img");
-const ctaContent = document.querySelector(".cta_bg_img");
 
 // Create variables but don't initialize them outside the media query
 let catHeroParallax;
-let ctaParallax;
 
 // Enable parallax for devices above 479px
 let catMediaMatcher = gsap.matchMedia();
@@ -333,18 +331,6 @@ catMediaMatcher.add("(min-width: 479px)", () => {
       },
     });
     catHeroParallax.to(".cat_hero_img", { y: "3rem" });
-  }
-
-  if (ctaContent) {
-    ctaParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".cta_bg_img",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    ctaParallax.to(".cta_bg_img", { y: "6rem" });
   }
   
 });
