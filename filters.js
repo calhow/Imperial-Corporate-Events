@@ -1,4 +1,4 @@
-// HOMEPAGE FILTER
+// EXPLOR FILTER
 
 // Swiper Module for theme filters
 const SwiperModule = (() => {
@@ -712,48 +712,6 @@ if (resultsCount && filterCount && pagination) {
 }
 
 
-// Parallax animations setup
-const homeHeroWrap = document.querySelector(".hero_home_wrap");
-
-// Create variables but don't initialize them outside the media query
-let homeHeroParallax;
-
-// Enable parallax for devices above 479px
-let parallaxMediaMatcher = gsap.matchMedia();
-parallaxMediaMatcher.add("(min-width: 479px)", () => {
-  // Initialize all parallax timelines inside the media query
-  if (homeHeroWrap) {
-    homeHeroParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: ".hero_home_wrap",
-        start: "top top",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    homeHeroParallax.to(".hero_home_vid", { y: "20rem" });
-  }
-  
-});
-
-// Scroll button fade animation
-const ScrollButtonFade = (() => {
-  const scrollBtn = document.querySelector(".hero_scroll-btn_wrap");
-  
-  if (scrollBtn) {
-    gsap.timeline({
-      scrollTrigger: {
-        trigger: ".hero_scroll-btn_wrap",
-        start: "bottom-=24px bottom",
-        end: "bottom top",
-        scrub: true,
-      }
-    }).to(scrollBtn, {
-      opacity: 0,
-      ease: "none"
-    });
-  }
-})();
 
 
 const initHomeScrollEffects = () => {
@@ -795,3 +753,4 @@ document.addEventListener("DOMContentLoaded", initHomeScrollEffects);
 window.BackgroundAnimations = {
   init: initHomeScrollEffects
 };
+

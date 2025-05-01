@@ -1,6 +1,424 @@
 const swiperInstances = [];
 
+// Utility debounce function
+const debounce = (func, wait) => {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+};
+
+const CategoryBackgroundManager = (() => {
+  // Configuration
+  const config = {
+    animationDuration: 0.6,
+    easing: 'power2.out',
+    targetClass: 'cat_bg_img',
+    containerClass: 'cat_bg_img_wrap',
+    bgImageCount: 8
+  };
+  
+  // Try alternative container class if needed
+  if (!document.querySelector(`.${config.containerClass}`)) {
+    config.containerClass = 'cat_bg_img_wrap-copy';
+  }
+  
+  // Check if background images with current class exist
+  const hasBgImages = document.querySelector(`.${config.targetClass}`);
+  if (!hasBgImages) {
+    // Try alternative class names
+    const alternativeClasses = ['cat_hero_bg_img', 'cat_bg_image'];
+    for (const altClass of alternativeClasses) {
+      if (document.querySelector(`.${altClass}`)) {
+        config.targetClass = altClass;
+        break;
+      }
+    }
+  }
+  
+  // State
+  let heroSwiper = null;
+  let isAnimating = false;
+  let resizeHandler = null;
+  let originalImages = [];
+  let duplicateImages = [];
+  let animatingIn = true;
+  
+  // Gets the source element from hero slide
+  const getSourceElement = (slide) => {
+    if (!slide && heroSwiper) {
+      slide = heroSwiper.slides[heroSwiper.activeIndex];
+    }
+    
+    if (!slide) {
+      return document.querySelector('.cat_card_poster') || null;
+    }
+    
+    return slide.querySelector('img') || slide.querySelector('video');
+  };
+  
+  // Extracts image URL from an element
+  const getImageUrl = (element) => {
+    if (!element) return null;
+    
+    let url = null;
+    
+    if (element.tagName === 'IMG') {
+      url = element.src;
+    } else if (element.tagName === 'VIDEO') {
+      url = element.poster || element.querySelector('source')?.getAttribute('poster');
+    }
+    
+    return url;
+  };
+  
+  // Gets container element for background images
+  const getContainerElement = () => {
+    return document.querySelector(`.${config.containerClass}`);
+  };
+  
+  // Finds all original background images
+  const findOriginalImages = () => {
+    const images = [];
+    for (let i = 1; i <= config.bgImageCount; i++) {
+      const img = document.querySelector(`.${config.targetClass}.is-${i}`);
+      if (img) images.push(img);
+    }
+    return images;
+  };
+    
+  // Creates duplicate set of images for crossfade animations
+  const createDuplicateImages = () => {
+    document.querySelectorAll(`.${config.targetClass}[data-duplicate="true"]`)
+      .forEach(el => el.parentNode?.removeChild(el));
+    
+    const container = getContainerElement();
+    if (!container || originalImages.length === 0) return [];
+    
+    const duplicates = [];
+    
+    originalImages.forEach((original, index) => {
+      const duplicate = document.createElement('img');
+      
+      // Copy attributes from original
+      for (const attr of original.attributes) {
+        if (attr.name !== 'class' && attr.name !== 'src' && attr.name !== 'style') {
+          duplicate.setAttribute(attr.name, attr.value);
+        }
+      }
+      
+      duplicate.className = original.className;
+      duplicate.setAttribute('data-duplicate', 'true');
+      duplicate.setAttribute('data-original-index', index.toString());
+      duplicate.style.opacity = '0';
+      
+      if (original.src) {
+        duplicate.src = original.src;
+      }
+      
+      container.appendChild(duplicate);
+      duplicates.push(duplicate);
+    });
+    
+    return duplicates;
+  };
+  
+  // Returns target opacity for an element based on CSS
+  const getTargetOpacity = (element) => {
+    const tempEl = document.createElement('img');
+    tempEl.className = element.className;
+    tempEl.style.cssText = "position: absolute; visibility: hidden;";
+    document.body.appendChild(tempEl);
+    
+    const cssOpacity = parseFloat(window.getComputedStyle(tempEl).opacity);
+    document.body.removeChild(tempEl);
+    
+    return isNaN(cssOpacity) ? 1 : cssOpacity;
+  };
+  
+  // Initializes the background image manager
+  const initialize = (swiper) => {
+    if (!swiper) return;
+    
+    cleanup();
+    
+    heroSwiper = swiper;
+    originalImages = findOriginalImages();
+    
+    if (originalImages.length === 0) return;
+    
+    duplicateImages = createDuplicateImages();
+    
+    const sourceElement = getSourceElement();
+    const imageUrl = getImageUrl(sourceElement);
+    
+    if (imageUrl) {
+      originalImages.forEach(img => {
+        img.src = imageUrl;
+        img.style.opacity = '';
+      });
+      
+      duplicateImages.forEach(img => {
+        img.src = imageUrl;
+        img.style.opacity = '0';
+      });
+    }
+    
+    // Listen for slide changes
+    heroSwiper.on('slideChange', handleSlideChange);
+    
+    // Add more event listeners to ensure we catch slide changes
+    heroSwiper.on('slideChangeTransitionStart', handleSlideChange);
+    
+    heroSwiper.on('slideChangeTransitionEnd', updateBackgroundImagesFromCurrentSlide);
+    
+    heroSwiper.on('breakpoint', () => {
+      resetAnimation();
+      updateBackgroundImagesFromCurrentSlide();
+    });
+    
+    // Debounce resize handler
+    resizeHandler = debounce(() => {
+      resetAnimation();
+      updateBackgroundImagesFromCurrentSlide();
+    }, 250);
+    
+    window.addEventListener('resize', resizeHandler);
+    window.addEventListener('beforeunload', cleanup, { once: true });
+  };
+  
+  // Cleans up event listeners and resources
+  const cleanup = () => {
+    resetAnimation();
+    
+    if (resizeHandler) {
+      window.removeEventListener('resize', resizeHandler);
+      resizeHandler = null;
+    }
+    
+    originalImages.forEach(img => {
+      img.style.opacity = '';
+      gsap.killTweensOf(img);
+    });
+    
+    duplicateImages.forEach(img => {
+      if (img.parentNode) {
+        img.parentNode.removeChild(img);
+      }
+    });
+    
+    if (heroSwiper) {
+      heroSwiper.off('slideChange');
+      heroSwiper.off('slideChangeTransitionStart');
+      heroSwiper.off('slideChangeTransitionEnd');
+      heroSwiper.off('breakpoint');
+      heroSwiper = null;
+    }
+    
+    originalImages = [];
+    duplicateImages = [];
+    isAnimating = false;
+    animatingIn = true;
+  };
+  
+  // Resets any in-progress animations
+  const resetAnimation = () => {
+    if (isAnimating) {
+      originalImages.forEach(img => {
+        gsap.killTweensOf(img);
+        img.style.opacity = '';
+      });
+      
+      duplicateImages.forEach(img => {
+        gsap.killTweensOf(img);
+        img.style.opacity = '0';
+      });
+      
+      isAnimating = false;
+    }
+  };
+  
+  // Handles slide changes and triggers animations
+  const handleSlideChange = () => {
+    if (!heroSwiper || originalImages.length === 0) return;
+    
+    if (isAnimating) resetAnimation();
+    
+    const activeSlide = heroSwiper.slides[heroSwiper.activeIndex];
+    if (!activeSlide) return;
+    
+    const sourceElement = getSourceElement(activeSlide);
+    const imageUrl = getImageUrl(sourceElement);
+    
+    if (!imageUrl) return;
+    
+    animateBackgroundTransition(imageUrl);
+  };
+  
+  // Animates background image transitions
+  const animateBackgroundTransition = (newImageUrl) => {
+    if (originalImages.length === 0 || duplicateImages.length === 0) return;
+    
+    const currentAnimationRequest = newImageUrl;
+    
+    if (isAnimating) resetAnimation();
+    
+    isAnimating = true;
+    
+    // Determine which set is currently visible and which will animate in
+    let currentSet = animatingIn ? originalImages : duplicateImages;
+    let nextSet = animatingIn ? duplicateImages : originalImages;
+    
+    try {
+      if (nextSet.some(img => !img.parentNode)) {
+        if (animatingIn && duplicateImages.some(img => !img.parentNode)) {
+          duplicateImages = createDuplicateImages();
+          nextSet = animatingIn ? duplicateImages : originalImages;
+        }
+        
+        if (nextSet.some(img => !img.parentNode)) {
+          isAnimating = false;
+          return;
+        }
+      }
+      
+      nextSet.forEach(img => {
+        img.src = newImageUrl;
+        if (img.style.display === 'none') img.style.display = '';
+        img.style.opacity = '0';
+      });
+      
+      // Get target opacities for all next set images
+      const nextSetTargetOpacities = nextSet.map(getTargetOpacity);
+      
+      const tl = gsap.timeline({
+        onComplete: () => {
+          if (currentAnimationRequest === newImageUrl) {
+            setTimeout(() => {
+              if (currentAnimationRequest !== newImageUrl) return;
+              
+              nextSet.forEach(img => img.style.opacity = '');
+              animatingIn = !animatingIn;
+              isAnimating = false;
+            }, 50);
+          } else {
+            isAnimating = false;
+          }
+        }
+      });
+      
+      // Animate current set out
+      currentSet.forEach(img => {
+        tl.to(img, {
+          opacity: 0,
+          duration: config.animationDuration,
+          ease: config.easing,
+          onComplete: () => img.style.opacity = '0'
+        }, 0);
+      });
+      
+      // Animate each next set image to its target CSS opacity
+      nextSet.forEach((img, i) => {
+        tl.to(img, {
+          opacity: nextSetTargetOpacities[i],
+          duration: config.animationDuration,
+          ease: config.easing,
+          onComplete: () => img.style.opacity = ''
+        }, 0);
+      });
+      
+    } catch (error) {
+      isAnimating = false;
+    }
+  };
+  
+  // Updates background images from current slide without animation
+  const updateBackgroundImagesFromCurrentSlide = () => {
+    if (!heroSwiper || originalImages.length === 0) return;
+    
+    const activeSlide = heroSwiper.slides[heroSwiper.activeIndex];
+    if (!activeSlide) return;
+    
+    const sourceElement = getSourceElement(activeSlide);
+    const imageUrl = getImageUrl(sourceElement);
+    
+    if (!imageUrl) return;
+    
+    originalImages.forEach(img => {
+      img.src = imageUrl;
+      img.style.opacity = '';
+    });
+    
+    duplicateImages.forEach(img => {
+      img.src = imageUrl;
+      img.style.opacity = '0';
+    });
+    
+    animatingIn = true;
+  };
+  
+  // Manually refreshes all background images with current slide content
+  const refreshBackgrounds = () => {
+    // Try to find container again in case DOM has changed
+    const container = getContainerElement();
+    
+    // Recheck original images
+    const freshOriginals = findOriginalImages();
+    
+    if (freshOriginals.length > 0) {
+      originalImages = freshOriginals;
+      
+      // If hero swiper exists, update from current slide
+      if (heroSwiper) {
+        updateBackgroundImagesFromCurrentSlide();
+      } else {
+        // Try to find a fallback source
+        const fallbackSource = getSourceElement();
+        const fallbackUrl = getImageUrl(fallbackSource);
+        
+        if (fallbackUrl) {
+          // Apply to all original images
+          originalImages.forEach(img => {
+            img.src = fallbackUrl;
+            img.style.opacity = '';
+          });
+          
+          // Recreate duplicates
+          duplicateImages = createDuplicateImages();
+          duplicateImages.forEach(img => {
+            img.src = fallbackUrl;
+            img.style.opacity = '0';
+          });
+        }
+      }
+      
+      return true;
+    }
+    
+    return false;
+  };
+  
+  return {
+    initialize,
+    updateBackgroundImagesFromCurrentSlide,
+    cleanup,
+    refreshBackgrounds
+  };
+})();
+
 const swiperConfigs = [
+  {
+    selector: ".swiper.is-cat-hero",
+    comboClass: "is-cat-hero",
+    slidesPerView: "auto",
+    parallax: true,
+    speed: 800,
+    autoplay: {
+      delay: 15000,
+      disableOnInteraction: true,
+    },
+  },
   {
     selector: ".swiper.is-reviews",
     comboClass: "is-reviews",
@@ -28,17 +446,61 @@ const swiperConfigs = [
   },
 ];
 
+// Video management for swiper slides
+const manageSlideVideos = (swiper) => {
+  const slides = swiper.slides;
+  
+  // Handle all videos in slides
+  slides.forEach((slide, index) => {
+    const video = slide.querySelector('video');
+    if (!video) return;
+    
+    // Pause all videos initially
+    video.pause();
+    
+    // Play video if it's the active slide
+    if (index === swiper.activeIndex) {
+      video.play().catch(err => console.warn('Video playback error:', err));
+    }
+  });
+};
+
+// Handle video on slide change
+const handleSlideChange = (swiper) => {
+  const slides = swiper.slides;
+  
+  // Pause all videos first
+  slides.forEach(slide => {
+    const video = slide.querySelector('video');
+    if (video) video.pause();
+  });
+  
+  // Play video on active slide
+  const activeSlide = slides[swiper.activeIndex];
+  if (activeSlide) {
+    const activeVideo = activeSlide.querySelector('video');
+    if (activeVideo) {
+      activeVideo.play().catch(err => console.warn('Video playback error:', err));
+    }
+  }
+};
+
 // Initialize Swiper instances with navigation and event handlers
 const initializeSwiper = ({
   selector,
   comboClass,
   slidesPerView,
   breakpoints,
+  parallax,
+  speed,
+  autoplay,
 }) => {
   const swiper = new Swiper(selector, {
-    speed: 400,
+    speed: speed || 500,
     slidesPerView,
     spaceBetween: 0,
+    parallax,
+    autoplay,
     navigation: {
       nextEl: `[data-swiper-button-next="${comboClass}"]`,
       prevEl: `[data-swiper-button-prev="${comboClass}"]`,
@@ -47,12 +509,50 @@ const initializeSwiper = ({
     on: {
       init() {
         toggleButtonWrapper(this);
+        if (comboClass === "is-cat-hero") {
+          manageSlideVideos(this);
+          CategoryBackgroundManager.initialize(this);
+        }
       },
       slideChange() {
         toggleButtonWrapper(this);
+        if (comboClass === "is-cat-hero") {
+          handleSlideChange(this);
+        }
       },
       resize() {
         toggleButtonWrapper(this);
+      },
+      autoplayStop() {
+        // Restart autoplay if it's the cat-hero swiper
+        if (comboClass === "is-cat-hero" && this.autoplay) {
+          setTimeout(() => this.autoplay.start(), 50);
+        }
+      },
+      autoplayPause() {
+        // Restart autoplay if it's the cat-hero swiper
+        if (comboClass === "is-cat-hero" && this.autoplay) {
+          setTimeout(() => this.autoplay.start(), 50);
+        }
+      },
+      slideChangeTransitionEnd() {
+        // Make sure autoplay is running
+        if (comboClass === "is-cat-hero" && this.autoplay && this.autoplay.paused) {
+          this.autoplay.start();
+        }
+        
+        if (comboClass === "is-cat-hero" && this.isEnd) {
+          setTimeout(() => {
+            this.slideTo(0, 500);
+            
+            // Ensure autoplay continues after a sufficient delay
+            setTimeout(() => {
+              if (this.autoplay) {
+                this.autoplay.start();
+              }
+            }, 600);
+          }, 2000); // Wait full delay time before resetting
+        }
       },
     },
   });
@@ -89,13 +589,17 @@ const manageSwipers = () => {
         if (swiperContainer) {
           const slides = swiperContainer.querySelectorAll(".swiper-slide");
           if (slides.length > 0) {
-            swiperInstances.push(initializeSwiper(config));
+            const swiper = initializeSwiper(config);
+            swiperInstances.push(swiper);
           }
         }
       });
     }
   } else {
     resetButtonWrappers();
+
+    // Clean up background manager when swipers are destroyed
+    CategoryBackgroundManager.cleanup();
 
     while (swiperInstances.length > 0) {
       const swiper = swiperInstances.pop();
@@ -310,27 +814,79 @@ if (typeof window.NavScrollTrigger !== 'undefined') {
   })();
 }
 
+// Re-initialize CategoryBackgroundManager if needed when DOM is fully loaded
+document.addEventListener("DOMContentLoaded", () => {
+  // Find all swiper containers
+  const heroContainer = document.querySelector('.swiper.is-cat-hero');
+  
+  if (heroContainer) {
+    const slides = heroContainer.querySelectorAll('.swiper-slide');
+  }
+  
+  // Find the hero swiper instance if it exists
+  const heroSwiperInstance = swiperInstances.find(swiper => swiper.comboClass === "is-cat-hero");
+  
+  if (heroSwiperInstance) {
+    // Force recreate all original and duplicate images
+    CategoryBackgroundManager.initialize(heroSwiperInstance);
+  } else {
+    // If no hero swiper instance but container exists, initialize manually
+    const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
+    if (heroConfig) {
+      const swiperContainer = document.querySelector(heroConfig.selector);
+      if (swiperContainer) {
+        const slides = swiperContainer.querySelectorAll(".swiper-slide");
+        if (slides.length > 0) {
+          const newSwiper = initializeSwiper(heroConfig);
+          swiperInstances.push(newSwiper);
+        }
+      }
+    }
+  }
+});
+
+// Add a final fallback on window load
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    // Try manually refreshing backgrounds after everything is loaded
+    CategoryBackgroundManager.refreshBackgrounds();
+    
+    // Check again for hero swiper
+    const heroSwiperInstance = swiperInstances.find(swiper => swiper.comboClass === "is-cat-hero");
+    if (heroSwiperInstance) {
+      CategoryBackgroundManager.initialize(heroSwiperInstance);
+    }
+  }, 500);
+});
+
 // Parallax animations setup
-const catHeroImg = document.querySelector(".cat_hero_img");
+const catCardMedia = document.querySelector(".cat_card_media");
+const catHeaderWrap = document.querySelector(".cat_header_wrap");
 
 // Create variables but don't initialize them outside the media query
-let catHeroParallax;
+let catCardMediaParallax;
 
 // Enable parallax for devices above 479px
-let catMediaMatcher = gsap.matchMedia();
-catMediaMatcher.add("(min-width: 479px)", () => {
+let catCardMediaMatcher = gsap.matchMedia();
+catCardMediaMatcher.add("(min-width: 479px)", () => {
   // Initialize all parallax timelines inside the media query
   
-  if (catHeroImg) {
-    catHeroParallax = gsap.timeline({
+  if (catCardMedia) {
+    catCardMediaParallax = gsap.timeline({
       scrollTrigger: {
-        trigger: ".cat_hero_img",
-        start: "top top",
+        trigger: ".cat_card_media",
+        start: () => {
+          const headerHeight = catHeaderWrap ? catHeaderWrap.offsetHeight : 0;
+          return `top-=${headerHeight}px top`;
+        },
         end: "bottom top",
         scrub: true,
       },
     });
-    catHeroParallax.to(".cat_hero_img", { y: "3rem" });
+    catCardMediaParallax.to(".cat_card_media > *", { y: "10rem" });
   }
   
 });
+
+
+
