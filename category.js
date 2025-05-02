@@ -12,19 +12,13 @@ const debounce = (func, wait) => {
 const CategoryBackgroundManager = (() => {
   // Configuration
   const config = {
-    animationDuration: 0.6,
+    animationDuration: 1.5,
     easing: 'power2.out',
     targetClass: 'cat_bg_img',
-    containerClass: 'cat_bg_img_wrap',
     bgImageCount: 8
   };
   
-  // Try alternative container class if needed
-  if (!document.querySelector(`.${config.containerClass}`)) {
-    config.containerClass = 'cat_bg_img_wrap-copy';
-  }
-  
-  // Check if background images with current class exist
+  // Try alternative class names if needed
   const hasBgImages = document.querySelector(`.${config.targetClass}`);
   if (!hasBgImages) {
     // Try alternative class names
@@ -73,32 +67,41 @@ const CategoryBackgroundManager = (() => {
     return url;
   };
   
-  // Gets container element for background images
-  const getContainerElement = () => {
-    return document.querySelector(`.${config.containerClass}`);
-  };
-  
   // Finds all original background images
   const findOriginalImages = () => {
     const images = [];
+    
+    // Check for sequentially numbered instances
     for (let i = 1; i <= config.bgImageCount; i++) {
-      const img = document.querySelector(`.${config.targetClass}.is-${i}`);
-      if (img) images.push(img);
+      const allImagesOfNumber = document.querySelectorAll(`.${config.targetClass}.is-${i}:not([data-duplicate="true"])`);
+      allImagesOfNumber.forEach(img => {
+        if (img) images.push(img);
+      });
     }
+    
+    // If no sequentially numbered instances found, look for any instances
+    if (images.length === 0) {
+      const allImages = document.querySelectorAll(`.${config.targetClass}:not([data-duplicate="true"])`);
+      allImages.forEach(img => images.push(img));
+    }
+    
     return images;
   };
     
   // Creates duplicate set of images for crossfade animations
   const createDuplicateImages = () => {
+    // Remove existing duplicates
     document.querySelectorAll(`.${config.targetClass}[data-duplicate="true"]`)
       .forEach(el => el.parentNode?.removeChild(el));
     
-    const container = getContainerElement();
-    if (!container || originalImages.length === 0) return [];
+    if (originalImages.length === 0) return [];
     
     const duplicates = [];
     
     originalImages.forEach((original, index) => {
+      // Create duplicate in the same parent as the original
+      if (!original.parentNode) return;
+      
       const duplicate = document.createElement('img');
       
       // Copy attributes from original
@@ -117,7 +120,8 @@ const CategoryBackgroundManager = (() => {
         duplicate.src = original.src;
       }
       
-      container.appendChild(duplicate);
+      // Append to same parent as the original
+      original.parentNode.appendChild(duplicate);
       duplicates.push(duplicate);
     });
     
@@ -260,6 +264,18 @@ const CategoryBackgroundManager = (() => {
   const animateBackgroundTransition = (newImageUrl) => {
     if (originalImages.length === 0 || duplicateImages.length === 0) return;
     
+    // Filter out any images that no longer have parent nodes
+    originalImages = originalImages.filter(img => img.parentNode);
+    duplicateImages = duplicateImages.filter(img => img.parentNode);
+    
+    // If too many images are missing, recreate duplicates
+    if (duplicateImages.length < originalImages.length / 2) {
+      duplicateImages = createDuplicateImages();
+    }
+    
+    // If we still don't have enough images, abort
+    if (originalImages.length === 0 || duplicateImages.length === 0) return;
+    
     const currentAnimationRequest = newImageUrl;
     
     if (isAnimating) resetAnimation();
@@ -337,6 +353,21 @@ const CategoryBackgroundManager = (() => {
   const updateBackgroundImagesFromCurrentSlide = () => {
     if (!heroSwiper || originalImages.length === 0) return;
     
+    // Filter out any images that no longer have parent nodes
+    originalImages = originalImages.filter(img => img.parentNode);
+    duplicateImages = duplicateImages.filter(img => img.parentNode);
+    
+    // If no originals left, try to find them again
+    if (originalImages.length === 0) {
+      originalImages = findOriginalImages();
+      if (originalImages.length === 0) return;
+    }
+    
+    // If duplicates are missing, recreate them
+    if (duplicateImages.length < originalImages.length / 2) {
+      duplicateImages = createDuplicateImages();
+    }
+    
     const activeSlide = heroSwiper.slides[heroSwiper.activeIndex];
     if (!activeSlide) return;
     
@@ -360,9 +391,6 @@ const CategoryBackgroundManager = (() => {
   
   // Manually refreshes all background images with current slide content
   const refreshBackgrounds = () => {
-    // Try to find container again in case DOM has changed
-    const container = getContainerElement();
-    
     // Recheck original images
     const freshOriginals = findOriginalImages();
     
@@ -448,40 +476,88 @@ const swiperConfigs = [
 
 // Video management for swiper slides
 const manageSlideVideos = (swiper) => {
-  const slides = swiper.slides;
+  // Store video elements for easier access
+  swiper.videos = [];
   
-  // Handle all videos in slides
-  slides.forEach((slide, index) => {
+  // Find all videos in slides
+  swiper.slides.forEach((slide, index) => {
     const video = slide.querySelector('video');
-    if (!video) return;
-    
-    // Pause all videos initially
-    video.pause();
-    
-    // Play video if it's the active slide
-    if (index === swiper.activeIndex) {
-      video.play().catch(err => console.warn('Video playback error:', err));
+    if (video) {
+      swiper.videos[index] = video;
+      
+      // Add data attributes to track slides
+      video.setAttribute('data-slide-index', index);
+      
+      // Pause all videos initially
+      video.pause();
     }
   });
+  
+  // Initial play on active slide
+  const activeVideo = swiper.videos[swiper.activeIndex];
+  if (activeVideo) {
+    activeVideo.play().catch(() => {});
+  }
+  
+  // Special handling to ensure videos are managed correctly
+  const checkVideoStates = () => {
+    if (!swiper || !swiper.videos) return;
+    
+    // Make sure inactive videos are paused
+    swiper.videos.forEach((video, index) => {
+      if (!video) return;
+      
+      if (index === swiper.activeIndex) {
+        if (video.paused && !video.ended) {
+          video.play().catch(() => {});
+        }
+      } else {
+        if (!video.paused) {
+          video.pause();
+        }
+      }
+    });
+  };
+  
+  // Run periodically to ensure video states
+  swiper.videoStateInterval = setInterval(checkVideoStates, 1000);
+  
+  // Store the original destroy method
+  const originalDestroy = swiper.destroy;
+  
+  // Override destroy to clean up video management
+  swiper.destroy = function(deleteInstance, cleanStyles) {
+    clearInterval(swiper.videoStateInterval);
+    
+    // Call original destroy
+    return originalDestroy.call(this, deleteInstance, cleanStyles);
+  };
+  
+  return checkVideoStates;
 };
 
 // Handle video on slide change
 const handleSlideChange = (swiper) => {
-  const slides = swiper.slides;
+  if (!swiper.videos) return;
   
-  // Pause all videos first
-  slides.forEach(slide => {
-    const video = slide.querySelector('video');
-    if (video) video.pause();
+  // Pause all videos
+  swiper.videos.forEach((video, index) => {
+    if (!video) return;
+    
+    // Skip active index
+    if (index === swiper.activeIndex) return;
+    
+    try {
+      video.pause();
+    } catch (e) {}
   });
   
-  // Play video on active slide
-  const activeSlide = slides[swiper.activeIndex];
-  if (activeSlide) {
-    const activeVideo = activeSlide.querySelector('video');
-    if (activeVideo) {
-      activeVideo.play().catch(err => console.warn('Video playback error:', err));
-    }
+  // Play active video
+  const activeVideo = swiper.videos[swiper.activeIndex];
+  if (activeVideo) {
+    try {
+      activeVideo.play().catch(() => {});
+    } catch (e) {}
   }
 };
 
@@ -509,13 +585,19 @@ const initializeSwiper = ({
     on: {
       init() {
         toggleButtonWrapper(this);
+        
         if (comboClass === "is-cat-hero") {
-          manageSlideVideos(this);
+          const checkVideoStates = manageSlideVideos(this);
+          
+          // Save checker function for later
+          this.checkVideoStates = checkVideoStates;
+          
           CategoryBackgroundManager.initialize(this);
         }
       },
       slideChange() {
         toggleButtonWrapper(this);
+        
         if (comboClass === "is-cat-hero") {
           handleSlideChange(this);
         }
@@ -535,10 +617,21 @@ const initializeSwiper = ({
           setTimeout(() => this.autoplay.start(), 50);
         }
       },
+      slideChangeTransitionStart() {
+        // Also try running the video handling here
+        if (comboClass === "is-cat-hero") {
+          handleSlideChange(this);
+        }
+      },
       slideChangeTransitionEnd() {
         // Make sure autoplay is running
         if (comboClass === "is-cat-hero" && this.autoplay && this.autoplay.paused) {
           this.autoplay.start();
+        }
+        
+        // Double-check video handling at transition end
+        if (comboClass === "is-cat-hero") {
+          handleSlideChange(this);
         }
         
         if (comboClass === "is-cat-hero" && this.isEnd) {
@@ -600,10 +693,33 @@ const manageSwipers = () => {
 
     // Clean up background manager when swipers are destroyed
     CategoryBackgroundManager.cleanup();
-
-    while (swiperInstances.length > 0) {
-      const swiper = swiperInstances.pop();
-      swiper.destroy(true, true);
+    
+    // Store the hero swiper if it exists before destroying
+    let heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
+    let heroConfig = null;
+    
+    // Destroy all non-hero swipers
+    for (let i = swiperInstances.length - 1; i >= 0; i--) {
+      const swiper = swiperInstances[i];
+      if (swiper.comboClass !== "is-cat-hero") {
+        swiper.destroy(true, true);
+        swiperInstances.splice(i, 1);
+      }
+    }
+    
+    // If we didn't save a hero swiper, create one if needed
+    if (!heroSwiper) {
+      const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
+      if (heroConfig) {
+        const heroContainer = document.querySelector(heroConfig.selector);
+        if (heroContainer) {
+          const slides = heroContainer.querySelectorAll(".swiper-slide");
+          if (slides.length > 0) {
+            const newHeroSwiper = initializeSwiper(heroConfig);
+            swiperInstances.push(newHeroSwiper);
+          }
+        }
+      }
     }
   }
 };
@@ -619,6 +735,26 @@ window.addEventListener("resize", (typeof Utils !== 'undefined' ? Utils.debounce
 
 // Initialize on page load
 manageSwipers();
+
+// Initialize cat-hero swiper immediately regardless of screen size
+document.addEventListener("DOMContentLoaded", () => {
+  // If the hero swiper doesn't exist yet, create it
+  const heroExists = swiperInstances.some(s => s.comboClass === "is-cat-hero");
+  
+  if (!heroExists) {
+    const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
+    if (heroConfig) {
+      const heroContainer = document.querySelector(heroConfig.selector);
+      if (heroContainer) {
+        const slides = heroContainer.querySelectorAll(".swiper-slide");
+        if (slides.length > 0) {
+          const newHeroSwiper = initializeSwiper(heroConfig);
+          swiperInstances.push(newHeroSwiper);
+        }
+      }
+    }
+  }
+});
 
 // Category tab underline animation
 const tabWraps = document.querySelectorAll(".cat_tab");
