@@ -2524,7 +2524,7 @@ expMediaMatcher.add("(min-width: 479px)", () => {
   if (testimonialThumb) {
     testimonialThumbParallax = gsap.timeline({
       scrollTrigger: {
-        trigger: ".testimonial_thumb_img",
+        trigger: testimonialThumb,
         start: "top bottom",
         end: "bottom top",
         scrub: true,
@@ -2536,7 +2536,7 @@ expMediaMatcher.add("(min-width: 479px)", () => {
   if (testimonialBg) {
     testimonialBgParallax = gsap.timeline({
       scrollTrigger: {
-        trigger: ".testimonial_content_bg-img",
+        trigger: testimonialBg,
         start: "top bottom",
         end: "bottom top",
         scrub: true,
@@ -2548,7 +2548,7 @@ expMediaMatcher.add("(min-width: 479px)", () => {
   if (expGallery) {
     expGalleryParallax = gsap.timeline({
       scrollTrigger: {
-        trigger: ".gallery_img",
+        trigger: expGallery,
         start: `top ${totalGalleryOffset}px`, 
         end: "bottom top",
         scrub: true,
@@ -2560,7 +2560,7 @@ expMediaMatcher.add("(min-width: 479px)", () => {
   if (videoElement && posterElement) {
     videoPosterParallax = gsap.timeline({
       scrollTrigger: {
-        trigger: videoElement,
+        trigger: posterElement,
         start: `top ${totalGalleryOffset}px`,
         end: "bottom top",
         scrub: true,

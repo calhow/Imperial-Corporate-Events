@@ -9,6 +9,18 @@ const debounce = (func, wait) => {
   };
 };
 
+// Function to adjust swiper parallax values based on screen width
+const adjustSwiperParallax = () => {
+  const catCardMediaElements = document.querySelectorAll('.swiper.is-cat-hero .cat_card_media');
+  
+  // Use smaller parallax value for mobile screens
+  const parallaxValue = window.innerWidth <= 767 ? '250' : '400';
+  
+  catCardMediaElements.forEach(element => {
+    element.setAttribute('data-swiper-parallax-x', parallaxValue);
+  });
+};
+
 const CategoryBackgroundManager = (() => {
   // Configuration
   const config = {
@@ -180,6 +192,9 @@ const CategoryBackgroundManager = (() => {
     heroSwiper.on('breakpoint', () => {
       resetAnimation();
       updateBackgroundImagesFromCurrentSlide();
+      
+      // Adjust parallax values on breakpoint change
+      adjustSwiperParallax();
     });
     
     // Debounce resize handler
@@ -446,11 +461,10 @@ const swiperConfigs = [
       delay: 15000,
       disableOnInteraction: true,
     },
-  },
-  {
-    selector: ".swiper.is-reviews",
-    comboClass: "is-reviews",
-    slidesPerView: "auto",
+    pagination: document.querySelector(".swiper-pagination.is-cat-hero") ? {
+      el: ".swiper-pagination.is-cat-hero",
+      clickable: true,
+    } : null,
   },
   {
     selector: ".swiper.is-cats",
@@ -476,12 +490,16 @@ const swiperConfigs = [
 
 // Video management for swiper slides
 const manageSlideVideos = (swiper) => {
-  // Store video elements for easier access
+  // Store video elements and their associated poster elements for easier access
   swiper.videos = [];
+  swiper.posters = [];
+  swiper.videoTimeouts = [];
   
-  // Find all videos in slides
+  // Find all videos and posters in slides
   swiper.slides.forEach((slide, index) => {
     const video = slide.querySelector('video');
+    const poster = slide.querySelector('.cat_card_poster');
+    
     if (video) {
       swiper.videos[index] = video;
       
@@ -490,37 +508,45 @@ const manageSlideVideos = (swiper) => {
       
       // Pause all videos initially
       video.pause();
+      
+      // Store poster if found
+      if (poster) {
+        swiper.posters[index] = poster;
+        // Ensure poster is visible initially
+        gsap.set(poster, { opacity: 1 });
+      }
     }
   });
   
-  // Initial play on active slide
-  const activeVideo = swiper.videos[swiper.activeIndex];
-  if (activeVideo) {
-    activeVideo.play().catch(() => {});
-  }
+  // Setup active slide with delay
+  setupActiveSlide(swiper, swiper.activeIndex);
   
   // Special handling to ensure videos are managed correctly
   const checkVideoStates = () => {
     if (!swiper || !swiper.videos) return;
     
-    // Make sure inactive videos are paused
+    // Make sure inactive videos are paused and posters are visible
     swiper.videos.forEach((video, index) => {
       if (!video) return;
       
       if (index === swiper.activeIndex) {
-        if (video.paused && !video.ended) {
-          video.play().catch(() => {});
-        }
+        // Active slide is managed by handleSlideChange and setupActiveSlide
       } else {
+        // For non-active slides, ensure video is paused and poster is visible
         if (!video.paused) {
           video.pause();
+        }
+        
+        const poster = swiper.posters[index];
+        if (poster && poster.style.opacity !== '1') {
+          gsap.set(poster, { opacity: 1 });
         }
       }
     });
   };
   
   // Run periodically to ensure video states
-  swiper.videoStateInterval = setInterval(checkVideoStates, 1000);
+  swiper.videoStateInterval = setInterval(checkVideoStates, 2000);
   
   // Store the original destroy method
   const originalDestroy = swiper.destroy;
@@ -529,6 +555,13 @@ const manageSlideVideos = (swiper) => {
   swiper.destroy = function(deleteInstance, cleanStyles) {
     clearInterval(swiper.videoStateInterval);
     
+    // Clear any pending timeouts
+    if (swiper.videoTimeouts) {
+      swiper.videoTimeouts.forEach(timeout => {
+        if (timeout) clearTimeout(timeout);
+      });
+    }
+    
     // Call original destroy
     return originalDestroy.call(this, deleteInstance, cleanStyles);
   };
@@ -536,29 +569,84 @@ const manageSlideVideos = (swiper) => {
   return checkVideoStates;
 };
 
+// Setup active slide with delayed video playback
+const setupActiveSlide = (swiper, index) => {
+  if (!swiper || !swiper.videos || !swiper.videos[index]) {
+    return;
+  }
+  
+  // Clear any existing timeout for this slide
+  if (swiper.videoTimeouts && swiper.videoTimeouts[index]) {
+    clearTimeout(swiper.videoTimeouts[index]);
+  }
+  
+  const video = swiper.videos[index];
+  const poster = swiper.posters[index];
+  
+  // Ensure video is initially paused
+  video.pause();
+  
+  // Ensure poster is visible
+  if (poster) {
+    gsap.set(poster, { opacity: 1 });
+  }
+  
+  // Set a timeout to play the video and fade out the poster after 3 seconds
+  swiper.videoTimeouts[index] = setTimeout(() => {
+    // Play the video
+    video.play().then(() => {
+      // Fade out the poster if it exists
+      if (poster) {
+        gsap.to(poster, {
+          opacity: 0, 
+          duration: 0.7, 
+          ease: "power2.out"
+        });
+      }
+    }).catch(() => {
+      // Silent catch for autoplay policy errors
+    });
+  }, 3000); // 3 second delay
+};
+
 // Handle video on slide change
 const handleSlideChange = (swiper) => {
-  if (!swiper.videos) return;
+  if (!swiper || !swiper.videos) {
+    return;
+  }
   
-  // Pause all videos
+  // Handle inactive slides - immediately pause videos and fade in posters
   swiper.videos.forEach((video, index) => {
     if (!video) return;
     
     // Skip active index
     if (index === swiper.activeIndex) return;
     
+    // Clear any pending timeouts for this slide
+    if (swiper.videoTimeouts && swiper.videoTimeouts[index]) {
+      clearTimeout(swiper.videoTimeouts[index]);
+      swiper.videoTimeouts[index] = null;
+    }
+    
     try {
       video.pause();
-    } catch (e) {}
+      
+      // Fade in poster if it exists
+      const poster = swiper.posters[index];
+      if (poster) {
+        gsap.to(poster, {
+          opacity: 1, 
+          duration: 0.2, 
+          ease: "power2.out"
+        });
+      }
+    } catch (e) {
+      // Silent catch for any video errors
+    }
   });
   
-  // Play active video
-  const activeVideo = swiper.videos[swiper.activeIndex];
-  if (activeVideo) {
-    try {
-      activeVideo.play().catch(() => {});
-    } catch (e) {}
-  }
+  // Setup the new active slide with delayed video play
+  setupActiveSlide(swiper, swiper.activeIndex);
 };
 
 // Initialize Swiper instances with navigation and event handlers
@@ -570,8 +658,16 @@ const initializeSwiper = ({
   parallax,
   speed,
   autoplay,
+  pagination,
 }) => {
-  const swiper = new Swiper(selector, {
+  // Pre-initialize the button wrapper before Swiper is created
+  const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
+  if (btnWrap) {
+    // Ensure it's visible during initialization
+    btnWrap.style.display = "flex";
+  }
+  
+  const swiperConfig = {
     speed: speed || 500,
     slidesPerView,
     spaceBetween: 0,
@@ -584,6 +680,7 @@ const initializeSwiper = ({
     breakpoints,
     on: {
       init() {
+        // Toggle buttons based on actual Swiper state now that it's initialized
         toggleButtonWrapper(this);
         
         if (comboClass === "is-cat-hero") {
@@ -593,6 +690,9 @@ const initializeSwiper = ({
           this.checkVideoStates = checkVideoStates;
           
           CategoryBackgroundManager.initialize(this);
+          
+          // Adjust parallax values based on screen size
+          adjustSwiperParallax();
         }
       },
       slideChange() {
@@ -647,8 +747,49 @@ const initializeSwiper = ({
           }, 2000); // Wait full delay time before resetting
         }
       },
+      afterInit() {
+        // Also initialize video handling after complete init
+        if (comboClass === "is-cat-hero") {
+          handleSlideChange(this);
+          
+          // Ensure parallax values are properly adjusted
+          adjustSwiperParallax();
+        }
+      },
+      activeIndexChange() {
+        // Another place to catch slide changes
+        if (comboClass === "is-cat-hero") {
+          handleSlideChange(this);
+        }
+      },
+      touchEnd() {
+        // Triggered when touch ends - good place to catch user interactions
+        if (comboClass === "is-cat-hero") {
+          handleSlideChange(this);
+        }
+      },
+      // Add click handler for navigation buttons
+      navigationNext() {
+        if (comboClass === "is-cat-hero") {
+          // Force handle slide change after a short delay to ensure Swiper has updated
+          setTimeout(() => handleSlideChange(this), 50);
+        }
+      },
+      navigationPrev() {
+        if (comboClass === "is-cat-hero") {
+          // Force handle slide change after a short delay to ensure Swiper has updated
+          setTimeout(() => handleSlideChange(this), 50);
+        }
+      }
     },
-  });
+  };
+  
+  // Only add pagination if it exists
+  if (pagination) {
+    swiperConfig.pagination = pagination;
+  }
+  
+  const swiper = new Swiper(selector, swiperConfig);
 
   swiper.comboClass = comboClass;
   return swiper;
@@ -656,11 +797,20 @@ const initializeSwiper = ({
 
 // Toggle visibility of navigation buttons based on swiper state
 const toggleButtonWrapper = (swiper) => {
+  if (!swiper || !swiper.comboClass) return;
+  
   const { comboClass } = swiper;
   const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
-
+  
   if (!btnWrap) return;
-  btnWrap.style.display = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
+  
+  // Determine the correct display value
+  const displayValue = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
+  
+  // Only update if needed to avoid unnecessary repaints
+  if (btnWrap.style.display !== displayValue) {
+    btnWrap.style.display = displayValue;
+  }
 };
 
 // Reset button wrappers to default state
@@ -677,6 +827,10 @@ const manageSwipers = () => {
 
   if (isSwiperEnabled) {
     if (swiperInstances.length === 0) {
+      // First reset all button wrappers to ensure clean state
+      resetButtonWrappers();
+      
+      // Initialize all swipers
       swiperConfigs.forEach((config) => {
         const swiperContainer = document.querySelector(config.selector);
         if (swiperContainer) {
@@ -684,7 +838,19 @@ const manageSwipers = () => {
           if (slides.length > 0) {
             const swiper = initializeSwiper(config);
             swiperInstances.push(swiper);
+            
+            // Explicitly toggle the button wrapper after Swiper is fully initialized
+            if (swiper && swiper.initialized) {
+              toggleButtonWrapper(swiper);
+            }
           }
+        }
+      });
+    } else {
+      // Update existing swipers
+      swiperInstances.forEach(swiper => {
+        if (swiper) {
+          toggleButtonWrapper(swiper);
         }
       });
     }
@@ -733,6 +899,9 @@ window.addEventListener("resize", (typeof Utils !== 'undefined' ? Utils.debounce
   };
 })(manageSwipers, 200));
 
+// Run parallax adjustment right away
+adjustSwiperParallax();
+
 // Initialize on page load
 manageSwipers();
 
@@ -750,11 +919,41 @@ document.addEventListener("DOMContentLoaded", () => {
         if (slides.length > 0) {
           const newHeroSwiper = initializeSwiper(heroConfig);
           swiperInstances.push(newHeroSwiper);
+          
+          // Ensure button wrapper is correctly initialized
+          if (newHeroSwiper && newHeroSwiper.initialized) {
+            toggleButtonWrapper(newHeroSwiper);
+          }
         }
       }
     }
+  } else {
+    // Update existing hero swiper's button wrapper
+    const heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
+    if (heroSwiper) {
+      toggleButtonWrapper(heroSwiper);
+    }
   }
+  
+  // Also update other swipers if they exist
+  swiperInstances.forEach(swiper => {
+    if (swiper && swiper.comboClass !== "is-cat-hero") {
+      toggleButtonWrapper(swiper);
+    }
+  });
+  
+  // Run the parallax adjustment
+  adjustSwiperParallax();
 });
+
+// Listen for resize events to adjust parallax values
+window.addEventListener('resize', (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+})(adjustSwiperParallax, 100));
 
 // Category tab underline animation
 const tabWraps = document.querySelectorAll(".cat_tab");
@@ -987,6 +1186,9 @@ window.addEventListener('load', () => {
     // Try manually refreshing backgrounds after everything is loaded
     CategoryBackgroundManager.refreshBackgrounds();
     
+    // Adjust parallax values after everything is loaded
+    adjustSwiperParallax();
+    
     // Check again for hero swiper
     const heroSwiperInstance = swiperInstances.find(swiper => swiper.comboClass === "is-cat-hero");
     if (heroSwiperInstance) {
@@ -1024,5 +1226,102 @@ catCardMediaMatcher.add("(min-width: 479px)", () => {
   
 });
 
+// Also ensure button wrappers are properly initialized on full page load
+window.addEventListener('load', () => {
+  // Update all swiper button wrappers
+  swiperInstances.forEach(swiper => {
+    if (swiper && swiper.initialized) {
+      toggleButtonWrapper(swiper);
+    }
+  });
+});
 
+// Swiper Module for category links
+const SwiperModule = (() => {
+  let swiper;
 
+  function initSwiper() {
+    if (window.innerWidth >= 992) {
+      if (!swiper) {
+        swiper = new Swiper(".cat_link_list_wrap", {
+          wrapperClass: "cat_link_list",
+          slideClass: "cat_link_item",
+          navigation: {
+            nextEl: '[data-swiper-btn-cat="next"]',
+            prevEl: '[data-swiper-btn-cat="prev"]',
+            disabledClass: "cat_link_btn_wrap_disabled",
+          },
+          slidesPerView: "auto",
+          slidesPerGroup: 1,
+          watchSlidesProgress: true,
+          resistanceRatio: 0.85,
+          freeMode: true,
+          watchOverflow: true,
+          on: {
+            init: updateSwiperClasses,
+            slideChange: updateSwiperClasses,
+            reachEnd: updateSwiperClasses,
+            reachBeginning: updateSwiperClasses,
+            setTranslate: updateSwiperClasses,
+          },
+        });
+      }
+    } else {
+      if (swiper) {
+        swiper.destroy(true, true);
+        swiper = undefined;
+      }
+    }
+  }
+
+  function updateSwiperClasses() {
+    const swiperContainer = document.querySelector(".cat_link_list_wrap");
+    const nextButton = document.querySelector(
+      '[data-swiper-btn-cat="next"]'
+    );
+    const prevButton = document.querySelector(
+      '[data-swiper-btn-cat="prev"]'
+    );
+
+    if (!swiperContainer || !nextButton || !prevButton) return;
+
+    swiperContainer.classList.remove("is-next", "is-both", "is-prev");
+
+    if (nextButton.classList.contains("cat_link_btn_wrap_disabled")) {
+      swiperContainer.classList.add("is-prev");
+    } else if (prevButton.classList.contains("cat_link_btn_wrap_disabled")) {
+      swiperContainer.classList.add("is-next");
+    } else {
+      swiperContainer.classList.add("is-both");
+    }
+  }
+
+  window.addEventListener("load", initSwiper);
+  
+  const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  };
+  
+  window.addEventListener("resize", debounceFn(initSwiper, 100));
+
+  return {
+    initSwiper,
+    getSwiper: () => swiper,
+  };
+})();
+
+// Initialize parallax adjustment on load
+document.addEventListener('DOMContentLoaded', adjustSwiperParallax);
+
+// Update on window resize with debounce
+window.addEventListener('resize', (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+})(adjustSwiperParallax, 100));
