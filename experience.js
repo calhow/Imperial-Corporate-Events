@@ -434,7 +434,8 @@ const toggleButtonWrapper = (swiper) => {
   const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
 
   if (!btnWrap) return;
-  btnWrap.style.display = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
+  const shouldHide = swiper.isBeginning && swiper.isEnd;
+  btnWrap.style.display = shouldHide ? "none" : "flex";
 };
 
 // Resets button wrappers to default state
@@ -459,6 +460,15 @@ const manageSwipers = () => {
             swiperInstances.push(initializeSwiper(config));
           }
         }
+      });
+    }
+    // Ensure .gallery_btn_wrap is always recalculated after resize
+    const mainGallerySwiper = document.querySelector('.swiper.is-gallery')?.swiper;
+    if (mainGallerySwiper) {
+      SwiperManager.toggleNavigationVisibility(mainGallerySwiper, {
+        galleryBtnWrap: document.querySelector('.gallery_btn_wrap'),
+        prevBtn: document.querySelector('[data-swiper-button-prev="is-gallery"]'),
+        nextBtn: document.querySelector('[data-swiper-button-next="is-gallery"]')
       });
     }
   } else {
@@ -637,32 +647,25 @@ const SwiperManager = {
       galleryClass = null,
       uniqueValue = null
     } = options;
-    
     const slideCount = swiper.slides.length;
     const hasMultipleSlides = slideCount > 1;
-    
     const btnWrap = galleryBtnWrap || 
       (galleryClass && document.querySelector(`.gallery_btn_wrap.${galleryClass}`)) ||
       document.querySelector(".gallery_btn_wrap");
-      
-    const prevButton = prevBtn || 
-      (uniqueValue && document.querySelector(`[data-swiper-button-prev="${uniqueValue}"]`)) ||
-      document.querySelector('[data-swiper-button-prev]');
-      
-    const nextButton = nextBtn || 
-      (uniqueValue && document.querySelector(`[data-swiper-button-next="${uniqueValue}"]`)) ||
-      document.querySelector('[data-swiper-button-next]');
-    
     if (btnWrap) {
       btnWrap.style.display = hasMultipleSlides ? "flex" : "none";
     }
-    
+    const prevButton = prevBtn || 
+      (uniqueValue && document.querySelector(`[data-swiper-button-prev="${uniqueValue}"]`)) ||
+      document.querySelector('[data-swiper-button-prev]');
+    const nextButton = nextBtn || 
+      (uniqueValue && document.querySelector(`[data-swiper-button-next="${uniqueValue}"]`)) ||
+      document.querySelector('[data-swiper-button-next]');
     if (prevButton && nextButton) {
       const displayValue = hasMultipleSlides ? "block" : "none";
       prevButton.style.display = displayValue;
       nextButton.style.display = displayValue;
     }
-    
     return hasMultipleSlides;
   }
 };

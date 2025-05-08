@@ -131,7 +131,7 @@ insertSVGFromCMS();
 
 // Initialize smooth scrolling
 const lenis = new Lenis({
-  lerp: 0.15,
+  lerp: 0.1,
   smoothWheel: true,
   smoothTouch: false,
   overscroll: false,
