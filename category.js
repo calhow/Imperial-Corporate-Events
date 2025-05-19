@@ -21,435 +21,6 @@ const adjustSwiperParallax = () => {
   });
 };
 
-const CategoryBackgroundManager = (() => {
-  // Configuration
-  const config = {
-    animationDuration: 1.5,
-    easing: 'power2.out',
-    targetClass: 'cat_bg_img',
-    bgImageCount: 8
-  };
-  
-  // Try alternative class names if needed
-  const hasBgImages = document.querySelector(`.${config.targetClass}`);
-  if (!hasBgImages) {
-    // Try alternative class names
-    const alternativeClasses = ['cat_hero_bg_img', 'cat_bg_image'];
-    for (const altClass of alternativeClasses) {
-      if (document.querySelector(`.${altClass}`)) {
-        config.targetClass = altClass;
-        break;
-      }
-    }
-  }
-  
-  // State
-  let heroSwiper = null;
-  let isAnimating = false;
-  let resizeHandler = null;
-  let originalImages = [];
-  let duplicateImages = [];
-  let animatingIn = true;
-  
-  // Gets the source element from hero slide
-  const getSourceElement = (slide) => {
-    if (!slide && heroSwiper) {
-      slide = heroSwiper.slides[heroSwiper.activeIndex];
-    }
-    
-    if (!slide) {
-      return document.querySelector('.cat_card_poster') || null;
-    }
-    
-    return slide.querySelector('img') || slide.querySelector('video');
-  };
-  
-  // Extracts image URL from an element
-  const getImageUrl = (element) => {
-    if (!element) return null;
-    
-    let url = null;
-    
-    if (element.tagName === 'IMG') {
-      url = element.src;
-    } else if (element.tagName === 'VIDEO') {
-      url = element.poster || element.querySelector('source')?.getAttribute('poster');
-    }
-    
-    return url;
-  };
-  
-  // Finds all original background images
-  const findOriginalImages = () => {
-    const images = [];
-    
-    // Check for sequentially numbered instances
-    for (let i = 1; i <= config.bgImageCount; i++) {
-      const allImagesOfNumber = document.querySelectorAll(`.${config.targetClass}.is-${i}:not([data-duplicate="true"])`);
-      allImagesOfNumber.forEach(img => {
-        if (img) images.push(img);
-      });
-    }
-    
-    // If no sequentially numbered instances found, look for any instances
-    if (images.length === 0) {
-      const allImages = document.querySelectorAll(`.${config.targetClass}:not([data-duplicate="true"])`);
-      allImages.forEach(img => images.push(img));
-    }
-    
-    return images;
-  };
-    
-  // Creates duplicate set of images for crossfade animations
-  const createDuplicateImages = () => {
-    // Remove existing duplicates
-    document.querySelectorAll(`.${config.targetClass}[data-duplicate="true"]`)
-      .forEach(el => el.parentNode?.removeChild(el));
-    
-    if (originalImages.length === 0) return [];
-    
-    const duplicates = [];
-    
-    originalImages.forEach((original, index) => {
-      // Create duplicate in the same parent as the original
-      if (!original.parentNode) return;
-      
-      const duplicate = document.createElement('img');
-      
-      // Copy attributes from original
-      for (const attr of original.attributes) {
-        if (attr.name !== 'class' && attr.name !== 'src' && attr.name !== 'style') {
-          duplicate.setAttribute(attr.name, attr.value);
-        }
-      }
-      
-      duplicate.className = original.className;
-      duplicate.setAttribute('data-duplicate', 'true');
-      duplicate.setAttribute('data-original-index', index.toString());
-      duplicate.style.opacity = '0';
-      
-      if (original.src) {
-        duplicate.src = original.src;
-      }
-      
-      // Append to same parent as the original
-      original.parentNode.appendChild(duplicate);
-      duplicates.push(duplicate);
-    });
-    
-    return duplicates;
-  };
-  
-  // Returns target opacity for an element based on CSS
-  const getTargetOpacity = (element) => {
-    const tempEl = document.createElement('img');
-    tempEl.className = element.className;
-    tempEl.style.cssText = "position: absolute; visibility: hidden;";
-    document.body.appendChild(tempEl);
-    
-    const cssOpacity = parseFloat(window.getComputedStyle(tempEl).opacity);
-    document.body.removeChild(tempEl);
-    
-    return isNaN(cssOpacity) ? 1 : cssOpacity;
-  };
-  
-  // Initializes the background image manager
-  const initialize = (swiper) => {
-    if (!swiper) return;
-    
-    cleanup();
-    
-    heroSwiper = swiper;
-    originalImages = findOriginalImages();
-    
-    if (originalImages.length === 0) return;
-    
-    duplicateImages = createDuplicateImages();
-    
-    const sourceElement = getSourceElement();
-    const imageUrl = getImageUrl(sourceElement);
-    
-    if (imageUrl) {
-      originalImages.forEach(img => {
-        img.src = imageUrl;
-        img.style.opacity = '';
-      });
-      
-      duplicateImages.forEach(img => {
-        img.src = imageUrl;
-        img.style.opacity = '0';
-      });
-    }
-    
-    // Listen for slide changes
-    heroSwiper.on('slideChange', handleSlideChange);
-    
-    // Add more event listeners to ensure we catch slide changes
-    heroSwiper.on('slideChangeTransitionStart', handleSlideChange);
-    
-    heroSwiper.on('slideChangeTransitionEnd', updateBackgroundImagesFromCurrentSlide);
-    
-    heroSwiper.on('breakpoint', () => {
-      resetAnimation();
-      updateBackgroundImagesFromCurrentSlide();
-      
-      // Adjust parallax values on breakpoint change
-      adjustSwiperParallax();
-    });
-    
-    // Debounce resize handler
-    resizeHandler = debounce(() => {
-      resetAnimation();
-      updateBackgroundImagesFromCurrentSlide();
-    }, 250);
-    
-    window.addEventListener('resize', resizeHandler);
-    window.addEventListener('beforeunload', cleanup, { once: true });
-  };
-  
-  // Cleans up event listeners and resources
-  const cleanup = () => {
-    resetAnimation();
-    
-    if (resizeHandler) {
-      window.removeEventListener('resize', resizeHandler);
-      resizeHandler = null;
-    }
-    
-    originalImages.forEach(img => {
-      img.style.opacity = '';
-      gsap.killTweensOf(img);
-    });
-    
-    duplicateImages.forEach(img => {
-      if (img.parentNode) {
-        img.parentNode.removeChild(img);
-      }
-    });
-    
-    if (heroSwiper) {
-      heroSwiper.off('slideChange');
-      heroSwiper.off('slideChangeTransitionStart');
-      heroSwiper.off('slideChangeTransitionEnd');
-      heroSwiper.off('breakpoint');
-      heroSwiper = null;
-    }
-    
-    originalImages = [];
-    duplicateImages = [];
-    isAnimating = false;
-    animatingIn = true;
-  };
-  
-  // Resets any in-progress animations
-  const resetAnimation = () => {
-    if (isAnimating) {
-      originalImages.forEach(img => {
-        gsap.killTweensOf(img);
-        img.style.opacity = '';
-      });
-      
-      duplicateImages.forEach(img => {
-        gsap.killTweensOf(img);
-        img.style.opacity = '0';
-      });
-      
-      isAnimating = false;
-    }
-  };
-  
-  // Handles slide changes and triggers animations
-  const handleSlideChange = () => {
-    if (!heroSwiper || originalImages.length === 0) return;
-    
-    if (isAnimating) resetAnimation();
-    
-    const activeSlide = heroSwiper.slides[heroSwiper.activeIndex];
-    if (!activeSlide) return;
-    
-    const sourceElement = getSourceElement(activeSlide);
-    const imageUrl = getImageUrl(sourceElement);
-    
-    if (!imageUrl) return;
-    
-    animateBackgroundTransition(imageUrl);
-  };
-  
-  // Animates background image transitions
-  const animateBackgroundTransition = (newImageUrl) => {
-    if (originalImages.length === 0 || duplicateImages.length === 0) return;
-    
-    // Filter out any images that no longer have parent nodes
-    originalImages = originalImages.filter(img => img.parentNode);
-    duplicateImages = duplicateImages.filter(img => img.parentNode);
-    
-    // If too many images are missing, recreate duplicates
-    if (duplicateImages.length < originalImages.length / 2) {
-      duplicateImages = createDuplicateImages();
-    }
-    
-    // If we still don't have enough images, abort
-    if (originalImages.length === 0 || duplicateImages.length === 0) return;
-    
-    const currentAnimationRequest = newImageUrl;
-    
-    if (isAnimating) resetAnimation();
-    
-    isAnimating = true;
-    
-    // Determine which set is currently visible and which will animate in
-    let currentSet = animatingIn ? originalImages : duplicateImages;
-    let nextSet = animatingIn ? duplicateImages : originalImages;
-    
-    try {
-      if (nextSet.some(img => !img.parentNode)) {
-        if (animatingIn && duplicateImages.some(img => !img.parentNode)) {
-          duplicateImages = createDuplicateImages();
-          nextSet = animatingIn ? duplicateImages : originalImages;
-        }
-        
-        if (nextSet.some(img => !img.parentNode)) {
-          isAnimating = false;
-          return;
-        }
-      }
-      
-      nextSet.forEach(img => {
-        img.src = newImageUrl;
-        if (img.style.display === 'none') img.style.display = '';
-        img.style.opacity = '0';
-      });
-      
-      // Get target opacities for all next set images
-      const nextSetTargetOpacities = nextSet.map(getTargetOpacity);
-      
-      const tl = gsap.timeline({
-        onComplete: () => {
-          if (currentAnimationRequest === newImageUrl) {
-            setTimeout(() => {
-              if (currentAnimationRequest !== newImageUrl) return;
-              
-              nextSet.forEach(img => img.style.opacity = '');
-              animatingIn = !animatingIn;
-              isAnimating = false;
-            }, 50);
-          } else {
-            isAnimating = false;
-          }
-        }
-      });
-      
-      // Animate current set out
-      currentSet.forEach(img => {
-        tl.to(img, {
-          opacity: 0,
-          duration: config.animationDuration,
-          ease: config.easing,
-          onComplete: () => img.style.opacity = '0'
-        }, 0);
-      });
-      
-      // Animate each next set image to its target CSS opacity
-      nextSet.forEach((img, i) => {
-        tl.to(img, {
-          opacity: nextSetTargetOpacities[i],
-          duration: config.animationDuration,
-          ease: config.easing,
-          onComplete: () => img.style.opacity = ''
-        }, 0);
-      });
-      
-    } catch (error) {
-      isAnimating = false;
-    }
-  };
-  
-  // Updates background images from current slide without animation
-  const updateBackgroundImagesFromCurrentSlide = () => {
-    if (!heroSwiper || originalImages.length === 0) return;
-    
-    // Filter out any images that no longer have parent nodes
-    originalImages = originalImages.filter(img => img.parentNode);
-    duplicateImages = duplicateImages.filter(img => img.parentNode);
-    
-    // If no originals left, try to find them again
-    if (originalImages.length === 0) {
-      originalImages = findOriginalImages();
-      if (originalImages.length === 0) return;
-    }
-    
-    // If duplicates are missing, recreate them
-    if (duplicateImages.length < originalImages.length / 2) {
-      duplicateImages = createDuplicateImages();
-    }
-    
-    const activeSlide = heroSwiper.slides[heroSwiper.activeIndex];
-    if (!activeSlide) return;
-    
-    const sourceElement = getSourceElement(activeSlide);
-    const imageUrl = getImageUrl(sourceElement);
-    
-    if (!imageUrl) return;
-    
-    originalImages.forEach(img => {
-      img.src = imageUrl;
-      img.style.opacity = '';
-    });
-    
-    duplicateImages.forEach(img => {
-      img.src = imageUrl;
-      img.style.opacity = '0';
-    });
-    
-    animatingIn = true;
-  };
-  
-  // Manually refreshes all background images with current slide content
-  const refreshBackgrounds = () => {
-    // Recheck original images
-    const freshOriginals = findOriginalImages();
-    
-    if (freshOriginals.length > 0) {
-      originalImages = freshOriginals;
-      
-      // If hero swiper exists, update from current slide
-      if (heroSwiper) {
-        updateBackgroundImagesFromCurrentSlide();
-      } else {
-        // Try to find a fallback source
-        const fallbackSource = getSourceElement();
-        const fallbackUrl = getImageUrl(fallbackSource);
-        
-        if (fallbackUrl) {
-          // Apply to all original images
-          originalImages.forEach(img => {
-            img.src = fallbackUrl;
-            img.style.opacity = '';
-          });
-          
-          // Recreate duplicates
-          duplicateImages = createDuplicateImages();
-          duplicateImages.forEach(img => {
-            img.src = fallbackUrl;
-            img.style.opacity = '0';
-          });
-        }
-      }
-      
-      return true;
-    }
-    
-    return false;
-  };
-  
-  return {
-    initialize,
-    updateBackgroundImagesFromCurrentSlide,
-    cleanup,
-    refreshBackgrounds
-  };
-})();
-
 const swiperConfigs = [
   {
     selector: ".swiper.is-cat-hero",
@@ -689,8 +260,6 @@ const initializeSwiper = ({
           // Save checker function for later
           this.checkVideoStates = checkVideoStates;
           
-          CategoryBackgroundManager.initialize(this);
-          
           // Adjust parallax values based on screen size
           adjustSwiperParallax();
         }
@@ -857,9 +426,6 @@ const manageSwipers = () => {
   } else {
     resetButtonWrappers();
 
-    // Clean up background manager when swipers are destroyed
-    CategoryBackgroundManager.cleanup();
-    
     // Store the hero swiper if it exists before destroying
     let heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
     let heroConfig = null;
@@ -1163,7 +729,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
   if (heroSwiperInstance) {
     // Force recreate all original and duplicate images
-    CategoryBackgroundManager.initialize(heroSwiperInstance);
+    // CategoryBackgroundManager.initialize(heroSwiperInstance);
   } else {
     // If no hero swiper instance but container exists, initialize manually
     const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
@@ -1184,7 +750,7 @@ document.addEventListener("DOMContentLoaded", () => {
 window.addEventListener('load', () => {
   setTimeout(() => {
     // Try manually refreshing backgrounds after everything is loaded
-    CategoryBackgroundManager.refreshBackgrounds();
+    // CategoryBackgroundManager.refreshBackgrounds();
     
     // Adjust parallax values after everything is loaded
     adjustSwiperParallax();
@@ -1192,7 +758,7 @@ window.addEventListener('load', () => {
     // Check again for hero swiper
     const heroSwiperInstance = swiperInstances.find(swiper => swiper.comboClass === "is-cat-hero");
     if (heroSwiperInstance) {
-      CategoryBackgroundManager.initialize(heroSwiperInstance);
+      // CategoryBackgroundManager.initialize(heroSwiperInstance);
     }
   }, 500);
 });
@@ -1325,3 +891,21 @@ window.addEventListener('resize', (typeof Utils !== 'undefined' ? Utils.debounce
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
 })(adjustSwiperParallax, 100));
+
+
+// SET EXPERIENCE TEXT
+
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".link_cat-btn-thumb_subtext").forEach(function (subtextWrap) {
+    const numberEl = subtextWrap.querySelector(".cat_link_subtext.u-display-inline-block");
+    const labelEl  = subtextWrap.querySelector(".cat_link_subtext:not(.u-display-inline-block)");
+
+    if (numberEl && labelEl) {
+      const count = parseInt(numberEl.textContent.trim(), 10);
+      if (!isNaN(count)) {
+        labelEl.innerHTML = count === 1 ? "&nbsp;experience" : "&nbsp;experiences";
+      }
+    }
+  });
+});
+

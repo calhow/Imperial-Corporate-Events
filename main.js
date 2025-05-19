@@ -30,10 +30,10 @@ const Utils = (() => {
   // Device detection utility
   const isMobile = () => window.innerWidth <= 767;
   
-  // Create animation properties with or without blur based on device
+  // Create animation properties without blur
   const getAnimProps = (props) => {
-    // If we're on mobile, remove filter:blur from animation props
-    if (isMobile() && props.filter && props.filter.includes('blur')) {
+    // Always remove filter:blur from animation props
+    if (props.filter && props.filter.includes('blur')) {
       const { filter, ...otherProps } = props;
       return otherProps;
     }
@@ -401,13 +401,11 @@ document.addEventListener("click", (event) => {
         updateLiveChatVisibility();
       }
       
-      // Only clear filter if we're not on mobile
-      if (!Utils.isMobile()) {
-        gsap.set(
-          `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
-          { filter: "none" }
-        );
-      }
+      // Always clear filter
+      gsap.set(
+        `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
+        { filter: "none" }
+      );
     }
   });
 
@@ -442,28 +440,28 @@ document.addEventListener("click", (event) => {
 
           // Content animations with staggered timing
           .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".menu_link_list > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }), 0.30)
+          .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.30)
           .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
           .to(".form_search_wrap", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to(".menu_calendar_list", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.45)
-          .to(".menu_calendar_list_pagination", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out"}), 0.5)
+          .to(".menu_calendar_list", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out" }, 0.45)
+          .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out"}, 0.5)
           .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".form_menu_grid > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.015 }), 0.3)
+          .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
           .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.45)
           .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".menu_trending_cms_list > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.02 }), 0.35)
+          .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.02 }, 0.35)
           .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to("[menu-category-label='1']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.4) 
-          .to("[menu-category-cms-list='1']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.42)
-          .to("[menu-category-pag='1']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.44)
+          .to("[menu-category-label='1']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.4) 
+          .to("[menu-category-cms-list='1']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out" }, 0.42)
+          .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.44)
           .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46)
-          .to("[menu-category-label='2']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.46) 
-          .to("[menu-category-cms-list='2']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.48)
-          .to("[menu-category-pag='2']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.5)
+          .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.46) 
+          .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out" }, 0.48)
+          .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.5)
           .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
-          .to("[menu-category-label='3']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.52) 
-          .to("[menu-category-cms-list='3']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.15, ease: "power1.out" }), 0.54)
-          .to("[menu-category-pag='3']", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out" }), 0.56);
+          .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
+          .to("[menu-category-cms-list='3']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out" }, 0.54)
+          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.56);
 
       } else if (trayModalType === 'package') {
         modalTl
@@ -483,6 +481,27 @@ document.addEventListener("click", (event) => {
             document.dispatchEvent(new CustomEvent('packageModalAnimationComplete'));
           }, 0.35);
 
+      } else if (trayModalType === 'experience') {
+        modalTl
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+            opacity: 1, 
+            duration: 0.3, 
+            ease: "power4.Out"
+          }, 0)
+          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
+            { xPercent: 105 }, 
+            { 
+              xPercent: 0, 
+              duration: 0.35, 
+              ease: "power4.Out"
+            }, 0.1 )
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+          .to(".experience_btn_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+          .to(".form_experience_heading", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.3) 
+          .to(".form_experience_grid > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
+          .to(".form_experience_para", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.4);
+          
       } else if (trayModalType === 'reviews') {
         modalTl
           .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
@@ -499,7 +518,7 @@ document.addEventListener("click", (event) => {
             }, 0.1 )
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".reviews_modal_review_list > *", Utils.getAnimProps({ opacity: 1, x: "0rem", y: "0rem", filter: "blur(0rem)", duration: 0.2, ease: "power1.out", stagger: 0.05 }), 0.35);
+          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.05 }, 0.35);
       }
     } else {
       // Regular modal animation
@@ -528,26 +547,26 @@ document.addEventListener("click", (event) => {
           .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_link_list > *", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to(".form_menu_grid > *", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to(".menu_trending_cms_list > *", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to(".menu_link_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".form_menu_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".form_search_wrap", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_calendar_list", Utils.getAnimProps({ opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to(".menu_calendar_list_pagination", Utils.getAnimProps({ opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to(".menu_calendar_list", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='3']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0) 
-          .to("[menu-category-pag='1']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to("[menu-category-pag='2']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to("[menu-category-pag='3']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to("[menu-category-label='1']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to("[menu-category-label='2']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0) 
-          .to("[menu-category-label='3']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to("[menu-category-cms-list='1']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
-          .to("[menu-category-cms-list='2']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0) 
-          .to("[menu-category-cms-list='3']", Utils.getAnimProps({ opacity: 0, x: "0.125rem", y: "-0.25rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)
+          .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0) 
+          .to("[menu-category-label='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-cms-list='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-cms-list='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0) 
+          .to("[menu-category-cms-list='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
           .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -567,14 +586,13 @@ document.addEventListener("click", (event) => {
             duration: 0.2, 
             ease: "power1.in"
           }, 0)
-          .to('.package_content > * > *', Utils.getAnimProps({ 
+          .to('.package_content > * > *', { 
             opacity: 0, 
             x: "0.125rem", 
             y: "-0.25rem", 
-            filter: "blur(2px)", 
             duration: 0.2, 
             ease: "power1.in"
-          }), 0)
+          }, 0)
           .to('.package_btn_wrap', { 
             opacity: 0, 
             x: "0.5rem", 
@@ -596,12 +614,22 @@ document.addEventListener("click", (event) => {
           });
       } else if (trayModalType === 'reviews') {
         modalTl
-        .to(".reviews_modal_review_list > *", Utils.getAnimProps({ opacity: 0, x: "0.25rem", y: "-0.5rem", filter: "blur(2px)", duration: 0.2, ease: "power1.out" }), 0)  
+        .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)  
         .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
         .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
         .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
         .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
         .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
+      } else if (trayModalType === 'experience') {
+        modalTl
+          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
+          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
+          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
+          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0)
+          .to(".form_experience_heading", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".form_experience_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".form_experience_para", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to(".experience_btn_wrap", { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, 0);
       }
     } else {
       // Regular modal exit animation
@@ -638,36 +666,35 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // Handle resize events to ensure blur filters are cleared on mobile
-  const clearBlurOnResize = Utils.debounce(() => {
-    if (Utils.isMobile()) {
-      // Clear blur filters from all modal content elements
-      const modalContentElements = [
-        // Nav modal elements
-        ".menu_link_list > *",
-        ".form_menu_grid > *",
-        ".menu_trending_cms_list > *",
-        ".menu_calendar_list",
-        ".menu_calendar_list_pagination",
-        "[menu-category-pag]",
-        "[menu-category-label]",
-        "[menu-category-cms-list]",
-        // Review modal elements
-        ".reviews_modal_review_list > *",
-        // Package modal elements
-        ".package_content > * > *"
-      ];
-      
-      modalContentElements.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        if (elements.length) {
-          gsap.set(elements, { filter: "none" });
-        }
-      });
-    }
+  // Handle resize events for modal visibility management
+  const handleResize = Utils.debounce(() => {
+    // Ensure proper visibility of modal elements on resize
+    const modalElements = [
+      // Nav modal elements
+      ".menu_link_list > *",
+      ".form_menu_grid > *",
+      ".menu_trending_cms_list > *",
+      ".menu_calendar_list",
+      ".menu_calendar_list_pagination",
+      "[menu-category-pag]",
+      "[menu-category-label]",
+      "[menu-category-cms-list]",
+      // Review modal elements
+      ".reviews_modal_review_list > *",
+      // Package modal elements
+      ".package_content > * > *"
+    ];
+    
+    // Reset any potentially problematic styles
+    modalElements.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length) {
+        gsap.set(elements, { filter: "none" });
+      }
+    });
   }, 150);
   
-  window.addEventListener("resize", clearBlurOnResize);
+  window.addEventListener("resize", handleResize);
 });
 
 // Tab switch animation system
@@ -1112,56 +1139,68 @@ function initializePackageAccordion() {
 // Global ScrollTrigger Module for Navbar Animations
 window.NavScrollTrigger = (() => {
   const initNavbarScrollEffects = () => {
-    const navMediaMatcher = gsap.matchMedia();
-
-    navMediaMatcher.add("(max-width: 1290px)", () => {
-      ScrollTrigger.create({
-        trigger: ".page_main",
-        start: "top top",
-        onEnter: () => {
-          gsap.to(".nav_main_logo", {
-            opacity: 0,
-            pointerEvents: "none",
-            duration: 0.2,
-            ease: "power1.out",
-          });
-        },
-        onLeaveBack: () => {
-          gsap.to(".nav_main_logo", {
-            opacity: 1,
-            pointerEvents: "auto",
-            duration: 0.2,
-            ease: "power1.out",
-          });
-        },
-      });
-
-      return () => {
-        // Cleanup function for when matchMedia conditions change
-      };
-    });
-
-
+    // Create a single ScrollTrigger
     ScrollTrigger.create({
       trigger: ".page_main",
       start: "top top",
       onEnter: () => {
-        gsap.to(".nav_main_link_wrap", {
-          opacity: 0,
-          pointerEvents: "none",
-          duration: 0.2,
-          ease: "power1.out",
-        });
+        // Add the class to body
+        document.body.classList.add("nav-hidden");
       },
       onLeaveBack: () => {
-        gsap.to(".nav_main_link_wrap", {
-          opacity: 1,
-          pointerEvents: "auto",
-          duration: 0.2,
-          ease: "power1.out",
-        });
-      },
+        // Remove the class from body
+        document.body.classList.remove("nav-hidden");
+      }
     });
+
+    // Add CSS rules for the animations
+    const addStyleSheet = () => {
+      // Create a style element
+      const style = document.createElement("style");
+      style.id = "nav-scroll-styles";
+      
+      // Define the CSS
+      style.textContent = `
+        /* Base transition for all nav elements */
+        .nav_main_logo, .cat_breadcrumbs_wrap, .nav_main_link_wrap {
+          transition: opacity 0.2s ease, pointer-events 0.2s ease;
+        }
+        
+        /* Small screens (mobile): Only hide logo and links */
+        @media (max-width: 991.98px) {
+          body.nav-hidden .nav_main_logo,
+          body.nav-hidden .nav_main_link_wrap {
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+        }
+        
+        /* Medium screens: Hide logo, breadcrumbs, and links */
+        @media (min-width: 992px) and (max-width: 1290px) {
+          body.nav-hidden .nav_main_logo,
+          body.nav-hidden .cat_breadcrumbs_wrap,
+          body.nav-hidden .nav_main_link_wrap {
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+        }
+        
+        /* Large screens: Only hide breadcrumbs and links */
+        @media (min-width: 1290.01px) {
+          body.nav-hidden .cat_breadcrumbs_wrap,
+          body.nav-hidden .nav_main_link_wrap {
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+        }
+      `;
+      
+      // Add to the DOM
+      document.head.appendChild(style);
+    };
+    
+    // Add the styles immediately
+    addStyleSheet();
   };
 
   document.addEventListener("DOMContentLoaded", initNavbarScrollEffects);

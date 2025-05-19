@@ -1297,14 +1297,7 @@ class AnimationStateManager {
     if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
     if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
     if (elements.contentGrandchildren?.length) {
-      const props = { opacity: 0, x: "0.125rem", y: "-0.25rem" };
-      
-      // Only add blur effect for non-mobile devices
-      if (!this.isMobile) {
-        props.filter = "blur(2px)";
-      }
-      
-      gsap.set(elements.contentGrandchildren, props);
+      gsap.set(elements.contentGrandchildren, { opacity: 0, x: "0.125rem", y: "-0.25rem" });
     }
     if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
     
@@ -1339,21 +1332,14 @@ class AnimationStateManager {
     }
 
     if (elements.contentGrandchildren?.length) {
-      const props = {
+      this.timeline.to(elements.contentGrandchildren, {
         opacity: 1,
         x: "0rem",
         y: "0rem",
         duration: 0.2,
         ease: "power1.out",
         stagger: 0.015
-      };
-      
-      // Only add blur effect for non-mobile devices
-      if (!this.isMobile) {
-        props.filter = "blur(0rem)";
-      }
-      
-      this.timeline.to(elements.contentGrandchildren, props, 0);
+      }, 0);
     }
 
     if (elements.btnWrap) {
@@ -1674,8 +1660,6 @@ const setInitialStates = (elements) => {
     
     gsap.set(allElements, { opacity: 0 });
 
-    const isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
-
     // Base states for all elements
     const states = {
         headingWrap: { opacity: 0, x: "0.5rem" },
@@ -1683,11 +1667,6 @@ const setInitialStates = (elements) => {
         contentGrandchildren: { opacity: 0, x: "0.125rem", y: "-0.25rem" },
         btnWrap: { opacity: 0, x: "0.5rem" }
     };
-    
-    // Add blur only for non-mobile
-    if (!isMobile) {
-        states.contentGrandchildren.filter = "blur(2px)";
-    }
 
     Object.entries(states).forEach(([key, props]) => {
         const target = elements[key];
@@ -1701,8 +1680,6 @@ const createContentAnimation = (elements) => {
         paused: true,
         onComplete: () => TimelineManager.remove(timeline)
     });
-
-    const isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
     
     // Base animations
     const animations = [
@@ -1725,11 +1702,6 @@ const createContentAnimation = (elements) => {
             props: { opacity: 1, x: "0rem" }
         }
     ];
-    
-    // Add blur only for non-mobile
-    if (!isMobile && animations[2].props) {
-        animations[2].props.filter = "blur(0rem)";
-    }
 
     animations.forEach(({ targets, props, stagger }) => {
         if (!targets) return;
@@ -1743,6 +1715,271 @@ const createContentAnimation = (elements) => {
 
     TimelineManager.add(timeline);
     return timeline;
+};
+
+// Handles content population for URL
+const handleContentForUrl = (url) => {
+  if (isModalContentCorrect(url)) {
+    return;
+  }
+  
+  if (contentCache.has(url)) {
+    populateModal(contentCache.get(url), url);
+    return;
+  }
+  
+  if (pendingFetches.has(url)) {
+    pendingFetches.get(url).then(content => {
+      if (content) {
+        populateModal(content, url);
+      }
+    });
+    return;
+  }
+  
+  const fetchPromise = fetchContent(url).then(content => {
+    if (content) {
+      contentCache.set(url, content);
+      populateModal(content, url);
+    }
+    return content;
+  }).catch(error => {
+    return null;
+  });
+  
+  pendingFetches.set(url, fetchPromise);
+};
+
+// Handles package card click events
+const handleCardClick = (event) => {
+  event.preventDefault();
+  
+  const card = event.currentTarget;
+  const linkElement = card.querySelector(".packages_link");
+  if (!linkElement) return;
+  
+  const url = linkElement.getAttribute("href");
+  if (!url) return;
+  
+  openModalForUrl(url);
+};
+
+// Triggers modal opening and content loading
+const openModalForUrl = async (url) => {
+  const modalAnimationComplete = new Promise(resolve => {
+    document.addEventListener('packageModalAnimationComplete', () => {
+      resolve();
+    }, { once: true });
+  });
+  
+  const btn = document.createElement('button');
+  btn.setAttribute('data-modal-open', 'package');
+  btn.style.position = 'absolute';
+  btn.style.opacity = '0';
+  btn.style.pointerEvents = 'none';
+  document.body.appendChild(btn);
+  btn.click();
+  
+  requestAnimationFrame(() => {
+    document.body.removeChild(btn);
+  });
+
+  if (!isModalContentCorrect(url)) {
+    let content = null;
+    
+    try {
+      if (contentCache.has(url)) {
+        content = contentCache.get(url);
+      } else if (pendingFetches.has(url)) {
+        content = await pendingFetches.get(url);
+      } else {
+        const fetchPromise = fetchContent(url);
+        pendingFetches.set(url, fetchPromise);
+        content = await fetchPromise;
+        if (content) {
+          contentCache.set(url, content);
+        }
+      }
+    } catch (error) {
+      return;
+    }
+
+    if (content) {
+      packageModalTarget.innerHTML = "";
+      packageModalTarget.setAttribute('data-current-url', url);
+      
+      const contentClone = content.cloneNode(true);
+      prepareContentForInsertion(contentClone);
+      
+      const elements = {
+        headingWrap: contentClone.querySelector('.package_heading_wrap'),
+        contentChildren: contentClone.querySelectorAll('.package_content > *'),
+        contentGrandchildren: contentClone.querySelectorAll('.package_content > * > *'),
+        btnWrap: contentClone.querySelector('.package_btn_wrap')
+      };
+      
+      const setInitialStates = () => {
+        gsap.set([
+          elements.headingWrap, 
+          ...elements.contentChildren, 
+          ...elements.contentGrandchildren, 
+          elements.btnWrap
+        ].filter(Boolean), { opacity: 0 });
+        
+        if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
+        if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
+        if (elements.contentGrandchildren?.length) {
+          gsap.set(elements.contentGrandchildren, { 
+            opacity: 0, 
+            x: "0.125rem", 
+            y: "-0.25rem"
+          });
+        }
+        if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
+        
+        packageModalTarget.offsetHeight;
+      };
+      
+      packageModalTarget.appendChild(contentClone);
+      
+      setInitialStates();
+
+      requestAnimationFrame(() => {
+        initializeModalContent(contentClone);
+        
+        setInitialStates();
+        
+        modalAnimationComplete.then(() => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setInitialStates();
+              
+              const contentTl = gsap.timeline();
+              
+              if (elements.headingWrap) {
+                contentTl.to(elements.headingWrap, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out"
+                }, 0);
+              }
+              
+              if (elements.contentChildren?.length) {
+                contentTl.to(elements.contentChildren, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out",
+                  stagger: 0.03
+                }, 0); 
+              }
+              
+              if (elements.contentGrandchildren?.length) {
+                contentTl.to(elements.contentGrandchildren, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  y: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out",
+                  stagger: 0.015
+                }, 0);
+              }
+              
+              if (elements.btnWrap) {
+                contentTl.to(elements.btnWrap, { 
+                  opacity: 1, 
+                  x: "0rem", 
+                  duration: 0.2, 
+                  ease: "power1.out"
+                }, 0);
+              }
+            });
+          });
+        });
+      });
+    }
+  } else {
+    const elements = {
+      headingWrap: packageModalTarget.querySelector('.package_heading_wrap'),
+      contentChildren: packageModalTarget.querySelectorAll('.package_content > *'),
+      contentGrandchildren: packageModalTarget.querySelectorAll('.package_content > * > *'),
+      btnWrap: packageModalTarget.querySelector('.package_btn_wrap')
+    };
+    
+    const setInitialStates = () => {
+      gsap.set([
+        elements.headingWrap, 
+        ...elements.contentChildren, 
+        ...elements.contentGrandchildren, 
+        elements.btnWrap
+      ].filter(Boolean), { opacity: 0 });
+      
+      if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
+      if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
+      if (elements.contentGrandchildren?.length) {
+        gsap.set(elements.contentGrandchildren, { 
+          opacity: 0, 
+          x: "0.125rem", 
+          y: "-0.25rem"
+        });
+      }
+      if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
+      
+      packageModalTarget.offsetHeight;
+    };
+    
+    setInitialStates();
+    
+    modalAnimationComplete.then(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setInitialStates();
+          
+          const contentTl = gsap.timeline();
+          
+          if (elements.headingWrap) {
+            contentTl.to(elements.headingWrap, { 
+              opacity: 1, 
+              x: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out"
+            }, 0);
+          }
+          
+          if (elements.contentChildren?.length) {
+            contentTl.to(elements.contentChildren, { 
+              opacity: 1, 
+              x: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out",
+              stagger: 0.03
+            }, 0); 
+          }
+          
+          if (elements.contentGrandchildren?.length) {
+            contentTl.to(elements.contentGrandchildren, { 
+              opacity: 1, 
+              x: "0rem", 
+              y: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out",
+              stagger: 0.015
+            }, 0);
+          }
+          
+          if (elements.btnWrap) {
+            contentTl.to(elements.btnWrap, { 
+              opacity: 1, 
+              x: "0rem", 
+              duration: 0.2, 
+              ease: "power1.out"
+            }, 0);
+          }
+        });
+      });
+    });
+  }
 };
 
 // Populates modal with content and animations
@@ -2015,275 +2252,6 @@ const setupContentProcessor = () => {
   } catch (error) {
     window.contentProcessor = null;
     window.contentProcessorReady = false;
-  }
-};
-
-// Handles content population for URL
-const handleContentForUrl = (url) => {
-  if (isModalContentCorrect(url)) {
-    return;
-  }
-  
-  if (contentCache.has(url)) {
-    populateModal(contentCache.get(url), url);
-    return;
-  }
-  
-  if (pendingFetches.has(url)) {
-    pendingFetches.get(url).then(content => {
-      if (content) {
-        populateModal(content, url);
-      }
-    });
-    return;
-  }
-  
-  const fetchPromise = fetchContent(url).then(content => {
-    if (content) {
-      contentCache.set(url, content);
-      populateModal(content, url);
-    }
-    return content;
-  }).catch(error => {
-    return null;
-  });
-  
-  pendingFetches.set(url, fetchPromise);
-};
-
-// Handles package card click events
-const handleCardClick = (event) => {
-  event.preventDefault();
-  
-  const card = event.currentTarget;
-  const linkElement = card.querySelector(".packages_link");
-  if (!linkElement) return;
-  
-  const url = linkElement.getAttribute("href");
-  if (!url) return;
-  
-  openModalForUrl(url);
-};
-
-// Triggers modal opening and content loading
-const openModalForUrl = async (url) => {
-  const modalAnimationComplete = new Promise(resolve => {
-    document.addEventListener('packageModalAnimationComplete', () => {
-      resolve();
-    }, { once: true });
-  });
-  
-  const btn = document.createElement('button');
-  btn.setAttribute('data-modal-open', 'package');
-  btn.style.position = 'absolute';
-  btn.style.opacity = '0';
-  btn.style.pointerEvents = 'none';
-  document.body.appendChild(btn);
-  btn.click();
-  
-  requestAnimationFrame(() => {
-    document.body.removeChild(btn);
-  });
-
-  if (!isModalContentCorrect(url)) {
-    let content = null;
-    
-    try {
-      if (contentCache.has(url)) {
-        content = contentCache.get(url);
-      } else if (pendingFetches.has(url)) {
-        content = await pendingFetches.get(url);
-      } else {
-        const fetchPromise = fetchContent(url);
-        pendingFetches.set(url, fetchPromise);
-        content = await fetchPromise;
-        if (content) {
-          contentCache.set(url, content);
-        }
-      }
-    } catch (error) {
-      return;
-    }
-
-    if (content) {
-      packageModalTarget.innerHTML = "";
-      packageModalTarget.setAttribute('data-current-url', url);
-      
-      const contentClone = content.cloneNode(true);
-      prepareContentForInsertion(contentClone);
-      
-      const elements = {
-        headingWrap: contentClone.querySelector('.package_heading_wrap'),
-        contentChildren: contentClone.querySelectorAll('.package_content > *'),
-        contentGrandchildren: contentClone.querySelectorAll('.package_content > * > *'),
-        btnWrap: contentClone.querySelector('.package_btn_wrap')
-      };
-      
-      const setInitialStates = () => {
-        gsap.set([
-          elements.headingWrap, 
-          ...elements.contentChildren, 
-          ...elements.contentGrandchildren, 
-          elements.btnWrap
-        ].filter(Boolean), { opacity: 0 });
-        
-        if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
-        if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
-        if (elements.contentGrandchildren?.length) {
-          gsap.set(elements.contentGrandchildren, { 
-            opacity: 0, 
-            x: "0.125rem", 
-            y: "-0.25rem", 
-            filter: "blur(2px)" 
-          });
-        }
-        if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
-        
-        packageModalTarget.offsetHeight;
-      };
-      
-      packageModalTarget.appendChild(contentClone);
-      
-      setInitialStates();
-
-      requestAnimationFrame(() => {
-        initializeModalContent(contentClone);
-        
-        setInitialStates();
-        
-        modalAnimationComplete.then(() => {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setInitialStates();
-              
-              const contentTl = gsap.timeline();
-              
-              if (elements.headingWrap) {
-                contentTl.to(elements.headingWrap, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out"
-                }, 0);
-              }
-              
-              if (elements.contentChildren?.length) {
-                contentTl.to(elements.contentChildren, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out",
-                  stagger: 0.03
-                }, 0); 
-              }
-              
-              if (elements.contentGrandchildren?.length) {
-                contentTl.to(elements.contentGrandchildren, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  y: "0rem", 
-                  filter: "blur(0rem)", 
-                  duration: 0.2, 
-                  ease: "power1.out",
-                  stagger: 0.015
-                }, 0);
-              }
-              
-              if (elements.btnWrap) {
-                contentTl.to(elements.btnWrap, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out"
-                }, 0);
-              }
-            });
-          });
-        });
-      });
-    }
-  } else {
-    const elements = {
-      headingWrap: packageModalTarget.querySelector('.package_heading_wrap'),
-      contentChildren: packageModalTarget.querySelectorAll('.package_content > *'),
-      contentGrandchildren: packageModalTarget.querySelectorAll('.package_content > * > *'),
-      btnWrap: packageModalTarget.querySelector('.package_btn_wrap')
-    };
-    
-    const setInitialStates = () => {
-      gsap.set([
-        elements.headingWrap, 
-        ...elements.contentChildren, 
-        ...elements.contentGrandchildren, 
-        elements.btnWrap
-      ].filter(Boolean), { opacity: 0 });
-      
-      if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
-      if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
-      if (elements.contentGrandchildren?.length) {
-        gsap.set(elements.contentGrandchildren, { 
-          opacity: 0, 
-          x: "0.125rem", 
-          y: "-0.25rem", 
-          filter: "blur(2px)" 
-        });
-      }
-      if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
-      
-      packageModalTarget.offsetHeight;
-    };
-    
-    setInitialStates();
-    
-    modalAnimationComplete.then(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setInitialStates();
-          
-          const contentTl = gsap.timeline();
-          
-          if (elements.headingWrap) {
-            contentTl.to(elements.headingWrap, { 
-              opacity: 1, 
-              x: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out"
-            }, 0);
-          }
-          
-          if (elements.contentChildren?.length) {
-            contentTl.to(elements.contentChildren, { 
-              opacity: 1, 
-              x: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out",
-              stagger: 0.03
-            }, 0); 
-          }
-          
-          if (elements.contentGrandchildren?.length) {
-            contentTl.to(elements.contentGrandchildren, { 
-              opacity: 1, 
-              x: "0rem", 
-              y: "0rem", 
-              filter: "blur(0rem)", 
-              duration: 0.2, 
-              ease: "power1.out",
-              stagger: 0.015
-            }, 0);
-          }
-          
-          if (elements.btnWrap) {
-            contentTl.to(elements.btnWrap, { 
-              opacity: 1, 
-              x: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out"
-            }, 0);
-          }
-        });
-      });
-    });
   }
 };
 
@@ -2572,3 +2540,189 @@ expMediaMatcher.add("(min-width: 479px)", () => {
     videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
   }
 });
+
+
+// Swiper Module for exp nav links
+const SwiperModule = (() => {
+  let swiper;
+  let isAnchorScrolling = false; // Prevents navigation jumps during smooth scrolling
+
+  function initSwiper() {
+    if (window.innerWidth >= 992) {
+      if (!swiper) {
+        swiper = new Swiper(".exp_nav_wrap", {
+          wrapperClass: "exp_nav_list",
+          slideClass: "exp_nav_item",
+          navigation: {
+            nextEl: '[data-swiper-btn-exp="next"]',
+            prevEl: '[data-swiper-btn-exp="prev"]',
+            disabledClass: "exp_nav_btn_wrap_disabled",
+          },
+          slidesPerView: "auto",
+          slidesPerGroup: 1,
+          watchSlidesProgress: true,
+          resistanceRatio: 0.85,
+          freeMode: true,
+          watchOverflow: true,
+          on: {
+            init: function() {
+              updateSwiperClasses();
+              slideToCurrentAnchor(this);
+            },
+            slideChange: updateSwiperClasses,
+            reachEnd: updateSwiperClasses,
+            reachBeginning: updateSwiperClasses,
+            setTranslate: updateSwiperClasses,
+          },
+        });
+
+        observeAnchorChanges();
+        setupAnchorClickHandlers();
+      }
+    } else {
+      if (swiper) {
+        swiper.destroy(true, true);
+        swiper = undefined;
+      }
+    }
+  }
+
+  // Centers the currently active nav item with adjustment for navigation buttons
+  function slideToCurrentAnchor(swiperInstance) {
+    if (isAnchorScrolling) return;
+    
+    const activeAnchorItem = document.querySelector('.exp_nav_item a.w--current');
+    if (activeAnchorItem && swiperInstance) {
+      const slideElement = activeAnchorItem.closest('.exp_nav_item');
+      if (slideElement) {
+        const slideIndex = Array.from(slideElement.parentNode.children).indexOf(slideElement);
+        if (slideIndex !== -1) {
+          const swiperWidth = swiperInstance.width;
+          const slideWidth = slideElement.offsetWidth;
+          const slideLeft = slideElement.offsetLeft;
+          
+          const prevButton = document.querySelector('[data-swiper-btn-exp="prev"]');
+          const buttonOffset = prevButton ? prevButton.offsetWidth + 10 : 0; // Extra padding prevents overlap
+          
+          let offset = slideLeft - (swiperWidth / 2) + (slideWidth / 2) - buttonOffset;
+          offset = Math.max(0, Math.min(offset, swiperInstance.maxTranslate() * -1));
+          
+          swiperInstance.translateTo(-offset, 300);
+          
+          setTimeout(() => {
+            swiperInstance.updateProgress();
+            swiperInstance.updateActiveIndex();
+            updateSwiperClasses();
+          }, 350);
+        }
+      }
+    }
+  }
+
+  // Prevents navigation jumps during anchor link scrolling
+  function setupAnchorClickHandlers() {
+    document.querySelectorAll('.exp_nav_item a').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        if (swiper) {
+          const slideElement = this.closest('.exp_nav_item');
+          if (slideElement) {
+            const slideIndex = Array.from(slideElement.parentNode.children).indexOf(slideElement);
+            if (slideIndex !== -1) {
+              isAnchorScrolling = true;
+              slideToCurrentAnchor(swiper);
+              
+              // Reset flag after estimated scroll animation completes
+              setTimeout(() => {
+                isAnchorScrolling = false;
+              }, 1500);
+            }
+          }
+        }
+      });
+    });
+  }
+
+  // Tracks navigation state changes from scrolling and hash changes
+  function observeAnchorChanges() {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && 
+            mutation.attributeName === 'class' && 
+            mutation.target.classList.contains('w--current')) {
+          
+          if (swiper && !isAnchorScrolling) {
+            slideToCurrentAnchor(swiper);
+          }
+        }
+      });
+    });
+
+    document.querySelectorAll('.exp_nav_item a').forEach(anchor => {
+      observer.observe(anchor, { attributes: true });
+    });
+    
+    window.addEventListener('hashchange', () => {
+      if (swiper) {
+        isAnchorScrolling = true;
+        setTimeout(() => slideToCurrentAnchor(swiper), 100);
+        setTimeout(() => {
+          isAnchorScrolling = false;
+        }, 1500);
+      }
+    });
+    
+    const scrollHandler = debounce(() => {
+      if (swiper && !isAnchorScrolling) {
+        slideToCurrentAnchor(swiper);
+      }
+    }, 200);
+    
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+  }
+
+  // Updates navigation button states based on swiper position
+  function updateSwiperClasses() {
+    const swiperContainer = document.querySelector(".exp_nav_wrap");
+    const nextButton = document.querySelector(
+      '[data-swiper-btn-exp="next"]'
+    );
+    const prevButton = document.querySelector(
+      '[data-swiper-btn-exp="prev"]'
+    );
+
+    if (!swiperContainer || !nextButton || !prevButton) return;
+
+    swiperContainer.classList.remove("is-next", "is-both", "is-prev");
+
+    if (prevButton.classList.contains("exp_nav_btn_wrap_disabled") && nextButton.classList.contains("exp_nav_btn_wrap_disabled")) {
+      return;
+    } else if (nextButton.classList.contains("exp_nav_btn_wrap_disabled")) {
+      swiperContainer.classList.add("is-prev");
+    } else if (prevButton.classList.contains("exp_nav_btn_wrap_disabled")) {
+      swiperContainer.classList.add("is-next");
+    } else {
+      swiperContainer.classList.add("is-both");
+    }
+  }
+
+  // Prevents rapid firing of expensive operations
+  const debounce = function(func, wait) {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  };
+
+  window.addEventListener("load", initSwiper);
+  
+  const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : debounce;
+  
+  window.addEventListener("resize", debounceFn(initSwiper, 100));
+
+  return {
+    initSwiper,
+    getSwiper: () => swiper,
+    slideToCurrentAnchor: () => slideToCurrentAnchor(swiper)
+  };
+})();
