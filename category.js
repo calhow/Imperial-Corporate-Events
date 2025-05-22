@@ -48,6 +48,11 @@ const swiperConfigs = [
     slidesPerView: "auto",
   },
   {
+    selector: ".swiper.is-reviews",
+    comboClass: "is-reviews",
+    slidesPerView: "auto",
+  },
+  {
     selector: ".swiper.is-comps",
     comboClass: "is-comps",
     slidesPerView: "auto",
@@ -897,8 +902,9 @@ window.addEventListener('resize', (typeof Utils !== 'undefined' ? Utils.debounce
 
 document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".link_cat-btn-thumb_subtext").forEach(function (subtextWrap) {
-    const numberEl = subtextWrap.querySelector(".cat_link_subtext.u-display-inline-block");
-    const labelEl  = subtextWrap.querySelector(".cat_link_subtext:not(.u-display-inline-block)");
+    const subtextElements = subtextWrap.querySelectorAll(".cat_link_subtext");
+    const numberEl = subtextElements[0];
+    const labelEl = subtextElements[1];
 
     if (numberEl && labelEl) {
       const count = parseInt(numberEl.textContent.trim(), 10);

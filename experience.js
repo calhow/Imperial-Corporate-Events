@@ -2726,3 +2726,34 @@ const SwiperModule = (() => {
     slideToCurrentAnchor: () => slideToCurrentAnchor(swiper)
   };
 })();
+
+
+// SHARE BUTTON
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('shareBtn');
+
+  btn.addEventListener('click', async () => {
+    const shareData = {
+      title: document.title,
+      text: document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+      url: window.location.href
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error('Share failed:', err);
+      }
+    } else {
+      // Fallback: copy URL to clipboard
+      try {
+        await navigator.clipboard.writeText(shareData.url);
+        btn.querySelector('.btn_default_text').textContent = 'Link copied';
+      } catch (err) {
+        console.error('Could not copy link:', err);
+      }
+    }
+  });
+});
