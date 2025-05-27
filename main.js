@@ -439,6 +439,7 @@ document.addEventListener("click", (event) => {
           .to(".nav_modal_close_mob", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
 
           // Content animations with staggered timing
+          .to(".menu_image_btn", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
           .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
           .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.30)
           .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
@@ -544,6 +545,7 @@ document.addEventListener("click", (event) => {
     if (isTrayModal) {
       if (trayModalType === 'nav') {
         modalTl
+          .to(".menu_image_btn", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -1317,32 +1319,6 @@ const CMSFilterManager = (() => {
 
 // Initialize the CMS Filter Manager
 document.addEventListener('DOMContentLoaded', CMSFilterManager.init);
-
-// Separate initialization script for footer-cta swiper
-const initializeFooterCtaSwiper = () => {
-  // Initialize footer CTA swiper
-  const footerSwiper = new Swiper(".swiper.is-footer-cta", {
-    speed: 600,
-    slidesPerView: "auto",
-    spaceBetween: 0,
-    autoplay: {
-      delay: 6000,
-      disableOnInteraction: false
-    },
-    loop: true,
-    effect: "fade",
-    fadeEffect: {
-      crossFade: true
-    }
-  });
-  
-  return {
-    instance: footerSwiper
-  };
-};
-
-// Initialize the footer CTA swiper independently
-const footerCtaSwiperController = initializeFooterCtaSwiper();
 
 
 // Set review score to one decimal place
