@@ -393,6 +393,11 @@ const swiperConfigs = [
     comboClass: "is-similar-exp",
     slidesPerView: "auto",
   },
+  {
+    selector: ".swiper.is-exp-venues",
+    comboClass: "is-exp-venues",
+    slidesPerView: "auto",
+  }
 ];
 
 // Initializes Swiper with proper navigation and breakpoints
@@ -505,18 +510,24 @@ cards.forEach((card) => {
   });
 });
 
-// Sets up highlight card tap behavior for mobile
+// Sets up highlight card tap behavior
 function setCardHighlightListeners() {
-  if (window.innerWidth < 992) {
-    document.querySelectorAll(".card_highlight_wrap").forEach((card) => {
-      card.addEventListener("click", handleClick);
-    });
-  }
+  document.querySelectorAll(".card_highlight_wrap").forEach((card) => {
+    card.addEventListener("click", handleClick);
+  });
 }
 
 function handleClick(event) {
+  // only bail out on title‐click if the card is currently active
+  if (
+    this.classList.contains('is-active') &&
+    event.target.closest('.card_highlight_text_title')
+  ) {
+    return;
+  }
+
   event.preventDefault();
-  this.classList.toggle("is-active");
+  this.classList.toggle('is-active');
 }
 
 document.addEventListener("DOMContentLoaded", setCardHighlightListeners);
@@ -765,175 +776,6 @@ function initializeGallerySwipers() {
 }
 
 
-// Controls fixed buttons visibility while scrolling on mobile
-(() => {
-  // Skip on desktop
-  if (window.innerWidth > 767) return;
-  
-  const btnWrap = document.querySelector(".exp_btn_wrap.is-fixed");
-  if (!btnWrap) return;
-
-  // Shared state
-  const state = {
-    lastScrollY: window.scrollY || 0,
-    isScrollingUp: false,
-    scrollingDown: true,
-    throttleTimer: null,
-    isInCriticalZone: false
-  };
-  
-  // Critical zone size (area near packages section requiring careful control)
-  const CRITICAL_ZONE_SIZE = 300;
-  
-  // Central button visibility control
-  const setButtonVisibility = (isVisible) => {
-    const currentlyVisible = btnWrap.classList.contains("is-active");
-    
-    if (currentlyVisible !== isVisible) {
-      btnWrap.classList.toggle("is-active", isVisible);
-    }
-    
-    if (isVisible) {
-      const shouldHaveUpscrollClass = state.isScrollingUp;
-      const hasUpscrollClass = btnWrap.classList.contains("is-upscroll");
-      
-      if (hasUpscrollClass !== shouldHaveUpscrollClass) {
-        btnWrap.classList.toggle("is-upscroll", shouldHaveUpscrollClass);
-      }
-    }
-  };
-  
-  // Use IntersectionObserver for efficient position tracking
-  if ('IntersectionObserver' in window) {
-    // Track packages section visibility
-    const packagesObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        const boundingRect = entry.boundingClientRect;
-        
-        // If packages section is above viewport, potentially show button
-        if (!entry.isIntersecting && boundingRect.bottom < 0) {
-          setTimeout(() => {
-            if (!btnWrap.classList.contains("is-active")) {
-              setButtonVisibility(true);
-            }
-          }, 150);
-        }
-      });
-    }, {
-      threshold: 0,
-      rootMargin: "0px 0px -100% 0px"
-    });
-    
-    // Track footer section visibility
-    const footerObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        // When footer comes into view, hide button
-        if (entry.isIntersecting) {
-          setButtonVisibility(false);
-        }
-      });
-    }, {
-      threshold: 0.1,
-      rootMargin: "-10px 0px 0px 0px"
-    });
-    
-    // Start observing
-    const packages = document.querySelector(".packages_wrap");
-    const footer = document.querySelector(".footer_wrap");
-    
-    if (packages) packagesObserver.observe(packages);
-    if (footer) footerObserver.observe(footer);
-    
-    // Clean up on viewport size change
-    const mediaQuery = window.matchMedia('(min-width: 768px)');
-    mediaQuery.addEventListener('change', e => {
-      if (e.matches) {
-        packagesObserver.disconnect();
-        footerObserver.disconnect();
-      }
-    });
-  }
-  
-  // ScrollTrigger for main visibility control
-  ScrollTrigger.create({
-    trigger: ".packages_wrap",
-    start: "bottom top",
-    onEnter: () => {
-      setButtonVisibility(true);
-      state.isInCriticalZone = false;
-    },
-    onLeaveBack: () => {
-      setButtonVisibility(false);
-      state.isInCriticalZone = true;
-    },
-    markers: false
-  });
-  
-  ScrollTrigger.create({
-    trigger: ".footer_wrap",
-    start: "top bottom",
-    onEnter: () => {
-      setButtonVisibility(false);
-      state.isInCriticalZone = false;
-    },
-    onLeaveBack: () => {
-      const packagesEl = document.querySelector(".packages_wrap");
-      if (packagesEl) {
-        const packagesRect = packagesEl.getBoundingClientRect();
-        
-        if (packagesRect.bottom < 0) {
-          setButtonVisibility(true);
-        }
-      }
-      
-      state.isInCriticalZone = false;
-    },
-    markers: false
-  });
-  
-  // Optimized scroll listener
-  window.addEventListener("scroll", () => {
-    const currentY = window.scrollY;
-    
-    // Update scroll direction state immediately
-    state.isScrollingUp = currentY < state.lastScrollY;
-    state.scrollingDown = currentY > state.lastScrollY;
-    
-    // Throttle expensive operations
-    if (!state.throttleTimer) {
-      state.throttleTimer = setTimeout(() => {
-        state.throttleTimer = null;
-        
-        // Critical zone handling
-        if (state.isInCriticalZone) {
-          const packagesEl = document.querySelector(".packages_wrap");
-          
-          if (packagesEl) {
-            const packagesRect = packagesEl.getBoundingClientRect();
-            const isButtonActive = btnWrap.classList.contains("is-active");
-            
-            // Suppress button in critical zone
-            if (isButtonActive) {
-              if (!state.isScrollingUp && packagesRect.bottom >= -CRITICAL_ZONE_SIZE) {
-                setButtonVisibility(false);
-              } else if (state.isScrollingUp && packagesRect.bottom > -CRITICAL_ZONE_SIZE * 2) {
-                setButtonVisibility(false);
-              }
-            }
-          }
-        }
-        
-        // Update scroll direction class only when button is active
-        if (btnWrap.classList.contains("is-active")) {
-          btnWrap.classList.toggle("is-upscroll", state.isScrollingUp);
-        }
-        
-        // Update last scroll position
-        state.lastScrollY = currentY <= 0 ? 0 : currentY;
-      }, 100);
-    }
-  }, { passive: true });
-})();
 
 // Fetches and injects nested CMS content
 function cmsNest() {
@@ -1584,7 +1426,7 @@ const initializeModalContent = async (contentElement) => {
         () => {
             initializeTabsInScope(packageModalTarget);
             initializeCountersInScope(packageModalTarget);
-            initializePackageForm();
+            initializePackageForm(packageModalTarget);
             initializeTabButtons(packageModalTarget);
         },
         () => {
@@ -1621,13 +1463,10 @@ const initializeModalContent = async (contentElement) => {
         setTimeout(() => {
             if (!eventFired) {
                 if (packageModalTarget) {
-                    // First check for elements specifically marked for processing
                     const markedElements = packageModalTarget.querySelectorAll("[data-svg-needs-processing='true']");
                     
-                    // Then check for standard svg-code elements
                     const svgElements = packageModalTarget.querySelectorAll(".svg-code");
                     
-                    // Also check for SVG elements that might be inside other containers
                     const potentialContainers = packageModalTarget.querySelectorAll('[data-cms-nest^="dropzone-"]');
                     let nestedSvgCount = 0;
                     
@@ -1645,7 +1484,7 @@ const initializeModalContent = async (contentElement) => {
                 
                 resolve();
             }
-        }, 5000);
+        }, 1000);
     });
 };
 
@@ -2303,18 +2142,23 @@ if (packageModalTarget) {
   });
 }
 
-// Initializes and manages package form submission
-const initializePackageForm = () => {
-  const form = packageModalTarget.querySelector('#wf-form-Package');
-  const submitBtn = packageModalTarget.querySelector('[data-form-submit="package"]');
+// Initializes and manages package form submission inside *any* modalTarget
+const initializePackageForm = (modalTarget) => {
+  if (!modalTarget) return;
+
+  // (1) Grab the form by ID...
+  const form = modalTarget.querySelector('#wf-form-Package');
+  // (2) ...and *any* button with data-form-submit
+  const submitBtn = modalTarget.querySelector('[data-form-submit]');
   const formWrapper = form?.closest('.w-form');
   if (!form || !submitBtn || !formWrapper) return;
 
+  // when the form actually fires its submit event
   form.addEventListener('submit', () => {
     submitBtn.classList.add('is-loading');
     submitBtn.classList.remove('is-success');
     submitBtn.disabled = true;
-    
+
     const btnText = submitBtn.querySelector('.btn_push_text');
     const btnIcon = submitBtn.querySelector('.btn_push_icon_mask');
     if (btnText) {
@@ -2324,6 +2168,7 @@ const initializePackageForm = () => {
     if (btnIcon) btnIcon.style.display = 'none';
   });
 
+  // helper to stop loading; pass true on success
   const stopLoading = (isSuccess = false) => {
     submitBtn.classList.remove('is-loading');
     const btnText = submitBtn.querySelector('.btn_push_text');
@@ -2343,31 +2188,31 @@ const initializePackageForm = () => {
       }
     }
     submitBtn.disabled = false;
-    
     if (btnIcon) btnIcon.style.display = isSuccess ? 'none' : '';
   };
 
+  // watch for Webflow's success/fail wrappers toggling inline styles
   const observer = new MutationObserver((mutations) => {
+    const successWrap = formWrapper.querySelector('.w-form-done');
+    const failWrap    = formWrapper.querySelector('.w-form-fail');
+
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-        const successWrap = formWrapper.querySelector('.w-form-done');
-        const failWrap = formWrapper.querySelector('.w-form-fail');
-        
-        if (successWrap && successWrap.style.display === 'block') {
+        if (successWrap?.style.display === 'block') {
           stopLoading(true);
-        } else if (failWrap && failWrap.style.display === 'block') {
+        } else if (failWrap?.style.display === 'block') {
           stopLoading(false);
         }
       }
     });
   });
-
   observer.observe(formWrapper, {
     attributes: true,
     attributeFilter: ['style'],
     subtree: true
   });
 
+  // intercept the “real” submit button click so we can run our loading UI
   submitBtn.addEventListener('click', () => {
     const tempBtn = document.createElement('button');
     tempBtn.type = 'submit';
@@ -2377,6 +2222,7 @@ const initializePackageForm = () => {
     form.removeChild(tempBtn);
   });
 
+  // re-init Webflow forms if needed
   if (window.Webflow && Webflow.require) {
     try {
       const forms = Webflow.require("forms");
@@ -2384,10 +2230,23 @@ const initializePackageForm = () => {
         forms.ready();
       }
     } catch (e) {
-      // Silently handle Webflow forms initialization errors
+      // ignore
     }
   }
 };
+
+// on DOM-ready, wire it up for *both* your package and your experience modal
+document.addEventListener('DOMContentLoaded', () => {
+  // your existing package modal
+  initializePackageForm(packageModalTarget);
+
+  // the “experience” modal
+  const experienceModalTarget = document.querySelector(
+    '[data-modal-group="experience"][data-modal-element="tray-contain"]'
+  );
+  initializePackageForm(experienceModalTarget);
+});
+
 
 // Manages multi-step form tab buttons
 const initializeTabButtons = (scope = document) => {
@@ -2732,6 +2591,8 @@ const SwiperModule = (() => {
 
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('shareBtn');
+  const textEl = btn.querySelector('.btn_default_text');
+  const originalText = textEl.textContent;
 
   btn.addEventListener('click', async () => {
     const shareData = {
@@ -2747,13 +2608,34 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Share failed:', err);
       }
     } else {
-      // Fallback: copy URL to clipboard
       try {
         await navigator.clipboard.writeText(shareData.url);
-        btn.querySelector('.btn_default_text').textContent = 'Link copied';
+        textEl.textContent = 'Link copied';
+        setTimeout(() => {
+          textEl.textContent = originalText;
+        }, 3000);
       } catch (err) {
         console.error('Could not copy link:', err);
       }
     }
   });
 });
+
+
+// Sticky button bar on tablet down
+const stickyOptionsMatchMedia = gsap.matchMedia();
+
+stickyOptionsMatchMedia.add("(max-width: 991px)", () => {
+  ScrollTrigger.create({
+    trigger: ".footer_wrap",
+    start: "top bottom",
+    onEnter: () => {
+      gsap.set(".exp_sticky_options_wrap", { yPercent: 100, overwrite: true });
+    },
+    onLeaveBack: () => {
+      gsap.set(".exp_sticky_options_wrap", { yPercent: 0, overwrite: true });
+    }
+  });
+});
+
+

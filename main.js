@@ -275,7 +275,7 @@ function handleVideosOnModalOpen(modalGroup) {
   );
   
   modalVideos.forEach((video) => {
-    if (modalGroup !== 'package') {
+    if (modalGroup !== 'package' && modalGroup !== 'experience') {
       video.play().catch(err => {});
     }
   });
@@ -1345,3 +1345,13 @@ const initializeFooterCtaSwiper = () => {
 const footerCtaSwiperController = initializeFooterCtaSwiper();
 
 
+// Set review score to one decimal place
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.one-decimal').forEach(div => {
+    const n = parseFloat(div.textContent);
+    if (!isNaN(n)) {
+      div.textContent = n.toFixed(1);
+    }
+  });
+});
