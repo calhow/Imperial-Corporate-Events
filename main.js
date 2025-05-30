@@ -459,7 +459,6 @@ document.addEventListener("click", (event) => {
           .to("[menu-category-label='2']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.46) 
           .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out" }, 0.48)
           .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.5)
-          .to("[menu-category-wrap='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
           .to("[menu-category-label='3']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
           .to("[menu-category-cms-list='3']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.15, ease: "power1.out" }, 0.54)
           .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out" }, 0.56);
@@ -559,7 +558,6 @@ document.addEventListener("click", (event) => {
           .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-wrap='3']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0) 
           .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -869,6 +867,21 @@ document.addEventListener("click", async (event) => {
       return;
     }
 
+    // Mobile focus handling - capture the user interaction immediately
+    const isMobileDevice = Utils.isMobile();
+    let mobileFocusHandler = null;
+    
+    if (isMobileDevice) {
+      // Create a mobile-specific focus handler that preserves user interaction context
+      mobileFocusHandler = () => {
+        targetField.focus();
+        targetField.setSelectionRange(
+          targetField.value.length,
+          targetField.value.length
+        );
+      };
+    }
+
     document.addEventListener(
       "modalOpenComplete",
       async (event) => {
@@ -883,13 +896,21 @@ document.addEventListener("click", async (event) => {
 
         targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
 
-        setTimeout(() => {
-          targetField.focus();
-          targetField.setSelectionRange(
-            targetField.value.length,
-            targetField.value.length
-          );
-        }, 300);
+        if (isMobileDevice && mobileFocusHandler) {
+          // On mobile, focus immediately without setTimeout to preserve user interaction context
+          requestAnimationFrame(() => {
+            mobileFocusHandler();
+          });
+        } else {
+          // Desktop behavior with original setTimeout
+          setTimeout(() => {
+            targetField.focus();
+            targetField.setSelectionRange(
+              targetField.value.length,
+              targetField.value.length
+            );
+          }, 300);
+        }
       },
       { once: true }
     );

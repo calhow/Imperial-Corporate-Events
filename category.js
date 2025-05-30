@@ -915,3 +915,20 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+
+// Sticky styling for category links
+gsap.matchMedia().add("(max-width: 767px)", () => {
+    
+  ScrollTrigger.create({
+    trigger: ".cat_link_list_section",
+    start: "top +1px",
+    toggleActions: "play none reverse none",
+    onEnter: () => {
+      gsap.set(".form_theme_underline", { opacity: 1 });
+    },
+    onLeaveBack: () => {
+      gsap.set(".form_theme_underline", { opacity: 0 });
+    },
+  });
+
+});

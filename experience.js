@@ -397,6 +397,27 @@ const swiperConfigs = [
     selector: ".swiper.is-exp-venues",
     comboClass: "is-exp-venues",
     slidesPerView: "auto",
+  },
+  {
+    selector: ".swiper.is-exp-reviews",
+    comboClass: "is-exp-reviews",
+    slidesPerView: "auto",
+  },
+  {
+    selector: ".swiper.is-package-featured",
+    comboClass: "is-package-featured",
+    slidesPerView: "auto",
+  },
+  {
+    selector: ".swiper.is-package-all",
+    comboClass: "is-package-all",
+    slidesPerView: 1,
+    spaceBetween: 32,
+    speed: 600,
+    grid: {
+      rows: 4,
+      fill: "column"
+    }
   }
 ];
 
@@ -406,11 +427,14 @@ const initializeSwiper = ({
   comboClass,
   slidesPerView,
   breakpoints,
+  grid,
+  speed,
+  spaceBetween
 }) => {
-  const swiper = new Swiper(selector, {
-    speed: 400,
+  const swiperConfig = {
+    speed: speed || 400,
     slidesPerView,
-    spaceBetween: 0,
+    spaceBetween: spaceBetween || 0,
     navigation: {
       nextEl: `[data-swiper-button-next="${comboClass}"]`,
       prevEl: `[data-swiper-button-prev="${comboClass}"]`,
@@ -427,7 +451,14 @@ const initializeSwiper = ({
         toggleButtonWrapper(this);
       },
     },
-  });
+  };
+
+  // Add grid configuration if provided
+  if (grid) {
+    swiperConfig.grid = grid;
+  }
+
+  const swiper = new Swiper(selector, swiperConfig);
 
   swiper.comboClass = comboClass;
   return swiper;
@@ -775,8 +806,6 @@ function initializeGallerySwipers() {
   });
 }
 
-
-
 // Fetches and injects nested CMS content
 function cmsNest() {
   const items = document.querySelectorAll("[data-cms-nest^='item']");
@@ -1079,7 +1108,8 @@ function adjustHotelStars() {
 }
 
 // Package modal content management
-const cardsSelector = ".packages_card";
+const cardsSelectors = [".packages_card", ".swiper-slide.is-package-all"];
+const combinedCardsSelector = cardsSelectors.join(", ");
 const contentSelector = ".package_contain";
 
 const packageModal = document.querySelector(".package_modal");
@@ -1236,9 +1266,15 @@ const attachPackageCardHandlers = (cards) => {
     
     card.addEventListener("click", handleCardClick);
     
-    const linkElement = card.querySelector(".packages_link");
+    // Look for different possible link patterns in both card types
+    const linkElement = card.querySelector(".packages_link") || 
+                       card.querySelector("a[href]") ||
+                       card.querySelector("[data-link-href]");
+    
     if (linkElement) {
-      const url = linkElement.getAttribute("href");
+      const url = linkElement.getAttribute("href") || 
+                  linkElement.getAttribute("data-link-href");
+      
       if (url && !contentCache.has(url) && !pendingFetches.has(url)) {
         prefetchPackageContent(url);
       }
@@ -1484,7 +1520,7 @@ const initializeModalContent = async (contentElement) => {
                 
                 resolve();
             }
-        }, 1000);
+        }, 2000);
     });
 };
 
@@ -1594,10 +1630,17 @@ const handleCardClick = (event) => {
   event.preventDefault();
   
   const card = event.currentTarget;
-  const linkElement = card.querySelector(".packages_link");
+  
+  // Look for different possible link patterns in both card types
+  const linkElement = card.querySelector(".packages_link") || 
+                     card.querySelector("a[href]") ||
+                     card.querySelector("[data-link-href]");
+  
   if (!linkElement) return;
   
-  const url = linkElement.getAttribute("href");
+  const url = linkElement.getAttribute("href") || 
+             linkElement.getAttribute("data-link-href");
+  
   if (!url) return;
   
   openModalForUrl(url);
@@ -2097,7 +2140,7 @@ const setupContentProcessor = () => {
 // Initialize package cards on page load
 document.addEventListener('DOMContentLoaded', () => {
   if (packageModalTarget) {
-    const packageCards = document.querySelectorAll(cardsSelector);
+    const packageCards = document.querySelectorAll(combinedCardsSelector);
     attachPackageCardHandlers(packageCards);
   }
 }, { passive: true });
@@ -2111,12 +2154,17 @@ const packageCardObserver = new MutationObserver((mutations) => {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            if (node.matches && node.matches(cardsSelector)) {
+            // Check if the node matches any of our card selectors
+            const matchesAnySelector = cardsSelectors.some(selector => 
+              node.matches && node.matches(selector)
+            );
+            
+            if (matchesAnySelector) {
               newCards.push(node);
             }
             
             if (node.querySelectorAll) {
-              const nestedCards = node.querySelectorAll(cardsSelector);
+              const nestedCards = node.querySelectorAll(combinedCardsSelector);
               if (nestedCards.length > 0) {
                 newCards = newCards.concat(Array.from(nestedCards));
               }
@@ -2212,7 +2260,7 @@ const initializePackageForm = (modalTarget) => {
     subtree: true
   });
 
-  // intercept the “real” submit button click so we can run our loading UI
+  // intercept the "real" submit button click so we can run our loading UI
   submitBtn.addEventListener('click', () => {
     const tempBtn = document.createElement('button');
     tempBtn.type = 'submit';
@@ -2240,7 +2288,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // your existing package modal
   initializePackageForm(packageModalTarget);
 
-  // the “experience” modal
+  // the "experience" modal
   const experienceModalTarget = document.querySelector(
     '[data-modal-group="experience"][data-modal-element="tray-contain"]'
   );
