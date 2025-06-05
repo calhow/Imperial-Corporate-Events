@@ -62,6 +62,11 @@ const swiperConfigs = [
     comboClass: "is-teams",
     slidesPerView: "auto",
   },
+  {
+    selector: ".swiper.is-competitions",
+    comboClass: "is-competitions",
+    slidesPerView: "auto",
+  },
 ];
 
 // Video management for swiper slides
