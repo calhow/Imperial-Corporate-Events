@@ -203,7 +203,7 @@ const FilterModule = (() => {
     const viewportWidth =
       window.innerWidth || document.documentElement.clientWidth;
 
-    filtersElement
+    document
       .querySelectorAll("[data-active-filters]")
       .forEach((element) => {
         const filterGroup = element
@@ -227,7 +227,7 @@ const FilterModule = (() => {
         element.classList.toggle("is-active", filterValues.length > 0);
       });
 
-    filtersElement.querySelectorAll("[data-filter-clear]").forEach((button) => {
+    document.querySelectorAll("[data-filter-clear]").forEach((button) => {
       const filterGroup = button
         .getAttribute("data-filter-clear")
         .toLowerCase();
@@ -244,7 +244,7 @@ const FilterModule = (() => {
       }
     });
 
-    const clearAllButton = filtersElement.querySelector(
+    const clearAllButton = document.querySelector(
       '[data-filter-clear-all="true"]'
     );
 
@@ -428,7 +428,7 @@ const FilterModule = (() => {
   }
 
   function setupClearButtons(filterInstance, filtersElement) {
-    const clearAllButton = filtersElement.querySelector(
+    const clearAllButton = document.querySelector(
       '[data-filter-clear-all="true"]'
     );
     if (clearAllButton) {
@@ -436,6 +436,22 @@ const FilterModule = (() => {
         resetSelectedFilters(filterInstance, filtersElement)
       );
     }
+
+    // Add click handlers for individual filter clear buttons
+    document.querySelectorAll("[data-filter-clear]").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const filterGroup = button.getAttribute("data-filter-clear").toLowerCase();
+        
+        if (filterGroup && filterInstance) {
+          await filterInstance.resetFilters([filterGroup]);
+          updateActiveFilters(filterInstance);
+          updateActiveFiltersDisplay(filtersElement);
+        }
+      });
+    });
   }
 
   function init(filterInstances) {
@@ -518,12 +534,10 @@ window.fsAttributes.push([
 
 // ScrollTrigger Module for handling scroll-based effects
 const ScrollTriggerModule = (() => {
-  const filterElement = document.querySelector(".filter_btn_contain");
-  const filterHeight = filterElement ? filterElement.offsetHeight : 0;
 
   // Use the global NavScrollTrigger if available
   if (typeof window.NavScrollTrigger === 'undefined') {
-    // If global module isn't available, implement locally
+    
     const navbar = document.querySelector(".nav_main_contain");
     const navbarHeight = navbar ? navbar.offsetHeight : 0;
 
@@ -579,7 +593,7 @@ const ScrollTriggerModule = (() => {
   gsap.matchMedia().add("(min-width: 480px)", () => {
     
     ScrollTrigger.create({
-      trigger: "#filter-section",
+      trigger: ".form_theme_wrap",
       start: "top +1px",
       toggleActions: "play none reverse none",
       onEnter: () => {
@@ -592,19 +606,19 @@ const ScrollTriggerModule = (() => {
 
     // Theme wrap max-width animation
     ScrollTrigger.create({
-      trigger: "#filter-section",
+      trigger: ".form_theme_wrap",
       start: "top +1px",
       toggleActions: "play none reverse none",
       onEnter: () => {
-        gsap.to(".form_theme_wrap", { 
+        gsap.to(".theme_wrap", { 
           maxWidth: "100%", 
           duration: 0.7, 
           ease: "power4.out" 
         });
       },
       onLeaveBack: () => {
-        gsap.to(".form_theme_wrap", { 
-          maxWidth: "48rem", 
+        gsap.to(".theme_wrap", { 
+          maxWidth: "95rem", 
           duration: 0.5, 
           ease: "power4.out" 
         });
@@ -634,12 +648,15 @@ const ScrollAnchorModule = (() => {
     };
 
     const handleFilterClick = debounceFn(function() {
-      const target = document.getElementById("filter-section");
+      const target = document.querySelector(".form_theme_wrap");
       if (!target) return;
       const targetPosition =
-        target.getBoundingClientRect().top + window.scrollY;
+        target.getBoundingClientRect().top + window.scrollY + 12; // 0.75rem = 12px
       if (Math.abs(window.scrollY - targetPosition) > 10) {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.scrollTo({ 
+          top: targetPosition, 
+          behavior: "smooth" 
+        });
       }
     }, 100);
 

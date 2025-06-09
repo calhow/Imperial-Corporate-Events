@@ -683,47 +683,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Navbar link animation on scroll
-if (typeof window.NavScrollTrigger !== 'undefined') {
-  // Use the global module
-  // It will initialize on DOMContentLoaded automatically
-} else {
-  // Local fallback implementation
-  const navScrollTriggerModule = (() => {
-    // Handle media queries
-    const mmSecond = gsap.matchMedia();
 
-    // Navbar opacity change for screens 1215px and above
-    mmSecond.add("(min-width: 1215px)", () => {
-      ScrollTrigger.create({
-        trigger: ".page_main",
-        start: "top+=5px top",
-        onEnter: () => {
-          gsap.to(".nav_main_link_wrap", {
-            opacity: 0,
-            pointerEvents: "none",
-            duration: 0.2,
-            ease: "power2.out",
-          });
-        },
-        onLeaveBack: () => {
-          gsap.to(".nav_main_link_wrap", {
-            opacity: 1,
-            pointerEvents: "auto",
-            duration: 0.1,
-            ease: "power2.out",
-          });
-        },
-      });
-
-      return () => {
-        // Cleanup function for when matchMedia conditions change
-      };
-    });
-
-    return {}; // Ensure the module returns an object if needed
-  })();
-}
 
 // Re-initialize CategoryBackgroundManager if needed when DOM is fully loaded
 document.addEventListener("DOMContentLoaded", () => {
@@ -918,22 +878,4 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   });
-});
-
-
-// Sticky styling for category links
-gsap.matchMedia().add("(max-width: 767px)", () => {
-    
-  ScrollTrigger.create({
-    trigger: ".cat_link_list_section",
-    start: "top +1px",
-    toggleActions: "play none reverse none",
-    onEnter: () => {
-      gsap.set(".form_theme_underline", { opacity: 1 });
-    },
-    onLeaveBack: () => {
-      gsap.set(".form_theme_underline", { opacity: 0 });
-    },
-  });
-
 });

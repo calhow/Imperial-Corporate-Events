@@ -1185,7 +1185,7 @@ window.NavScrollTrigger = (() => {
       // Define the CSS
       style.textContent = `
         /* Base transition for all nav elements */
-        .nav_main_logo, .cat_breadcrumbs_wrap, .nav_main_link_wrap {
+        .nav_main_logo, .nav_main_link_wrap {
           transition: opacity 0.2s ease, pointer-events 0.2s ease;
         }
         
@@ -1201,7 +1201,6 @@ window.NavScrollTrigger = (() => {
         /* Medium screens: Hide logo, breadcrumbs, and links */
         @media (min-width: 992px) and (max-width: 1290px) {
           body.nav-hidden .nav_main_logo,
-          body.nav-hidden .cat_breadcrumbs_wrap,
           body.nav-hidden .nav_main_link_wrap {
             opacity: 0 !important;
             pointer-events: none !important;
@@ -1210,7 +1209,6 @@ window.NavScrollTrigger = (() => {
         
         /* Large screens: Only hide breadcrumbs and links */
         @media (min-width: 1290.01px) {
-          body.nav-hidden .cat_breadcrumbs_wrap,
           body.nav-hidden .nav_main_link_wrap {
             opacity: 0 !important;
             pointer-events: none !important;
