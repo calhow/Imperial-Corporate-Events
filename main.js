@@ -1350,3 +1350,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+// Iterates through review scores on experience cards and sets the star wrapper width 
+document.querySelectorAll('.exp_card_reviews').forEach(el => {
+  el.style.width = `${el.dataset.reviewScore * 0.75}rem`;
+});
