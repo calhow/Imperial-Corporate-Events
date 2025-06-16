@@ -1355,3 +1355,146 @@ document.addEventListener('DOMContentLoaded', () => {
 document.querySelectorAll('.exp_card_reviews').forEach(el => {
   el.style.width = `${el.dataset.reviewScore * 0.75}rem`;
 });
+
+// Experience Card Video Interaction Handler
+const ExperienceCardVideoManager = (() => {
+  let scrollTriggers = [];
+  let currentDevice = null;
+  
+  const initializeVideoInteractions = () => {
+    const deviceType = Utils.isMobile() ? 'mobile' : 'desktop';
+    
+    // Only reinitialize if device type changed
+    if (currentDevice === deviceType) return;
+    
+    // Clean up existing interactions
+    cleanup();
+    currentDevice = deviceType;
+    
+    const experienceCards = document.querySelectorAll('.exp_card_wrap');
+    
+    experienceCards.forEach(card => {
+      const video = card.querySelector('.exp_card_video');
+      const poster = card.querySelector('.exp_card_poster');
+      
+      if (!video || !poster) return;
+      
+      // Check if video has a valid source
+      if (!hasValidVideoSource(video)) return;
+      
+      if (deviceType === 'mobile') {
+        setupMobileInteraction(card, video, poster);
+      } else {
+        setupDesktopInteraction(card, video, poster);
+      }
+    });
+  };
+  
+  const hasValidVideoSource = (video) => {
+    const source = video.querySelector('source');
+    if (!source) return false;
+    
+    const src = source.getAttribute('src');
+    const dataSrc = source.getAttribute('data-src');
+    
+    // Check if either src or data-src has a valid (non-empty) value
+    return (src && src.trim() !== '') || (dataSrc && dataSrc.trim() !== '');
+  };
+  
+  const setupMobileInteraction = (card, video, poster) => {
+    const trigger = ScrollTrigger.create({
+      trigger: card,
+      start: "bottom bottom",
+      end: "top top",
+      onEnter: () => playVideoAndHidePoster(video, poster),
+      onLeave: () => pauseVideoAndShowPoster(video, poster),
+      onEnterBack: () => playVideoAndHidePoster(video, poster),
+      onLeaveBack: () => pauseVideoAndShowPoster(video, poster)
+    });
+    
+    scrollTriggers.push(trigger);
+  };
+  
+  const setupDesktopInteraction = (card, video, poster) => {
+    const handleMouseEnter = () => playVideoAndHidePoster(video, poster);
+    const handleMouseLeave = () => pauseVideoAndShowPoster(video, poster);
+    
+    card.addEventListener('mouseenter', handleMouseEnter);
+    card.addEventListener('mouseleave', handleMouseLeave);
+    
+    // Store event handlers for cleanup
+    card._videoEventHandlers = {
+      mouseenter: handleMouseEnter,
+      mouseleave: handleMouseLeave
+    };
+  };
+  
+  const playVideoAndHidePoster = (video, poster) => {
+    video.play().catch(() => {
+      // Silently handle autoplay restrictions
+    });
+    
+    gsap.to(poster, {
+      opacity: 0,
+      duration: 0.5,
+      ease: "power2.out"
+    });
+  };
+  
+  const pauseVideoAndShowPoster = (video, poster) => {
+    video.pause();
+    
+    gsap.to(poster, {
+      opacity: 1,
+      duration: 0.3,
+      ease: "power2.out"
+    });
+  };
+  
+  const cleanup = () => {
+    // Clean up ScrollTriggers
+    scrollTriggers.forEach(trigger => trigger.kill());
+    scrollTriggers = [];
+    
+    // Clean up desktop event handlers
+    document.querySelectorAll('.exp_card_wrap').forEach(card => {
+      if (card._videoEventHandlers) {
+        card.removeEventListener('mouseenter', card._videoEventHandlers.mouseenter);
+        card.removeEventListener('mouseleave', card._videoEventHandlers.mouseleave);
+        delete card._videoEventHandlers;
+      }
+    });
+  };
+  
+  // Handle resize events
+  const handleResize = Utils.debounce(() => {
+    initializeVideoInteractions();
+  }, 150);
+  
+  return {
+    init: () => {
+      document.addEventListener('DOMContentLoaded', initializeVideoInteractions);
+      window.addEventListener('resize', handleResize);
+      
+      // Also initialize for dynamically loaded content
+      if (window.fsAttributes) {
+        window.fsAttributes.push([
+          "cmsload",
+          (listInstances) => {
+            listInstances.forEach(instance => {
+              instance.on('renderitems', () => {
+                setTimeout(initializeVideoInteractions, 100);
+              });
+            });
+          }
+        ]);
+      }
+    },
+    reinitialize: initializeVideoInteractions,
+    cleanup: cleanup
+  };
+})();
+
+// Initialize Experience Card Video Manager
+ExperienceCardVideoManager.init();
+
