@@ -971,7 +971,7 @@ document.addEventListener("click", async (event) => {
     // Show button if expanded or clamped
     if (isExpanded || isClamped(paraElement)) {
       toggleBtn.classList.remove("is-hidden");
-      toggleBtn.innerText = isExpanded ? "show less" : "read more";
+      toggleBtn.innerText = isExpanded ? "less" : "more";
     } else {
       toggleBtn.classList.add("is-hidden");
     }
@@ -1036,7 +1036,7 @@ document.addEventListener("click", async (event) => {
     const isNowExpanded = paraElement.classList.contains("is-expanded");
     
     // Set button text based on expanded state
-    toggleBtn.innerText = isNowExpanded ? "show less" : "read more";
+    toggleBtn.innerText = isNowExpanded ? "less" : "more";
   });
   
   // Set up ResizeObserver to invalidate cache on resize
