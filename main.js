@@ -1,6 +1,6 @@
 // Set background color from data attributes
 const setBgColor = (element) => {
-  const bgColor = element.dataset.bgColor || "#333333"; // Fallback to #333333
+  const bgColor = element.dataset.bgColor || "transparent"; // Fallback to transparent
   element.style.backgroundColor = bgColor;
 };
 
@@ -971,7 +971,7 @@ document.addEventListener("click", async (event) => {
     // Show button if expanded or clamped
     if (isExpanded || isClamped(paraElement)) {
       toggleBtn.classList.remove("is-hidden");
-      toggleBtn.innerText = isExpanded ? "less" : "more";
+      toggleBtn.innerText = isExpanded ? "Show less" : "Read more";
     } else {
       toggleBtn.classList.add("is-hidden");
     }
