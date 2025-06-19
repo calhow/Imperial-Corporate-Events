@@ -79,7 +79,7 @@ const ScrollButtonFade = (() => {
 
 
   // Parallax animations setup
-const homeHeroWrap = document.querySelector(".hero_home_wrap");
+const homeHeroWrap = document.querySelector("[data-hero-wrap]");
 
 // Create variables but don't initialize them outside the media query
 let homeHeroParallax;
@@ -91,13 +91,13 @@ parallaxMediaMatcher.add("(min-width: 479px)", () => {
   if (homeHeroWrap) {
     homeHeroParallax = gsap.timeline({
       scrollTrigger: {
-        trigger: ".hero_home_wrap",
+        trigger: "[data-hero-wrap]",
         start: "top top",
         end: "bottom top",
         scrub: true,
       },
     });
-    homeHeroParallax.to(".hero_home_vid", { y: "20rem" });
+    homeHeroParallax.to([".hero_vid", ".hero_vid_poster"], { y: "20rem" });
   }
   
 });
@@ -147,7 +147,7 @@ const TextSplitAnimation = (() => {
     // Create animation to reveal characters
     gsap.timeline({
       scrollTrigger: {
-        trigger: ".hero_home_wrap",
+        trigger: "[data-hero-wrap]",
         start: "bottom-=250px top",
         once: true
       },
@@ -166,3 +166,83 @@ const TextSplitAnimation = (() => {
   });
 })();
 
+/**
+ * HeroVideoManager (No Animation Version)
+ * Manages the lazy-loading and playback of the primary hero video using HLS.js.
+ * - Dependency: HLS.js
+ */
+const HeroVideoManager = (() => {
+  // The CSS selector for the video element
+  const VIDEO_SELECTOR = ".hero_vid";
+
+  /**
+   * Initializes the video manager.
+   */
+  const init = () => {
+    // Ensure the HLS.js library is available
+    if (typeof Hls === 'undefined') {
+      console.error("HeroVideoManager requires HLS.js to be loaded.");
+      return;
+    }
+
+    const videoElement = document.querySelector(VIDEO_SELECTOR);
+
+    // If the video element doesn't exist, do nothing.
+    if (!videoElement) {
+      return;
+    }
+
+    const sourceElement = videoElement.querySelector('source.hero_vid_src');
+    const hlsUrl = sourceElement ? sourceElement.dataset.hlsSrc : null;
+
+    // If there's no HLS source URL, do nothing.
+    if (!hlsUrl) {
+      return;
+    }
+
+    // Check for HLS support in the browser
+    if (Hls.isSupported()) {
+      setupHlsPlayer(videoElement, hlsUrl);
+    }
+  };
+
+  /**
+   * Sets up and configures the HLS.js player for the video.
+   * @param {HTMLVideoElement} videoElement - The video element to attach to.
+   * @param {string} hlsUrl - The URL of the HLS manifest.
+   */
+  const setupHlsPlayer = (videoElement, hlsUrl) => {
+    const hls = new Hls({
+      // Start loading the video immediately in the background
+      autoStartLoad: true,
+    });
+
+    // Load the HLS stream
+    hls.loadSource(hlsUrl);
+
+    // Attach HLS.js to the video element
+    hls.attachMedia(videoElement);
+
+    // When the HLS manifest has been parsed, the video is ready to play.
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      // Attempt to play the video.
+      const playPromise = videoElement.play();
+
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          // Autoplay was prevented by the browser.
+          // This is a failsafe to prevent console errors.
+          console.log("Hero video autoplay was prevented by the browser.");
+        });
+      }
+    });
+  };
+
+  // Expose the init function to be called publicly
+  return {
+    init: init
+  };
+})();
+
+// Wait for the DOM to be fully loaded before initializing the video manager.
+document.addEventListener('DOMContentLoaded', HeroVideoManager.init);

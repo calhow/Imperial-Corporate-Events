@@ -971,7 +971,7 @@ document.addEventListener("click", async (event) => {
     // Show button if expanded or clamped
     if (isExpanded || isClamped(paraElement)) {
       toggleBtn.classList.remove("is-hidden");
-      toggleBtn.innerText = isExpanded ? "Show less" : "Read more";
+      toggleBtn.innerText = isExpanded ? "less" : "more";
     } else {
       toggleBtn.classList.add("is-hidden");
     }
@@ -1356,32 +1356,30 @@ document.querySelectorAll('.exp_card_reviews').forEach(el => {
   el.style.width = `${el.dataset.reviewScore * 0.75}rem`;
 });
 
-// Experience Card Video Interaction Handler
+// Experience Card Video Interaction Handler (HLS Lazy-Loading Version)
 const ExperienceCardVideoManager = (() => {
   let scrollTriggers = [];
   let currentDevice = null;
-  
+  // Use a Map to store and manage HLS instances for each video element
+  const hlsInstances = new Map();
+
   const initializeVideoInteractions = () => {
     const deviceType = Utils.isMobile() ? 'mobile' : 'desktop';
-    
-    // Only reinitialize if device type changed
-    if (currentDevice === deviceType) return;
-    
-    // Clean up existing interactions
+    if (currentDevice === deviceType && scrollTriggers.length > 0) return;
+
     cleanup();
     currentDevice = deviceType;
-    
+
     const experienceCards = document.querySelectorAll('.exp_card_wrap');
-    
     experienceCards.forEach(card => {
       const video = card.querySelector('.exp_card_video');
       const poster = card.querySelector('.exp_card_poster');
-      
-      if (!video || !poster) return;
-      
-      // Check if video has a valid source
-      if (!hasValidVideoSource(video)) return;
-      
+      if (!video || !poster || !hasValidVideoSource(video)) return;
+
+      if (poster.src) {
+        video.poster = poster.src;
+      }
+
       if (deviceType === 'mobile') {
         setupMobileInteraction(card, video, poster);
       } else {
@@ -1389,74 +1387,83 @@ const ExperienceCardVideoManager = (() => {
       }
     });
   };
-  
+
   const hasValidVideoSource = (video) => {
     const source = video.querySelector('source');
-    if (!source) return false;
-    
-    const src = source.getAttribute('src');
-    const dataSrc = source.getAttribute('data-src');
-    
-    // Check if either src or data-src has a valid (non-empty) value
-    return (src && src.trim() !== '') || (dataSrc && dataSrc.trim() !== '');
+    return source && source.dataset.hlsSrc;
   };
   
+  // This function is triggered by hover or scroll
+  const playVideoAndHidePoster = (video, poster) => {
+    // If an HLS instance already exists for this video, just play it
+    if (hlsInstances.has(video)) {
+      video.play().catch(() => {});
+    } 
+    // If this is the first time, create and attach a new HLS instance
+    else if (Hls.isSupported()) {
+      const hlsUrl = video.querySelector('source').dataset.hlsSrc;
+      if (!hlsUrl) return;
+
+      const hls = new Hls({
+        // Enable level capping based on player size.
+        // This prevents loading qualities higher than necessary for the viewport.
+        capLevelToPlayerSize: true,
+
+        // Start with an automatic level determined by player size and bandwidth.
+        // -1 means auto.
+        startLevel: -1,
+      });
+
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+      });
+
+      // Store the new instance in our map
+      hlsInstances.set(video, hls);
+    }
+    
+    // Animate the poster out
+    gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
+  };
+
+  const pauseVideoAndShowPoster = (video, poster) => {
+    video.pause();
+    // For extreme memory optimization on pages with many videos, you could destroy
+    // the HLS instance here, but it would need to reload on re-enter.
+    // For most cases, just pausing is fine.
+    
+    // Animate the poster back in
+    gsap.to(poster, { opacity: 1, duration: 0.3, ease: "power2.out" });
+  };
+
   const setupMobileInteraction = (card, video, poster) => {
     const trigger = ScrollTrigger.create({
       trigger: card,
-      start: "bottom bottom",
+      start: "center bottom", // Start loading when the center of the card hits the bottom of the viewport
       end: "top top",
       onEnter: () => playVideoAndHidePoster(video, poster),
       onLeave: () => pauseVideoAndShowPoster(video, poster),
       onEnterBack: () => playVideoAndHidePoster(video, poster),
       onLeaveBack: () => pauseVideoAndShowPoster(video, poster)
     });
-    
     scrollTriggers.push(trigger);
   };
-  
+
   const setupDesktopInteraction = (card, video, poster) => {
     const handleMouseEnter = () => playVideoAndHidePoster(video, poster);
     const handleMouseLeave = () => pauseVideoAndShowPoster(video, poster);
-    
+
     card.addEventListener('mouseenter', handleMouseEnter);
     card.addEventListener('mouseleave', handleMouseLeave);
-    
-    // Store event handlers for cleanup
-    card._videoEventHandlers = {
-      mouseenter: handleMouseEnter,
-      mouseleave: handleMouseLeave
-    };
+    card._videoEventHandlers = { mouseenter: handleMouseEnter, mouseleave: handleMouseLeave };
   };
-  
-  const playVideoAndHidePoster = (video, poster) => {
-    video.play().catch(() => {
-      // Silently handle autoplay restrictions
-    });
-    
-    gsap.to(poster, {
-      opacity: 0,
-      duration: 0.5,
-      ease: "power2.out"
-    });
-  };
-  
-  const pauseVideoAndShowPoster = (video, poster) => {
-    video.pause();
-    
-    gsap.to(poster, {
-      opacity: 1,
-      duration: 0.3,
-      ease: "power2.out"
-    });
-  };
-  
+
   const cleanup = () => {
-    // Clean up ScrollTriggers
     scrollTriggers.forEach(trigger => trigger.kill());
     scrollTriggers = [];
-    
-    // Clean up desktop event handlers
+
     document.querySelectorAll('.exp_card_wrap').forEach(card => {
       if (card._videoEventHandlers) {
         card.removeEventListener('mouseenter', card._videoEventHandlers.mouseenter);
@@ -1464,30 +1471,24 @@ const ExperienceCardVideoManager = (() => {
         delete card._videoEventHandlers;
       }
     });
+    
+    // Destroy all active HLS instances to free up memory
+    hlsInstances.forEach((hls, video) => {
+        hls.destroy();
+    });
+    hlsInstances.clear();
   };
-  
-  // Handle resize events
-  const handleResize = Utils.debounce(() => {
-    initializeVideoInteractions();
-  }, 150);
-  
+
+  const handleResize = Utils.debounce(() => initializeVideoInteractions(), 150);
+
   return {
     init: () => {
       document.addEventListener('DOMContentLoaded', initializeVideoInteractions);
       window.addEventListener('resize', handleResize);
-      
-      // Also initialize for dynamically loaded content
       if (window.fsAttributes) {
-        window.fsAttributes.push([
-          "cmsload",
-          (listInstances) => {
-            listInstances.forEach(instance => {
-              instance.on('renderitems', () => {
-                setTimeout(initializeVideoInteractions, 100);
-              });
-            });
-          }
-        ]);
+        window.fsAttributes.push(["cmsload", (listInstances) => {
+          listInstances.forEach(instance => instance.on('renderitems', () => setTimeout(initializeVideoInteractions, 100)));
+        }]);
       }
     },
     reinitialize: initializeVideoInteractions,
@@ -1495,6 +1496,5 @@ const ExperienceCardVideoManager = (() => {
   };
 })();
 
-// Initialize Experience Card Video Manager
+// Initialize the manager
 ExperienceCardVideoManager.init();
-
