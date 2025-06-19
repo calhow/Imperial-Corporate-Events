@@ -1395,9 +1395,9 @@ const ExperienceCardVideoManager = (() => {
   
   // This function is triggered by hover or scroll
   const playVideoAndHidePoster = (video, poster) => {
-    // Only fade out the poster once the video has loaded enough to start playing.
+    // Use 'canplay' to ensure the video is ready before fading the poster.
     // The { once: true } option automatically removes the listener after it fires.
-    video.addEventListener('playing', () => {
+    video.addEventListener('canplay', () => {
       gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
     }, { once: true });
 

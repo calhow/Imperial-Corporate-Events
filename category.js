@@ -159,8 +159,8 @@ const setupActiveSlide = (swiper, index) => {
   video.pause();
   if (poster) {
     gsap.set(poster, { opacity: 1 });
-    // Set up the listener once to fade out the poster when playback starts.
-    video.addEventListener('playing', () => {
+    // Use the 'canplay' event to ensure the video is ready before fading the poster.
+    video.addEventListener('canplay', () => {
       gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
     }, { once: true });
   }
