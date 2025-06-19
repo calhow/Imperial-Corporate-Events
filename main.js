@@ -1395,21 +1395,24 @@ const ExperienceCardVideoManager = (() => {
   
   // This function is triggered by hover or scroll
   const playVideoAndHidePoster = (video, poster) => {
-    // Use 'canplay' to ensure the video is ready before fading the poster.
-    // The { once: true } option automatically removes the listener after it fires.
-    video.addEventListener('canplay', () => {
-      gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
-    }, { once: true });
+    // The play() method returns a promise. We chain the poster animation to it,
+    // ensuring the poster only fades when playback successfully starts.
+    video.play().then(() => {
+      // Check the poster's opacity to ensure we only fade it once.
+      if (gsap.getProperty(poster, "opacity") > 0) {
+        gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
+      }
+    }).catch(() => {
+      // If playback fails (e.g., browser blocks it), do nothing.
+    });
 
-    // If an HLS instance already exists for this video, just play it
-    if (hlsInstances.has(video)) {
-      video.play().catch(() => {});
-    } 
-    // If this is the first time, create and attach a new HLS instance
-    else if (Hls.isSupported()) {
+    // If this is the first time, create and attach a new HLS instance.
+    // The play() command issued above will be handled by the browser's media
+    // pipeline once HLS.js attaches the source.
+    if (!hlsInstances.has(video) && Hls.isSupported()) {
       const hlsUrl = video.querySelector('source').dataset.hlsSrc;
       if (!hlsUrl) return;
-      
+
       const hls = new Hls({
         capLevelToPlayerSize: true,
         startLevel: -1,
@@ -1417,11 +1420,6 @@ const ExperienceCardVideoManager = (() => {
 
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {});
-      });
-
-      // Store the new instance in our map
       hlsInstances.set(video, hls);
     }
   };

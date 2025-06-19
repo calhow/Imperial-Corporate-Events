@@ -159,10 +159,6 @@ const setupActiveSlide = (swiper, index) => {
   video.pause();
   if (poster) {
     gsap.set(poster, { opacity: 1 });
-    // Use the 'canplay' event to ensure the video is ready before fading the poster.
-    video.addEventListener('canplay', () => {
-      gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
-    }, { once: true });
   }
 
   // Pre-load the video by creating the HLS instance immediately.
@@ -179,7 +175,15 @@ const setupActiveSlide = (swiper, index) => {
 
   // After a 1-second delay, attempt to play the video.
   swiper.videoTimeouts[index] = setTimeout(() => {
-    video.play().catch(() => {});
+    // The play() method returns a promise. We chain the poster animation to it.
+    video.play().then(() => {
+      // This only runs when playback has successfully started.
+      if (poster) {
+        gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
+      }
+    }).catch(() => {
+      // If playback fails (e.g., browser blocks it), do nothing. The poster remains.
+    });
   }, 1000); // 1 second delay
 };
 
