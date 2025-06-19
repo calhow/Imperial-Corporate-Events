@@ -1410,36 +1410,46 @@ const ExperienceCardVideoManager = (() => {
   
   // This function is triggered by hover or scroll
   const playVideoAndHidePoster = (video) => {
-    // If an HLS instance already exists, just play it.
-    if (hlsInstances.has(video)) {
-      video.play().catch(() => {});
-      return;
-    }
-    
-    // For the first interaction, create a new HLS instance.
-    if (Hls.isSupported()) {
-      const hlsUrl = video.querySelector('source').dataset.hlsSrc;
-      if (!hlsUrl) return;
+    // A small delay ensures we only play if the user's intent is clear,
+    // preventing race conditions from rapid scroll or hover events.
+    video.playTimeout = setTimeout(() => {
+      if (hlsInstances.has(video)) {
+        const hls = hlsInstances.get(video);
+        hls.startLoad();
+        video.play().catch((e) => {});
+      } else if (Hls.isSupported()) {
+        const hlsUrl = video.querySelector('source').dataset.hlsSrc;
+        if (!hlsUrl) {
+            return;
+        }
 
-      const hls = new Hls({
-        capLevelToPlayerSize: true,
-        startLevel: -1,
-      });
+        const hls = new Hls({
+          capLevelToPlayerSize: true,
+          startLevel: -1,
+        });
 
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-      
-      // Once the manifest is parsed, it's safe to play.
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {});
-      });
-      
-      hlsInstances.set(video, hls);
-    }
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch((e) => {});
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {});
+
+        hlsInstances.set(video, hls);
+      }
+    }, 200); // 200ms delay to confirm user intent
   };
 
   const pauseVideoAndShowPoster = (video, poster) => {
+    // Immediately clear any pending play command.
+    if (video.playTimeout) {
+      clearTimeout(video.playTimeout);
+    }
+
     video.pause();
+
     // Fade the video OUT to reveal the poster underneath.
     gsap.to(video, { opacity: 0, duration: 0.3, ease: "power2.out" });
   };
@@ -1449,17 +1459,29 @@ const ExperienceCardVideoManager = (() => {
       trigger: card,
       start: "bottom bottom",
       end: "top top+=72",
-      onEnter: () => playVideoAndHidePoster(video),
-      onLeave: () => pauseVideoAndShowPoster(video, poster),
-      onEnterBack: () => playVideoAndHidePoster(video),
-      onLeaveBack: () => pauseVideoAndShowPoster(video, poster)
+      onEnter: () => {
+        playVideoAndHidePoster(video);
+      },
+      onLeave: () => {
+        pauseVideoAndShowPoster(video, poster);
+      },
+      onEnterBack: () => {
+        playVideoAndHidePoster(video);
+      },
+      onLeaveBack: () => {
+        pauseVideoAndShowPoster(video, poster);
+      }
     });
     scrollTriggers.push(trigger);
   };
 
   const setupDesktopInteraction = (card, video, poster) => {
-    const handleMouseEnter = () => playVideoAndHidePoster(video);
-    const handleMouseLeave = () => pauseVideoAndShowPoster(video, poster);
+    const handleMouseEnter = () => {
+        playVideoAndHidePoster(video);
+    };
+    const handleMouseLeave = () => {
+        pauseVideoAndShowPoster(video, poster);
+    };
 
     card.addEventListener('mouseenter', handleMouseEnter);
     card.addEventListener('mouseleave', handleMouseLeave);
@@ -1467,9 +1489,11 @@ const ExperienceCardVideoManager = (() => {
   };
 
   const cleanup = () => {
+    // Kill all existing ScrollTriggers
     scrollTriggers.forEach(trigger => trigger.kill());
     scrollTriggers = [];
 
+    // Remove hover listeners from all cards
     document.querySelectorAll('.exp_card_wrap').forEach(card => {
       if (card._videoEventHandlers) {
         card.removeEventListener('mouseenter', card._videoEventHandlers.mouseenter);
@@ -1478,11 +1502,13 @@ const ExperienceCardVideoManager = (() => {
       }
     });
     
-    // Destroy all active HLS instances to free up memory
+    // Destroy HLS instances only for videos that are no longer in the DOM.
     hlsInstances.forEach((hls, video) => {
-        hls.destroy();
+        if (!document.body.contains(video)) {
+            hls.destroy();
+            hlsInstances.delete(video);
+        }
     });
-    hlsInstances.clear();
   };
 
   const handleResize = Utils.debounce(() => initializeVideoInteractions(), 150);

@@ -28,6 +28,7 @@ const swiperConfigs = [
     slidesPerView: "auto",
     parallax: true,
     speed: 800,
+    loop: true,
     autoplay: {
       delay: 20000,
       disableOnInteraction: true,
@@ -108,7 +109,7 @@ const manageSlideVideos = (swiper) => {
   // Add a paused flag for ScrollTrigger
   swiper.isPaused = false;
   
-  setupActiveSlide(swiper, swiper.activeIndex);
+  setupActiveSlide(swiper);
 
   const checkVideoStates = () => { /* This function remains the same */ };
   swiper.videoStateInterval = setInterval(checkVideoStates, 2000);
@@ -132,51 +133,60 @@ const manageSlideVideos = (swiper) => {
   return checkVideoStates;
 };
 
-
 // Setup active slide with delayed video playback (HLS Version)
-const setupActiveSlide = (swiper, index) => {
-  // NEW: Add guard clause to prevent running when paused by ScrollTrigger
-  if (!swiper || !swiper.slides[index] || swiper.isPaused) return;
+const setupActiveSlide = (swiper) => {
+  const realIndex = swiper.realIndex;
+  if (!swiper || !swiper.slides[swiper.activeIndex] || swiper.isPaused) return;
 
-  const activeSlide = swiper.slides[index];
-  const video = activeSlide.querySelector('video');
-  const source = video ? video.querySelector('source') : null;
-  const hasVideoSource = source && source.dataset.hlsSrc;
+  const video = swiper.videos[realIndex];
 
-  // Set autoplay delay: 10s for no video, 20s for video.
-  const newDelay = hasVideoSource ? 20000 : 10000;
+  // Set autoplay delay based on whether the active slide has a video.
+  const newDelay = video ? 20000 : 10000;
   if (swiper.params.autoplay.delay !== newDelay) {
     swiper.params.autoplay.delay = newDelay;
-    swiper.autoplay.stop(); // The autoplayStop handler will restart it with the new delay.
+    swiper.autoplay.stop();
   }
 
-  // If there's no video on this slide, we're done with video-specific logic.
-  if (!hasVideoSource || !video) {
+  // If there's no video on this slide, we're done.
+  if (!video) {
     return;
   }
   
-  if (swiper.videoTimeouts && swiper.videoTimeouts[index]) {
-    clearTimeout(swiper.videoTimeouts[index]);
+  if (swiper.videoTimeouts && swiper.videoTimeouts[realIndex]) {
+    clearTimeout(swiper.videoTimeouts[realIndex]);
   }
-
-  const poster = activeSlide.querySelector('.cat_card_poster');
 
   video.pause();
 
-  // Pre-load the video by creating the HLS instance immediately.
-  if (!swiper.hlsInstances.has(video) && Hls.isSupported()) {
-    const hlsUrl = source.dataset.hlsSrc;
-    const hls = new Hls({
-      capLevelToPlayerSize: true,
-      startLevel: -1,
-    });
-    hls.loadSource(hlsUrl);
-    hls.attachMedia(video);
-    swiper.hlsInstances.set(video, hls);
+  // If an HLS instance already exists, just restart its loading.
+  if (swiper.hlsInstances.has(video)) {
+    const hls = swiper.hlsInstances.get(video);
+    hls.startLoad();
+  }
+  // Otherwise, create a new HLS instance with optimized buffer settings.
+  else if (Hls.isSupported()) {
+    const source = video.querySelector('source');
+    const hlsUrl = source ? source.dataset.hlsSrc : null;
+    if (hlsUrl) {
+      const hls = new Hls({
+        capLevelToPlayerSize: true,
+        startLevel: -1,
+        // Limit buffer to 20s to conserve memory, since autoplay is 20s.
+        maxBufferLength: 20,
+        maxMaxBufferLength: 20,
+        // Don't keep any buffer behind the playhead; not needed for this use case.
+        backBufferLength: 0,
+        // Set a hard memory cap of 20MB per video instance.
+        maxBufferSize: 20 * 1000 * 1000,
+      });
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      swiper.hlsInstances.set(video, hls);
+    }
   }
 
   // After a 1-second delay, attempt to play the video.
-  swiper.videoTimeouts[index] = setTimeout(() => {
+  swiper.videoTimeouts[realIndex] = setTimeout(() => {
     // The play() method returns a promise. We chain the poster animation to it.
     video.play().then(() => {
       // Use requestAnimationFrame to sync the poster fade with the browser's
@@ -191,15 +201,15 @@ const setupActiveSlide = (swiper, index) => {
   }, 1000); // 1 second delay
 };
 
-// NEW: Resets all non-active slides to their initial state.
+// Resets all non-active slides to their initial state.
 const resetInactiveSlides = (swiper) => {
   if (!swiper || !swiper.videos || swiper.isPaused) {
     return;
   }
   
-  // Pause videos and fade in posters for all slides that are not the active one.
+  // Pause videos and fade out for all slides that are not the active one.
   swiper.videos.forEach((video, index) => {
-    if (!video || index === swiper.activeIndex) return;
+    if (!video || index === swiper.realIndex) return;
     
     if (swiper.videoTimeouts && swiper.videoTimeouts[index]) {
       clearTimeout(swiper.videoTimeouts[index]);
@@ -210,6 +220,11 @@ const resetInactiveSlides = (swiper) => {
       video.pause();
       // Fade the video OUT to reveal the poster underneath.
       gsap.to(video, { opacity: 0, duration: 0.2, ease: "power2.out" });
+
+      // Stop loading video data for inactive slides to save bandwidth.
+      if (swiper.hlsInstances.has(video)) {
+        swiper.hlsInstances.get(video).stopLoad();
+      }
     } catch (e) {
       // Silent catch for any video errors.
     }
@@ -273,7 +288,7 @@ const initializeSwiper = ({
               swiper.autoplay.start();
               // When coming back into view, reset inactive slides and set up the active one.
               resetInactiveSlides(swiper);
-              setupActiveSlide(swiper, swiper.activeIndex);
+              setupActiveSlide(swiper);
             },
           });
         }
@@ -288,14 +303,10 @@ const initializeSwiper = ({
       slideChangeTransitionEnd(swiper) {
         toggleButtonWrapper(swiper);
         if (comboClass === "is-cat-hero") {
-          setupActiveSlide(swiper, swiper.activeIndex);
+          setupActiveSlide(swiper);
           // Ensure autoplay continues after manual interaction
           if (swiper.autoplay && swiper.autoplay.paused) {
             swiper.autoplay.start();
-          }
-          // Handle the loop-around case
-          if (swiper.isEnd) {
-            setTimeout(() => swiper.slideTo(0, swiper.params.speed), swiper.params.autoplay.delay);
           }
         }
       },
