@@ -1395,6 +1395,12 @@ const ExperienceCardVideoManager = (() => {
   
   // This function is triggered by hover or scroll
   const playVideoAndHidePoster = (video, poster) => {
+    // Only fade out the poster once the video has loaded enough to start playing.
+    // The { once: true } option automatically removes the listener after it fires.
+    video.addEventListener('playing', () => {
+      gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
+    }, { once: true });
+
     // If an HLS instance already exists for this video, just play it
     if (hlsInstances.has(video)) {
       video.play().catch(() => {});
@@ -1403,14 +1409,9 @@ const ExperienceCardVideoManager = (() => {
     else if (Hls.isSupported()) {
       const hlsUrl = video.querySelector('source').dataset.hlsSrc;
       if (!hlsUrl) return;
-
+      
       const hls = new Hls({
-        // Enable level capping based on player size.
-        // This prevents loading qualities higher than necessary for the viewport.
         capLevelToPlayerSize: true,
-
-        // Start with an automatic level determined by player size and bandwidth.
-        // -1 means auto.
         startLevel: -1,
       });
 
@@ -1423,9 +1424,6 @@ const ExperienceCardVideoManager = (() => {
       // Store the new instance in our map
       hlsInstances.set(video, hls);
     }
-    
-    // Animate the poster out
-    gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
   };
 
   const pauseVideoAndShowPoster = (video, poster) => {
@@ -1441,8 +1439,8 @@ const ExperienceCardVideoManager = (() => {
   const setupMobileInteraction = (card, video, poster) => {
     const trigger = ScrollTrigger.create({
       trigger: card,
-      start: "center bottom", // Start loading when the center of the card hits the bottom of the viewport
-      end: "top top",
+      start: "bottom bottom",
+      end: "top top+=72",
       onEnter: () => playVideoAndHidePoster(video, poster),
       onLeave: () => pauseVideoAndShowPoster(video, poster),
       onEnterBack: () => playVideoAndHidePoster(video, poster),

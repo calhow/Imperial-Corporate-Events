@@ -83,6 +83,12 @@ const manageSlideVideos = (swiper) => {
     const poster = slide.querySelector('.cat_card_poster');
     
     if (video) {
+      const source = video.querySelector('source');
+      // Skip slides that don't have a video with a valid HLS source.
+      if (!source || !source.dataset.hlsSrc) {
+        return;
+      }
+
       if (poster && poster.src) {
         video.poster = poster.src;
       }
@@ -125,7 +131,22 @@ const manageSlideVideos = (swiper) => {
 
 // Setup active slide with delayed video playback (HLS Version)
 const setupActiveSlide = (swiper, index) => {
-  if (!swiper || !swiper.videos || !swiper.videos[index]) {
+  if (!swiper || !swiper.slides[index]) return;
+
+  const activeSlide = swiper.slides[index];
+  const video = activeSlide.querySelector('video');
+  const source = video ? video.querySelector('source') : null;
+  const hasVideoSource = source && source.dataset.hlsSrc;
+
+  // Set autoplay delay: 10s for no video, 20s for video.
+  const newDelay = hasVideoSource ? 20000 : 10000;
+  if (swiper.params.autoplay.delay !== newDelay) {
+    swiper.params.autoplay.delay = newDelay;
+    swiper.autoplay.stop(); // The autoplayStop handler will restart it with the new delay.
+  }
+
+  // If there's no video on this slide, we're done with video-specific logic.
+  if (!hasVideoSource || !video) {
     return;
   }
   
@@ -133,48 +154,33 @@ const setupActiveSlide = (swiper, index) => {
     clearTimeout(swiper.videoTimeouts[index]);
   }
 
-  const video = swiper.videos[index];
-  const poster = swiper.posters[index];
+  const poster = activeSlide.querySelector('.cat_card_poster');
 
   video.pause();
   if (poster) {
     gsap.set(poster, { opacity: 1 });
+    // Set up the listener once to fade out the poster when playback starts.
+    video.addEventListener('playing', () => {
+      gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
+    }, { once: true });
   }
 
-  // Set a timeout to load and play the video
+  // Pre-load the video by creating the HLS instance immediately.
+  if (!swiper.hlsInstances.has(video) && Hls.isSupported()) {
+    const hlsUrl = source.dataset.hlsSrc;
+    const hls = new Hls({
+      capLevelToPlayerSize: true,
+      startLevel: -1,
+    });
+    hls.loadSource(hlsUrl);
+    hls.attachMedia(video);
+    swiper.hlsInstances.set(video, hls);
+  }
+
+  // After a 1-second delay, attempt to play the video.
   swiper.videoTimeouts[index] = setTimeout(() => {
-    // If an HLS instance already exists, just play it
-    if (swiper.hlsInstances.has(video)) {
-        video.play().catch(()=>{});
-        if (poster) gsap.to(poster, { opacity: 0, duration: 0.7, ease: "power2.out" });
-    }
-    // Otherwise, if HLS is supported, create a new instance
-    else if (Hls.isSupported()) {
-      const source = video.querySelector('source');
-      const hlsUrl = source ? source.dataset.hlsSrc : null;
-      if (!hlsUrl) return;
-
-      const hls = new Hls({
-        // Enable level capping based on player size.
-        capLevelToPlayerSize: true,
-        // Start with an automatic level determined by player size and bandwidth.
-        startLevel: -1,
-      });
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-      
-      // When the manifest is parsed and ready, play the video and fade the poster
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(()=>{});
-        if (poster) {
-          gsap.to(poster, { opacity: 0, duration: 0.7, ease: "power2.out" });
-        }
-      });
-
-      // Store the new instance in our map
-      swiper.hlsInstances.set(video, hls);
-    }
-  }, 2000); // 2 second delay remains
+    video.play().catch(() => {});
+  }, 1000); // 1 second delay
 };
 
 // Handle video on slide change
