@@ -104,6 +104,9 @@ const manageSlideVideos = (swiper) => {
     }
   });
 
+  // Add a paused flag for ScrollTrigger
+  swiper.isPaused = false;
+  
   setupActiveSlide(swiper, swiper.activeIndex);
 
   const checkVideoStates = () => { /* This function remains the same */ };
@@ -131,7 +134,8 @@ const manageSlideVideos = (swiper) => {
 
 // Setup active slide with delayed video playback (HLS Version)
 const setupActiveSlide = (swiper, index) => {
-  if (!swiper || !swiper.slides[index]) return;
+  // NEW: Add guard clause to prevent running when paused by ScrollTrigger
+  if (!swiper || !swiper.slides[index] || swiper.isPaused) return;
 
   const activeSlide = swiper.slides[index];
   const video = activeSlide.querySelector('video');
@@ -177,30 +181,29 @@ const setupActiveSlide = (swiper, index) => {
   swiper.videoTimeouts[index] = setTimeout(() => {
     // The play() method returns a promise. We chain the poster animation to it.
     video.play().then(() => {
-      // This only runs when playback has successfully started.
-      if (poster) {
-        gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
-      }
+      // Use requestAnimationFrame to sync the poster fade with the browser's
+      // next paint cycle. This ensures the video frame is ready to be displayed.
+      requestAnimationFrame(() => {
+        if (poster) {
+          gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
+        }
+      });
     }).catch(() => {
       // If playback fails (e.g., browser blocks it), do nothing. The poster remains.
     });
   }, 1000); // 1 second delay
 };
 
-// Handle video on slide change
-const handleSlideChange = (swiper) => {
-  if (!swiper || !swiper.videos) {
+// NEW: Resets all non-active slides to their initial state.
+const resetInactiveSlides = (swiper) => {
+  if (!swiper || !swiper.videos || swiper.isPaused) {
     return;
   }
   
-  // Handle inactive slides - immediately pause videos and fade in posters
+  // Pause videos and fade in posters for all slides that are not the active one.
   swiper.videos.forEach((video, index) => {
-    if (!video) return;
+    if (!video || index === swiper.activeIndex) return;
     
-    // Skip active index
-    if (index === swiper.activeIndex) return;
-    
-    // Clear any pending timeouts for this slide
     if (swiper.videoTimeouts && swiper.videoTimeouts[index]) {
       clearTimeout(swiper.videoTimeouts[index]);
       swiper.videoTimeouts[index] = null;
@@ -208,23 +211,14 @@ const handleSlideChange = (swiper) => {
     
     try {
       video.pause();
-      
-      // Fade in poster if it exists
       const poster = swiper.posters[index];
       if (poster) {
-        gsap.to(poster, {
-          opacity: 1, 
-          duration: 0.2, 
-          ease: "power2.out"
-        });
+        gsap.to(poster, { opacity: 1, duration: 0.2, ease: "power2.out" });
       }
     } catch (e) {
-      // Silent catch for any video errors
+      // Silent catch for any video errors.
     }
   });
-  
-  // Setup the new active slide with delayed video play
-  setupActiveSlide(swiper, swiper.activeIndex);
 };
 
 // Initialize Swiper instances with navigation and event handlers
@@ -257,125 +251,67 @@ const initializeSwiper = ({
     },
     breakpoints,
     on: {
-      init() {
-        // Toggle buttons based on actual Swiper state now that it's initialized
-        toggleButtonWrapper(this);
-        
+      init(swiper) {
+        toggleButtonWrapper(swiper);
         if (comboClass === "is-cat-hero") {
-          const checkVideoStates = manageSlideVideos(this);
-          
-          // Save checker function for later
-          this.checkVideoStates = checkVideoStates;
-          
-          // Adjust parallax values based on screen size
+          manageSlideVideos(swiper);
           adjustSwiperParallax();
-
-          // Pause and resume swiper based on visibility
-          const heroSwiper = this;
+          // Set up visibility-based play/pause
           ScrollTrigger.create({
-            trigger: heroSwiper.el,
+            trigger: swiper.el,
             start: "top bottom",
             end: "bottom top",
             onLeave: () => {
-              heroSwiper.autoplay.stop();
-              if (heroSwiper.videos) {
-                heroSwiper.videos.forEach((video, index) => {
-                  if (video) {
-                    video.pause();
-                  }
-                  if (heroSwiper.videoTimeouts && heroSwiper.videoTimeouts[index]) {
-                    clearTimeout(heroSwiper.videoTimeouts[index]);
-                    heroSwiper.videoTimeouts[index] = null;
+              swiper.isPaused = true; // Set paused flag
+              swiper.autoplay.stop();
+              if (swiper.videos) {
+                swiper.videos.forEach((video, index) => {
+                  if (video) video.pause();
+                  if (swiper.videoTimeouts && swiper.videoTimeouts[index]) {
+                    clearTimeout(swiper.videoTimeouts[index]);
                   }
                 });
               }
             },
             onEnterBack: () => {
-              heroSwiper.autoplay.start();
-              handleSlideChange(heroSwiper);
+              swiper.isPaused = false; // Unset paused flag
+              swiper.autoplay.start();
+              // When coming back into view, reset inactive slides and set up the active one.
+              resetInactiveSlides(swiper);
+              setupActiveSlide(swiper, swiper.activeIndex);
             },
           });
         }
       },
-      slideChange() {
-        toggleButtonWrapper(this);
-        
+      // When a slide change starts, reset the slides that are no longer active.
+      slideChange(swiper) {
         if (comboClass === "is-cat-hero") {
-          handleSlideChange(this);
+          resetInactiveSlides(swiper);
         }
       },
-      resize() {
-        toggleButtonWrapper(this);
-      },
-      autoplayStop() {
-        // Restart autoplay if it's the cat-hero swiper
-        if (comboClass === "is-cat-hero" && this.autoplay) {
-          setTimeout(() => this.autoplay.start(), 50);
-        }
-      },
-      autoplayPause() {
-        // Restart autoplay if it's the cat-hero swiper
-        if (comboClass === "is-cat-hero" && this.autoplay) {
-          setTimeout(() => this.autoplay.start(), 50);
-        }
-      },
-      slideChangeTransitionStart() {
-        // Also try running the video handling here
+      // When the new slide has finished transitioning, set it up for playback.
+      slideChangeTransitionEnd(swiper) {
+        toggleButtonWrapper(swiper);
         if (comboClass === "is-cat-hero") {
-          handleSlideChange(this);
+          setupActiveSlide(swiper, swiper.activeIndex);
+          // Ensure autoplay continues after manual interaction
+          if (swiper.autoplay && swiper.autoplay.paused) {
+            swiper.autoplay.start();
+          }
+          // Handle the loop-around case
+          if (swiper.isEnd) {
+            setTimeout(() => swiper.slideTo(0, swiper.params.speed), swiper.params.autoplay.delay);
+          }
         }
       },
-      slideChangeTransitionEnd() {
-        // Make sure autoplay is running
-        if (comboClass === "is-cat-hero" && this.autoplay && this.autoplay.paused) {
-          this.autoplay.start();
-        }
-        
-        // Double-check video handling at transition end
-        if (comboClass === "is-cat-hero") {
-          handleSlideChange(this);
-        }
-        
-        if (comboClass === "is-cat-hero" && this.isEnd) {
-          setTimeout(() => {
-            this.slideTo(0, this.params.speed);
-          }, this.params.autoplay.delay);
+      resize: toggleButtonWrapper,
+      // Ensure autoplay restarts with the correct (potentially updated) delay
+      autoplayStop(swiper) {
+        // MODIFIED: Only restart autoplay if it's NOT paused by the ScrollTrigger.
+        if (comboClass === "is-cat-hero" && swiper.autoplay && !swiper.isPaused) {
+          setTimeout(() => swiper.autoplay.start(), 50);
         }
       },
-      afterInit() {
-        // Also initialize video handling after complete init
-        if (comboClass === "is-cat-hero") {
-          handleSlideChange(this);
-          
-          // Ensure parallax values are properly adjusted
-          adjustSwiperParallax();
-        }
-      },
-      activeIndexChange() {
-        // Another place to catch slide changes
-        if (comboClass === "is-cat-hero") {
-          handleSlideChange(this);
-        }
-      },
-      touchEnd() {
-        // Triggered when touch ends - good place to catch user interactions
-        if (comboClass === "is-cat-hero") {
-          handleSlideChange(this);
-        }
-      },
-      // Add click handler for navigation buttons
-      navigationNext() {
-        if (comboClass === "is-cat-hero") {
-          // Force handle slide change after a short delay to ensure Swiper has updated
-          setTimeout(() => handleSlideChange(this), 50);
-        }
-      },
-      navigationPrev() {
-        if (comboClass === "is-cat-hero") {
-          // Force handle slide change after a short delay to ensure Swiper has updated
-          setTimeout(() => handleSlideChange(this), 50);
-        }
-      }
     },
   };
   

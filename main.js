@@ -1376,9 +1376,22 @@ const ExperienceCardVideoManager = (() => {
       const poster = card.querySelector('.exp_card_poster');
       if (!video || !poster || !hasValidVideoSource(video)) return;
 
+      // --- ONE-TIME SETUP ---
+      // Set the video's poster attribute.
       if (poster.src) {
         video.poster = poster.src;
       }
+      
+      // Add the poster-fade listener ONCE. This will fire whenever playback starts.
+      video.addEventListener('playing', () => {
+        // Ensure we only fade the poster if it's currently visible.
+        if (gsap.getProperty(poster, "opacity") > 0) {
+          requestAnimationFrame(() => {
+            gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
+          });
+        }
+      });
+      // --- END ONE-TIME SETUP ---
 
       if (deviceType === 'mobile') {
         setupMobileInteraction(card, video, poster);
@@ -1394,22 +1407,15 @@ const ExperienceCardVideoManager = (() => {
   };
   
   // This function is triggered by hover or scroll
-  const playVideoAndHidePoster = (video, poster) => {
-    // The play() method returns a promise. We chain the poster animation to it,
-    // ensuring the poster only fades when playback successfully starts.
-    video.play().then(() => {
-      // Check the poster's opacity to ensure we only fade it once.
-      if (gsap.getProperty(poster, "opacity") > 0) {
-        gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
-      }
-    }).catch(() => {
-      // If playback fails (e.g., browser blocks it), do nothing.
-    });
-
-    // If this is the first time, create and attach a new HLS instance.
-    // The play() command issued above will be handled by the browser's media
-    // pipeline once HLS.js attaches the source.
-    if (!hlsInstances.has(video) && Hls.isSupported()) {
+  const playVideoAndHidePoster = (video) => {
+    // If an HLS instance already exists, just play it.
+    if (hlsInstances.has(video)) {
+      video.play().catch(() => {});
+      return;
+    }
+    
+    // For the first interaction, create a new HLS instance.
+    if (Hls.isSupported()) {
       const hlsUrl = video.querySelector('source').dataset.hlsSrc;
       if (!hlsUrl) return;
 
@@ -1420,16 +1426,18 @@ const ExperienceCardVideoManager = (() => {
 
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
+      
+      // Once the manifest is parsed, it's safe to play.
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+      });
+      
       hlsInstances.set(video, hls);
     }
   };
 
   const pauseVideoAndShowPoster = (video, poster) => {
     video.pause();
-    // For extreme memory optimization on pages with many videos, you could destroy
-    // the HLS instance here, but it would need to reload on re-enter.
-    // For most cases, just pausing is fine.
-    
     // Animate the poster back in
     gsap.to(poster, { opacity: 1, duration: 0.3, ease: "power2.out" });
   };
@@ -1439,16 +1447,16 @@ const ExperienceCardVideoManager = (() => {
       trigger: card,
       start: "bottom bottom",
       end: "top top+=72",
-      onEnter: () => playVideoAndHidePoster(video, poster),
+      onEnter: () => playVideoAndHidePoster(video),
       onLeave: () => pauseVideoAndShowPoster(video, poster),
-      onEnterBack: () => playVideoAndHidePoster(video, poster),
+      onEnterBack: () => playVideoAndHidePoster(video),
       onLeaveBack: () => pauseVideoAndShowPoster(video, poster)
     });
     scrollTriggers.push(trigger);
   };
 
   const setupDesktopInteraction = (card, video, poster) => {
-    const handleMouseEnter = () => playVideoAndHidePoster(video, poster);
+    const handleMouseEnter = () => playVideoAndHidePoster(video);
     const handleMouseLeave = () => pauseVideoAndShowPoster(video, poster);
 
     card.addEventListener('mouseenter', handleMouseEnter);
