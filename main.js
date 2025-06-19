@@ -1381,13 +1381,15 @@ const ExperienceCardVideoManager = (() => {
       if (poster.src) {
         video.poster = poster.src;
       }
+      // Set the initial state: video is transparent, letting the poster show through.
+      gsap.set(video, { opacity: 0 });
       
-      // Add the poster-fade listener ONCE. This will fire whenever playback starts.
+      // Add the video fade-in listener ONCE. This will fire whenever playback starts.
       video.addEventListener('playing', () => {
-        // Ensure we only fade the poster if it's currently visible.
-        if (gsap.getProperty(poster, "opacity") > 0) {
+        // Ensure we only fade the video in if it's currently invisible.
+        if (gsap.getProperty(video, "opacity") < 1) {
           requestAnimationFrame(() => {
-            gsap.to(poster, { opacity: 0, duration: 0.5, ease: "power2.out" });
+            gsap.to(video, { opacity: 1, duration: 0.5, ease: "power2.out" });
           });
         }
       });
@@ -1438,8 +1440,8 @@ const ExperienceCardVideoManager = (() => {
 
   const pauseVideoAndShowPoster = (video, poster) => {
     video.pause();
-    // Animate the poster back in
-    gsap.to(poster, { opacity: 1, duration: 0.3, ease: "power2.out" });
+    // Fade the video OUT to reveal the poster underneath.
+    gsap.to(video, { opacity: 0, duration: 0.3, ease: "power2.out" });
   };
 
   const setupMobileInteraction = (card, video, poster) => {

@@ -96,10 +96,11 @@ const manageSlideVideos = (swiper) => {
       swiper.videos[index] = video;
       video.setAttribute('data-slide-index', index);
       video.pause();
+      // Set the initial state: video is transparent, letting the poster show through.
+      gsap.set(video, { opacity: 0 });
       
       if (poster) {
         swiper.posters[index] = poster;
-        gsap.set(poster, { opacity: 1 });
       }
     }
   });
@@ -161,9 +162,6 @@ const setupActiveSlide = (swiper, index) => {
   const poster = activeSlide.querySelector('.cat_card_poster');
 
   video.pause();
-  if (poster) {
-    gsap.set(poster, { opacity: 1 });
-  }
 
   // Pre-load the video by creating the HLS instance immediately.
   if (!swiper.hlsInstances.has(video) && Hls.isSupported()) {
@@ -184,9 +182,8 @@ const setupActiveSlide = (swiper, index) => {
       // Use requestAnimationFrame to sync the poster fade with the browser's
       // next paint cycle. This ensures the video frame is ready to be displayed.
       requestAnimationFrame(() => {
-        if (poster) {
-          gsap.to(poster, { opacity: 0, duration: 0.7, ease: 'power2.out' });
-        }
+        // Fade the video IN, revealing it over the poster.
+        gsap.to(video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
       });
     }).catch(() => {
       // If playback fails (e.g., browser blocks it), do nothing. The poster remains.
@@ -211,10 +208,8 @@ const resetInactiveSlides = (swiper) => {
     
     try {
       video.pause();
-      const poster = swiper.posters[index];
-      if (poster) {
-        gsap.to(poster, { opacity: 1, duration: 0.2, ease: "power2.out" });
-      }
+      // Fade the video OUT to reveal the poster underneath.
+      gsap.to(video, { opacity: 0, duration: 0.2, ease: "power2.out" });
     } catch (e) {
       // Silent catch for any video errors.
     }
