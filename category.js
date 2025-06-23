@@ -744,7 +744,7 @@ const SwiperModule = (() => {
       swiperContainer.classList.add("is-both");
     } else if (isNextDisabled && !isPrevDisabled) {
       swiperContainer.classList.add("is-prev");
-    } else if (!isNextDisabled && isPrevDisabled) {
+    } else if (isPrevDisabled && !isNextDisabled) {
       swiperContainer.classList.add("is-next");
     }
   }
