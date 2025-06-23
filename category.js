@@ -719,6 +719,7 @@ const SwiperModule = (() => {
     }
   }
 
+  // Updates swiper container classes based on nav button states to control their visibility.
   function updateSwiperClasses() {
     const swiperContainer = document.querySelector(".cat_link_list_wrap");
     const nextButton = document.querySelector(
@@ -732,12 +733,19 @@ const SwiperModule = (() => {
 
     swiperContainer.classList.remove("is-next", "is-both", "is-prev");
 
-    if (nextButton.classList.contains("cat_link_btn_wrap_disabled")) {
-      swiperContainer.classList.add("is-prev");
-    } else if (prevButton.classList.contains("cat_link_btn_wrap_disabled")) {
-      swiperContainer.classList.add("is-next");
-    } else {
+    const isNextDisabled = nextButton.classList.contains(
+      "cat_link_btn_wrap_disabled"
+    );
+    const isPrevDisabled = prevButton.classList.contains(
+      "cat_link_btn_wrap_disabled"
+    );
+
+    if (!isNextDisabled && !isPrevDisabled) {
       swiperContainer.classList.add("is-both");
+    } else if (isNextDisabled && !isPrevDisabled) {
+      swiperContainer.classList.add("is-prev");
+    } else if (!isNextDisabled && isPrevDisabled) {
+      swiperContainer.classList.add("is-next");
     }
   }
 
