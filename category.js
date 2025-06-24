@@ -797,3 +797,76 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+// Static Border Glow Effect for Fixture Cards
+
+const initDynamicLighting = () => {
+  const svgFilterContainer = document.querySelector('.g_fixture_filter');
+  const filterTemplate = document.getElementById('lighting');
+
+  if (!svgFilterContainer || !filterTemplate) {
+    console.error('SVG filter template or container not found.');
+    return;
+  }
+
+  const lightWraps = document.querySelectorAll('[data-light-wrap]');
+  const lightFixtures = [];
+
+  lightWraps.forEach((wrap, index) => {
+    const light1Element = wrap.querySelector('[data-light="light1"]');
+    const light2Element = wrap.querySelector('[data-light="light2"]');
+    const color1 = light1Element ? light1Element.getAttribute('data-light-color') : 'transparent';
+    const color2 = light2Element ? light2Element.getAttribute('data-light-color') : 'transparent';
+
+    const newFilter = filterTemplate.cloneNode(true);
+    const uniqueId = `lighting-instance-${index}`;
+    newFilter.id = uniqueId;
+
+    const newLight1 = newFilter.querySelector('#light1');
+    const newLight2 = newFilter.querySelector('#light2');
+
+    if (newLight1) newLight1.setAttribute('lighting-color', color1);
+    if (newLight2) newLight2.setAttribute('lighting-color', color2);
+
+    svgFilterContainer.appendChild(newFilter);
+    wrap.style.setProperty('--dynamic-filter-url', `url(#${uniqueId})`);
+
+    lightFixtures.push({
+      wrap,
+      light1Element,
+      light2Element,
+      pointLight1: newFilter.querySelector('#light1 fePointLight'),
+      pointLight2: newFilter.querySelector('#light2 fePointLight'),
+    });
+  });
+
+  const updateLightPositions = () => {
+    lightFixtures.forEach(({ wrap, light1Element, light2Element, pointLight1, pointLight2 }) => {
+      const wrapRect = wrap.getBoundingClientRect();
+
+      if (pointLight1 && light1Element) {
+        const light1ElementRect = light1Element.getBoundingClientRect();
+        const light1CenterX = light1ElementRect.left + light1ElementRect.width / 2;
+        const light1CenterY = light1ElementRect.top + light1ElementRect.height / 2;
+        const relativeX = light1CenterX - wrapRect.left;
+        const relativeY = light1CenterY - wrapRect.top;
+        pointLight1.setAttribute('x', relativeX);
+        pointLight1.setAttribute('y', relativeY);
+      }
+
+      if (pointLight2 && light2Element) {
+        const light2ElementRect = light2Element.getBoundingClientRect();
+        const light2CenterX = light2ElementRect.left + light2ElementRect.width / 2;
+        const light2CenterY = light2ElementRect.top + light2ElementRect.height / 2;
+        const relativeX = light2CenterX - wrapRect.left;
+        const relativeY = light2CenterY - wrapRect.top;
+        pointLight2.setAttribute('x', relativeX);
+        pointLight2.setAttribute('y', relativeY);
+      }
+    });
+  };
+
+  updateLightPositions();
+  window.addEventListener('resize', debounce(updateLightPositions, 100));
+};
+
+window.addEventListener('load', initDynamicLighting);
