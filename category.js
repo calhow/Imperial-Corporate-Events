@@ -68,6 +68,11 @@ const swiperConfigs = [
     comboClass: "is-competitions",
     slidesPerView: "auto",
   },
+  {
+    selector: ".swiper.is-packages",
+    comboClass: "is-packages",
+    slidesPerView: "auto",
+  },
 ];
 
 // Video management for swiper slides (HLS Version)
@@ -369,16 +374,42 @@ const manageSwipers = () => {
       
       // Initialize all swipers
       swiperConfigs.forEach((config) => {
-        const swiperContainer = document.querySelector(config.selector);
-        if (swiperContainer) {
-          const slides = swiperContainer.querySelectorAll(".swiper-slide");
-          if (slides.length > 0) {
-            const swiper = initializeSwiper(config);
-            swiperInstances.push(swiper);
-            
-            // Explicitly toggle the button wrapper after Swiper is fully initialized
-            if (swiper && swiper.initialized) {
-              toggleButtonWrapper(swiper);
+        // Special handling for .is-packages: may be multiple per page
+        if (config.comboClass === "is-packages") {
+          const packageSwipers = document.querySelectorAll(config.selector);
+          packageSwipers.forEach((swiperContainer) => {
+            const slides = swiperContainer.querySelectorAll(".swiper-slide");
+            if (slides.length > 0) {
+              // Use a unique comboClass for each instance to support multiple navs
+              const uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
+              swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
+              // Update nav button wrappers for this instance
+              const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
+              if (btnWrap) btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
+              // Update nav buttons for this instance
+              const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
+              const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
+              if (nextBtn) nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
+              if (prevBtn) prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
+              // Create config for this instance
+              const instanceConfig = { ...config, comboClass: uniqueCombo, selector: `[data-swiper-unique='${uniqueCombo}']` };
+              const swiper = initializeSwiper(instanceConfig);
+              swiperInstances.push(swiper);
+              if (swiper && swiper.initialized) {
+                toggleButtonWrapper(swiper);
+              }
+            }
+          });
+        } else {
+          const swiperContainer = document.querySelector(config.selector);
+          if (swiperContainer) {
+            const slides = swiperContainer.querySelectorAll(".swiper-slide");
+            if (slides.length > 0) {
+              const swiper = initializeSwiper(config);
+              swiperInstances.push(swiper);
+              if (swiper && swiper.initialized) {
+                toggleButtonWrapper(swiper);
+              }
             }
           }
         }
@@ -870,3 +901,55 @@ const initDynamicLighting = () => {
 };
 
 window.addEventListener('load', initDynamicLighting);
+
+
+// TOGGLE EXP CARD PACKAGES ACCORDION
+
+document.addEventListener('click', function(event) {
+  // Find the closest ancestor button with the target attribute
+  const toggleButton = event.target.closest('[data-packages-btn-toggle]');
+
+  // If a toggle button was clicked
+  if (toggleButton) {
+    // Find the main card container for this button
+    const cardWrapper = toggleButton.closest('.exp_card_wrap');
+    
+    // If a card wrapper is found, find the accordion content within it
+    if (cardWrapper) {
+      const content = cardWrapper.querySelector('.exp_card_accordion_content');
+      
+      // If the content container is found, toggle the visibility class
+      if (content) {
+        content.classList.toggle('is-hidden');
+      }
+    }
+  }
+});
+
+
+// SET EXP CARD PACKAGES IMAGE
+document.addEventListener('DOMContentLoaded', function() {
+  // Select all card components on the page
+  const allCards = document.querySelectorAll('.exp_card_wrap');
+
+  // Iterate over each card component
+  allCards.forEach(card => {
+    // Find the first package image within the current card
+    const sourceImage = card.querySelector('.exp_packages_img');
+
+    // If no package image exists in this card, skip to the next one
+    if (!sourceImage) {
+      return;
+    }
+
+    // Find all target image elements where the src will be placed
+    const targetImages = card.querySelectorAll('.exp_card_header_btn_img_wrap.is-1 .exp_card_header_btn_img');
+
+    // If any target images are found, loop through them and update their src
+    if (targetImages.length > 0) {
+      targetImages.forEach(targetImage => {
+        targetImage.src = sourceImage.src;
+      });
+    }
+  });
+});
