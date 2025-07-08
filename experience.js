@@ -1466,6 +1466,24 @@ const initializeModalContent = async (contentElement) => {
             initializeTabButtons(packageModalTarget);
         },
         () => {
+            // Destroy and reinitialize Finsweet CMS Select
+            if (typeof window.fsAttributes !== 'undefined' && window.fsAttributes.cmsselect) {
+                try {
+                    // Destroy existing instances
+                    if (window.fsAttributes.cmsselect.destroy) {
+                        window.fsAttributes.cmsselect.destroy();
+                    }
+                    
+                    // Reinitialize for the modal content
+                    if (window.fsAttributes.cmsselect.init) {
+                        window.fsAttributes.cmsselect.init();
+                    }
+                } catch (error) {
+                    console.warn('Failed to reinitialize Finsweet CMS Select:', error);
+                }
+            }
+        },
+        () => {
             // Check for SVG elements before CMS nesting
             processSVGElements(packageModalTarget);
             
