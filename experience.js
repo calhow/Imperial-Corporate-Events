@@ -1442,6 +1442,8 @@ const processSVGElements = (container) => {
 
 // Initializes modal content with all needed functionality
 const initializeModalContent = async (contentElement) => {
+    let availabilitySyncCleanup = null; // Store cleanup function
+    
     const initSequence = [
         () => initializePackageAccordion(),
         // Setup paragraph toggles for the package modal content
@@ -1464,6 +1466,9 @@ const initializeModalContent = async (contentElement) => {
             initializeCountersInScope(packageModalTarget);
             initializePackageForm(packageModalTarget);
             initializeTabButtons(packageModalTarget);
+            
+            // Initialize availability checkbox sync
+            availabilitySyncCleanup = initializeAvailabilitySync(packageModalTarget);
         },
         () => {
             // Destroy and reinitialize Finsweet CMS Select
@@ -1540,6 +1545,11 @@ const initializeModalContent = async (contentElement) => {
             }
         }, 2000);
     });
+    
+    // Store cleanup function for destruction when modal content changes
+    if (availabilitySyncCleanup && packageModalTarget) {
+        packageModalTarget._availabilitySyncCleanup = availabilitySyncCleanup;
+    }
 };
 
 // Sets initial animation states
@@ -1888,6 +1898,13 @@ async function populateModal(content, url) {
     
     TimelineManager.clearAll();
     EventManager.removeAll(packageModalTarget);
+    
+    // Clean up availability sync if it exists
+    if (packageModalTarget._availabilitySyncCleanup) {
+        packageModalTarget._availabilitySyncCleanup();
+        packageModalTarget._availabilitySyncCleanup = null;
+    }
+    
     packageModalTarget.innerHTML = "";
     
     if (url) {
@@ -2703,5 +2720,92 @@ stickyOptionsMatchMedia.add("(max-width: 991px)", () => {
     }
   });
 });
+
+// Synchronizes availability checkboxes between forms
+const initializeAvailabilitySync = (modalTarget) => {
+  if (!modalTarget) return null;
+  
+  const availabilityForm = modalTarget.querySelector('#wf-form-Availability');
+  const packageForm = modalTarget.querySelector('#wf-form-Package');
+  
+  if (!availabilityForm || !packageForm) return null;
+  
+  const availabilityCheckboxes = availabilityForm.querySelectorAll('input[name="date"]');
+  const packageCheckboxes = packageForm.querySelectorAll('input[name="date"]');
+  
+  if (!availabilityCheckboxes.length || !packageCheckboxes.length) return null;
+  
+  const eventListeners = [];
+  let isSyncing = false; // Prevent infinite loops
+  
+  // Helper function to find matching checkbox by value
+  const findMatchingCheckbox = (value, checkboxes) => {
+    return Array.from(checkboxes).find(cb => cb.value === value);
+  };
+  
+  // Sync from availability form to package form
+  availabilityCheckboxes.forEach(checkbox => {
+    const handler = (event) => {
+      if (isSyncing) return;
+      
+      const matchingCheckbox = findMatchingCheckbox(checkbox.value, packageCheckboxes);
+      if (matchingCheckbox) {
+        isSyncing = true;
+        matchingCheckbox.checked = checkbox.checked;
+        
+        // Trigger change event on the target checkbox
+        const changeEvent = new Event('change', { bubbles: true });
+        matchingCheckbox.dispatchEvent(changeEvent);
+        
+        // Update parent label states
+        const parentLabel = matchingCheckbox.closest('label');
+        if (parentLabel) {
+          parentLabel.classList.toggle('is-checked', checkbox.checked);
+        }
+        
+        setTimeout(() => { isSyncing = false; }, 0);
+      }
+    };
+    
+    checkbox.addEventListener('change', handler);
+    eventListeners.push({ element: checkbox, type: 'change', handler });
+  });
+  
+  // Sync from package form to availability form
+  packageCheckboxes.forEach(checkbox => {
+    const handler = (event) => {
+      if (isSyncing) return;
+      
+      const matchingCheckbox = findMatchingCheckbox(checkbox.value, availabilityCheckboxes);
+      if (matchingCheckbox) {
+        isSyncing = true;
+        matchingCheckbox.checked = checkbox.checked;
+        
+        // Trigger change event on the target checkbox
+        const changeEvent = new Event('change', { bubbles: true });
+        matchingCheckbox.dispatchEvent(changeEvent);
+        
+        // Update parent label states
+        const parentLabel = matchingCheckbox.closest('label');
+        if (parentLabel) {
+          parentLabel.classList.toggle('is-checked', checkbox.checked);
+        }
+        
+        setTimeout(() => { isSyncing = false; }, 0);
+      }
+    };
+    
+    checkbox.addEventListener('change', handler);
+    eventListeners.push({ element: checkbox, type: 'change', handler });
+  });
+  
+  // Return cleanup function
+  return () => {
+    eventListeners.forEach(({ element, type, handler }) => {
+      element.removeEventListener(type, handler);
+    });
+    eventListeners.length = 0;
+  };
+};
 
 
