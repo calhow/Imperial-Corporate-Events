@@ -1,7 +1,7 @@
 // EXPLOR FILTER
 
 // Swiper Module for theme filters
-const SwiperModule = (() => {
+const ThemeFilterSwiperModule = (() => {
   let swiper;
 
   function initSwiper() {
@@ -320,7 +320,7 @@ const FilterModule = (() => {
       window.innerWidth || document.documentElement.clientWidth;
 
     if (viewportWidth >= 992) {
-      const swiper = SwiperModule.getSwiper();
+              const swiper = ThemeFilterSwiperModule.getSwiper();
       if (swiper) {
         swiper.slideTo(0);
       }
@@ -380,7 +380,7 @@ const FilterModule = (() => {
               window.innerWidth || document.documentElement.clientWidth;
 
             if (viewportWidth >= 992) {
-              const swiper = SwiperModule.getSwiper();
+              const swiper = ThemeFilterSwiperModule.getSwiper();
               if (swiper) {
                 swiper.slideTo(0);
               }

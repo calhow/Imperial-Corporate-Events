@@ -40,11 +40,22 @@ const Utils = (() => {
     return props;
   };
 
+  // Timeout fetch utility
+  const fetchWithTimeout = (url, options = {}, timeout = 5000) => {
+    return Promise.race([
+      fetch(url, options),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), timeout)
+      )
+    ]);
+  };
+
   return {
     debounce,
     isInViewport,
     isMobile,
-    getAnimProps
+    getAnimProps,
+    fetchWithTimeout
   };
 })();
 
@@ -706,6 +717,12 @@ const initializeTabGroup = (group, root = document) => {
     return;
   }
 
+  // Check if this tab group is already initialized
+  const existingInitialized = Array.from(tabs).some(tab => tab.hasAttribute('data-tab-initialized'));
+  if (existingInitialized) {
+    return;
+  }
+
   const contentElements = root.querySelectorAll(
     `[data-tab-element="content"][data-tab-group="${group}"]`
   );
@@ -753,23 +770,38 @@ const initializeTabGroup = (group, root = document) => {
 
   if (tabMode === "highlight") {
     if (isInModal) {
-      document.addEventListener("click", (event) => {
-        const modalOpenBtn = event.target.closest("[data-modal-open]");
-        if (modalOpenBtn) {
-          const modalGroup = modalOpenBtn.getAttribute("data-modal-open");
-          if (parent.closest(`[data-modal-group='${modalGroup}']`)) {
-            setTimeout(() => {
-              // Find the currently active tab for this group
-              const currentActiveTab = Array.from(tabs).find(tab => tab.classList.contains("is-active"));
-              if (currentActiveTab) {
-                positionHighlight(currentActiveTab);
-              } else {
-                positionHighlight(tabs[0]);
-              }
-            }, 50);
+      // Modal-scoped elements (package modal content) use packageModalAnimationComplete
+      if (root !== document) {
+        const handlePackageModalComplete = () => {
+          requestAnimationFrame(() => {
+            const currentTabs = root.querySelectorAll(`[data-tab-element="tab"][data-tab-group="${group}"]`);
+            const currentActiveTab = Array.from(currentTabs).find(tab => tab.classList.contains("is-active"));
+            if (currentActiveTab && highlight && highlight.parentNode) {
+              positionHighlight(currentActiveTab);
+            }
+          });
+        };
+        
+        document.addEventListener('packageModalAnimationComplete', handlePackageModalComplete, { once: true });
+      } else {
+        // Document-level elements (nav modal content) use click-based timing
+        document.addEventListener("click", (event) => {
+          const modalOpenBtn = event.target.closest("[data-modal-open]");
+          if (modalOpenBtn) {
+            const modalGroup = modalOpenBtn.getAttribute("data-modal-open");
+            
+            // Only handle non-package modals (nav, experience, reviews, etc.)
+            if (modalGroup !== 'package' && parent.closest(`[data-modal-group='${modalGroup}']`)) {
+              setTimeout(() => {
+                const currentActiveTab = Array.from(tabs).find(tab => tab.classList.contains("is-active"));
+                if (currentActiveTab && highlight && highlight.parentNode) {
+                  positionHighlight(currentActiveTab);
+                }
+              }, 50);
+            }
           }
-        }
-      });
+        });
+      }
     } else {
       window.addEventListener("load", () => {
         positionHighlight(activeTab);
@@ -806,18 +838,26 @@ const initializeTabGroup = (group, root = document) => {
       });
     });
   });
+
+  // Mark tabs as initialized
+  tabs.forEach(tab => tab.setAttribute('data-tab-initialized', 'true'));
 };
 
-const initializeTabsInScope = (root = document) => {
+// Initialize all tab groups within a scope
+const initializeTabGroupsInScope = (scope = document) => {
   const tabGroups = new Set();
-  root.querySelectorAll('[data-tab-element="tab"]').forEach((tab) => {
-    tabGroups.add(tab.dataset.tabGroup);
+  scope.querySelectorAll('[data-tab-element="tab"]').forEach((tab) => {
+    if (tab.dataset.tabGroup) {
+      tabGroups.add(tab.dataset.tabGroup);
+    }
   });
-  tabGroups.forEach((group) => initializeTabGroup(group, root));
+  
+  tabGroups.forEach((group) => initializeTabGroup(group, scope));
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  initializeTabsInScope();
+  // Initialize tabs using the tab group system
+  initializeTabGroupsInScope();
 });
 
 // Wait for upcoming tab with retries
@@ -1129,20 +1169,7 @@ document.addEventListener("click", function (event) {
   }
 });
 
-// Initialize package accordion
-function initializePackageAccordion() {
-  const accordionHeaders = document.querySelectorAll(
-    ".package_accordion_header"
-  );
-  accordionHeaders.forEach((header) => {
-    header.addEventListener("click", function () {
-      const parentAccordion = header.closest(".package_accordion");
-      if (parentAccordion) {
-        parentAccordion.classList.toggle("is-active");
-      }
-    });
-  });
-}
+
 
 // Open LiveChat when button clicked
 (() => {

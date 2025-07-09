@@ -1,14 +1,5 @@
 const swiperInstances = [];
 
-// Utility debounce function
-const debounce = (func, wait) => {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-};
-
 // Function to adjust swiper parallax values based on screen width
 const adjustSwiperParallax = () => {
   const catCardMediaElements = document.querySelectorAll('.swiper.is-cat-hero .cat_card_media');
@@ -267,7 +258,7 @@ const initializeSwiper = ({
     breakpoints,
     on: {
       init(swiper) {
-        toggleButtonWrapper(swiper);
+        toggleCategoryButtonWrapper(swiper);
         if (comboClass === "is-cat-hero") {
           manageSlideVideos(swiper);
           adjustSwiperParallax();
@@ -306,7 +297,7 @@ const initializeSwiper = ({
       },
       // When the new slide has finished transitioning, set it up for playback.
       slideChangeTransitionEnd(swiper) {
-        toggleButtonWrapper(swiper);
+        toggleCategoryButtonWrapper(swiper);
         if (comboClass === "is-cat-hero") {
           setupActiveSlide(swiper);
           // Ensure autoplay continues after manual interaction
@@ -315,7 +306,7 @@ const initializeSwiper = ({
           }
         }
       },
-      resize: toggleButtonWrapper,
+      resize: toggleCategoryButtonWrapper,
       // Ensure autoplay restarts with the correct (potentially updated) delay
       autoplayStop(swiper) {
         // MODIFIED: Only restart autoplay if it's NOT paused by the ScrollTrigger.
@@ -337,8 +328,8 @@ const initializeSwiper = ({
   return swiper;
 };
 
-// Toggle visibility of navigation buttons based on swiper state
-const toggleButtonWrapper = (swiper) => {
+// Toggle visibility of navigation buttons based on swiper state for category page
+const toggleCategoryButtonWrapper = (swiper) => {
   if (!swiper || !swiper.comboClass) return;
   
   const { comboClass } = swiper;
@@ -355,22 +346,22 @@ const toggleButtonWrapper = (swiper) => {
   }
 };
 
-// Reset button wrappers to default state
-const resetButtonWrappers = () => {
+// Reset button wrappers to default state for category page
+const resetCategoryButtonWrappers = () => {
   const buttonWrappers = document.querySelectorAll("[data-swiper-combo]");
   buttonWrappers.forEach((btnWrap) => {
     btnWrap.style.display = "none";
   });
 };
 
-// Initialize or destroy swipers based on viewport width
-const manageSwipers = () => {
+// Initialize or destroy swipers based on viewport width for category page
+const manageCategorySwipers = () => {
   const isSwiperEnabled = window.innerWidth > 991;
 
   if (isSwiperEnabled) {
     if (swiperInstances.length === 0) {
       // First reset all button wrappers to ensure clean state
-      resetButtonWrappers();
+      resetCategoryButtonWrappers();
       
       // Initialize all swipers
       swiperConfigs.forEach((config) => {
@@ -396,7 +387,7 @@ const manageSwipers = () => {
               const swiper = initializeSwiper(instanceConfig);
               swiperInstances.push(swiper);
               if (swiper && swiper.initialized) {
-                toggleButtonWrapper(swiper);
+                toggleCategoryButtonWrapper(swiper);
               }
             }
           });
@@ -408,7 +399,7 @@ const manageSwipers = () => {
               const swiper = initializeSwiper(config);
               swiperInstances.push(swiper);
               if (swiper && swiper.initialized) {
-                toggleButtonWrapper(swiper);
+                toggleCategoryButtonWrapper(swiper);
               }
             }
           }
@@ -418,12 +409,12 @@ const manageSwipers = () => {
       // Update existing swipers
       swiperInstances.forEach(swiper => {
         if (swiper) {
-          toggleButtonWrapper(swiper);
+          toggleCategoryButtonWrapper(swiper);
         }
       });
     }
   } else {
-    resetButtonWrappers();
+    resetCategoryButtonWrappers();
 
     // Store the hero swiper if it exists before destroying
     let heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
@@ -462,13 +453,13 @@ window.addEventListener("resize", (typeof Utils !== 'undefined' ? Utils.debounce
     clearTimeout(timeout);
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
-})(manageSwipers, 200));
+})(manageCategorySwipers, 200));
 
 // Run parallax adjustment right away
 adjustSwiperParallax();
 
 // Initialize on page load
-manageSwipers();
+manageCategorySwipers();
 
 // Initialize cat-hero swiper immediately regardless of screen size
 document.addEventListener("DOMContentLoaded", () => {
@@ -487,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
           
           // Ensure button wrapper is correctly initialized
           if (newHeroSwiper && newHeroSwiper.initialized) {
-            toggleButtonWrapper(newHeroSwiper);
+            toggleCategoryButtonWrapper(newHeroSwiper);
           }
         }
       }
@@ -496,14 +487,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Update existing hero swiper's button wrapper
     const heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
     if (heroSwiper) {
-      toggleButtonWrapper(heroSwiper);
+      toggleCategoryButtonWrapper(heroSwiper);
     }
   }
   
   // Also update other swipers if they exist
   swiperInstances.forEach(swiper => {
     if (swiper && swiper.comboClass !== "is-cat-hero") {
-      toggleButtonWrapper(swiper);
+      toggleCategoryButtonWrapper(swiper);
     }
   });
   
@@ -649,7 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resizeTimeout = setTimeout(updateContentWrapHeight, 100);
       };
     })()
-  );
+  ); 
   
   window.addEventListener("resize", debouncedResize);
 });
@@ -713,7 +704,7 @@ window.addEventListener('load', () => {
 });
 
 // Swiper Module for category links
-const SwiperModule = (() => {
+const CategoryLinkSwiperModule = (() => {
   let swiper;
 
   function initSwiper() {
@@ -897,7 +888,7 @@ const initDynamicLighting = () => {
   };
 
   updateLightPositions();
-  window.addEventListener('resize', debounce(updateLightPositions, 100));
+  window.addEventListener('resize', Utils.debounce(updateLightPositions, 100));
 };
 
 window.addEventListener('load', initDynamicLighting);
