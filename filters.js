@@ -1,43 +1,199 @@
-// EXPLOR FILTER
+// FINSWEET ATTRIBUTES V2 FILTER - SIMPLIFIED VERSION
 
-// Swiper Module for theme filters
-const ThemeFilterSwiperModule = (() => {
-  let swiper;
+// Initialize immediately without waiting for fsAttributes
+(function() {
+  'use strict';
 
-  function initSwiper() {
-    if (window.innerWidth >= 992) {
-      if (!swiper) {
-        swiper = new Swiper(".form_theme-tab_wrap", {
-          wrapperClass: "form_theme-tab_list",
-          slideClass: "form_theme-tab_item",
-          navigation: {
-            nextEl: '[data-swiper-btn-filter="next"]',
-            prevEl: '[data-swiper-btn-filter="prev"]',
-            disabledClass: "theme_btn_wrap_disabled",
-          },
-          slidesPerView: "auto",
-          slidesPerGroup: 1,
-          watchSlidesProgress: true,
-          resistanceRatio: 0.85,
-          freeMode: true,
-          watchOverflow: true,
-          on: {
-            init: updateSwiperClasses,
-            slideChange: updateSwiperClasses,
-            reachEnd: updateSwiperClasses,
-            reachBeginning: updateSwiperClasses,
-            setTranslate: updateSwiperClasses,
-          },
-        });
+  // State management
+  let activeFilters = {};
+  let isInitialized = false;
+
+
+        
+  // Get active filters from DOM
+  function getActiveFilters() {
+    const filters = {};
+    
+    // Get all filter fields
+    const filterFields = document.querySelectorAll('[fs-list-field]');
+    
+    filterFields.forEach(field => {
+      const category = field.getAttribute('fs-list-field');
+      if (!category) return;
+      
+      const categoryLower = category.toLowerCase();
+        let value = null;
+        
+      if (field.type === 'checkbox' && field.checked) {
+        value = field.getAttribute('fs-list-value') || field.value;
+      } else if (field.type === 'radio' && field.checked) {
+        value = field.getAttribute('fs-list-value') || field.value;
+      } else if (field.tagName === 'SELECT' && field.selectedIndex > 0) {
+        value = field.value;
+      } else if (field.type === 'text' && field.value.trim()) {
+        value = field.value.trim();
+        }
+        
+        if (value && value !== 'Radio' && value !== 'on' && value !== '') {
+        if (!filters[categoryLower]) {
+          filters[categoryLower] = [];
+        }
+        filters[categoryLower].push({
+            originalValue: value,
+          displayValue: categoryLower === "months" ? value.replace(/\s+\d{4}$/, "").trim() : value,
+          });
       }
-    } else {
-      if (swiper) {
-        swiper.destroy(true, true);
-        swiper = undefined;
+    });
+    
+    return filters;
+  }
+
+  // Update active filter display
+  function updateActiveFiltersDisplay() {
+    activeFilters = getActiveFilters();
+    
+    const displayElements = document.querySelectorAll("[data-active-filters]");
+    displayElements.forEach(element => {
+      const filterGroup = element.getAttribute("data-active-filters").toLowerCase();
+      const filterValues = activeFilters[filterGroup] || [];
+
+      const activeFiltersText = filterValues.map(item => item.displayValue).join(", ");
+
+      const defaultText = {
+        area: "Anywhere",
+        months: "Anytime", 
+        category: "Anything",
+      };
+
+      const displayText = activeFiltersText || defaultText[filterGroup] || "";
+      element.textContent = displayText;
+      element.classList.toggle("is-active", filterValues.length > 0);
+    });
+
+    // Update clear buttons
+    const clearButtons = document.querySelectorAll("[data-filter-clear]");
+    clearButtons.forEach(button => {
+      const filterGroup = button.getAttribute("data-filter-clear").toLowerCase();
+      const hasActiveFilters = activeFilters[filterGroup] && activeFilters[filterGroup].length > 0;
+      const isClearFilterBtn = button.getAttribute("data-clear-filter-btn") === "true";
+
+      if (isClearFilterBtn && window.innerWidth <= 991) {
+        button.style.display = "none";
+      } else {
+        button.style.display = hasActiveFilters ? "flex" : "none";
       }
+    });
+
+    // Update clear all button
+    const clearAllButton = document.querySelector('[data-filter-clear-all="true"]');
+    if (clearAllButton) {
+      const hasAnyActiveFilters = ["area", "months", "category", "theme"].some(
+        group => activeFilters[group] && activeFilters[group].length > 0
+      );
+      clearAllButton.classList.toggle("is-active", hasAnyActiveFilters);
     }
   }
 
+     // Update underline position for theme tabs
+   function updateUnderlinePosition() {
+     let checkedRadio = document.querySelector(".form_theme-radio_wrap input:checked");
+     const fillElement = document.querySelector(".form_theme_underline_fill");
+     
+     // Fallback to first radio if none is checked
+     if (!checkedRadio) {
+       const firstRadioWrap = document.querySelector(".form_theme-radio_wrap:first-child");
+       if (firstRadioWrap) {
+         checkedRadio = firstRadioWrap.querySelector('input[type="radio"]');
+       }
+     }
+     
+     if (checkedRadio && fillElement) {
+       // Find the radio wrapper and underline element within it
+       const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
+       const targetUnderline = radioWrap.querySelector('.form_theme-tab_underline');
+       if (!targetUnderline) return;
+       
+       // Get the width of the radio wrapper
+       const radioWrapWidth = radioWrap.offsetWidth;
+       
+       // Use GSAP Flip for smooth animation if available
+       if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
+         // Record the current state
+         const state = Flip.getState(fillElement);
+         
+         // Make DOM changes
+         targetUnderline.appendChild(fillElement);
+         fillElement.style.width = `${radioWrapWidth}px`;
+         
+         // Animate from the previous state
+         Flip.from(state, {
+           duration: window.innerWidth >= 992 ? 0.4 : 0.3,
+           ease: "power1.out"
+         });
+       } else if (typeof gsap !== 'undefined') {
+         // Fallback GSAP animation without Flip
+         gsap.set(fillElement, { clearProps: "all" });
+         targetUnderline.appendChild(fillElement);
+         fillElement.style.width = `${radioWrapWidth}px`;
+       } else {
+         // Fallback without GSAP
+         fillElement.style.transform = '';
+         fillElement.style.transition = 'width 0.3s ease';
+         targetUnderline.appendChild(fillElement);
+         fillElement.style.width = `${radioWrapWidth}px`;
+       }
+     }
+   }
+
+  // Setup event listeners
+  function setupEventListeners() {
+
+    // Filter field changes
+    const filterFields = document.querySelectorAll('[fs-list-field]');
+    filterFields.forEach(field => {
+      if (field.tagName === 'DIV' && !field.type) return;
+      
+      const eventType = field.type === 'text' ? 'input' : 'change';
+      const fieldName = field.getAttribute('fs-list-field');
+      const isThemeFilter = fieldName && fieldName.toLowerCase() === 'theme';
+      
+      field.addEventListener(eventType, Utils.debounce(() => {
+        updateActiveFiltersDisplay();
+      }, 100));
+    });
+
+    // Theme radio changes for underline
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('.form_theme-radio_wrap input[type="radio"]')) {
+        updateUnderlinePosition();
+      }
+    });
+
+    // Resize handler
+    window.addEventListener('resize', Utils.debounce(() => {
+    updateActiveFiltersDisplay();
+      updateUnderlinePosition();
+    }, 100));
+  }
+
+  // Initialize filter row activation
+  function setupFilterRows() {
+    document.addEventListener('click', (e) => {
+      const element = e.target.closest('[data-filter-row], [data-filter-button]');
+      if (!element) return;
+
+      const targetAttribute = element.getAttribute('data-filter-row') || element.getAttribute('data-filter-button');
+      if (targetAttribute) {
+        const activeRow = document.querySelector('[data-filter-row].is-active');
+        if (activeRow) activeRow.classList.remove('is-active');
+
+        const targetRow = document.querySelector(`[data-filter-row="${targetAttribute}"]`);
+        if (targetRow) targetRow.classList.add('is-active');
+      }
+    });
+  }
+
+  // Updates swiper container classes based on nav button states to control their visibility
   function updateSwiperClasses() {
     const swiperContainer = document.querySelector(".form_theme-tab_wrap");
     const nextButton = document.querySelector(
@@ -47,727 +203,99 @@ const ThemeFilterSwiperModule = (() => {
       '[data-swiper-btn-filter="prev"]'
     );
 
+    if (!swiperContainer || !nextButton || !prevButton) return;
+
     swiperContainer.classList.remove("is-next", "is-both", "is-prev");
 
-    if (nextButton.classList.contains("theme_btn_wrap_disabled")) {
-      swiperContainer.classList.add("is-prev");
-    } else if (prevButton.classList.contains("theme_btn_wrap_disabled")) {
-      swiperContainer.classList.add("is-next");
-    } else {
+    const isNextDisabled = nextButton.classList.contains(
+      "theme_btn_wrap_disabled"
+    );
+    const isPrevDisabled = prevButton.classList.contains(
+      "theme_btn_wrap_disabled"
+    );
+
+    if (!isNextDisabled && !isPrevDisabled) {
       swiperContainer.classList.add("is-both");
+    } else if (isNextDisabled && !isPrevDisabled) {
+      swiperContainer.classList.add("is-prev");
+    } else if (isPrevDisabled && !isNextDisabled) {
+      swiperContainer.classList.add("is-next");
     }
   }
 
-  window.addEventListener("load", initSwiper);
-  
-  const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-    let timeout;
-    return function(...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  };
-  
-  window.addEventListener("resize", debounceFn(initSwiper, 100));
+  // Initialize swiper for theme filters
+  function setupSwiper() {
+    if (typeof Swiper === 'undefined' || window.innerWidth < 992) return;
 
-  return {
-    initSwiper,
-    getSwiper: () => swiper,
-  };
-})();
+    const swiperContainer = document.querySelector(".form_theme-tab_wrap");
+    if (!swiperContainer) return;
 
-
-// Underline animation for theme filters
-const UnderlineModule = (() => {
-  const fillElement = document.createElement("div");
-  fillElement.classList.add("form_theme_underline_fill");
-  document.body.appendChild(fillElement);
-
-  const getAnimationDuration = () =>
-    (window.innerWidth || document.documentElement.clientWidth) >= 992
-      ? 0.4
-      : 0.3;
-
-  function updateUnderline(newActiveWrap) {
-    const underline = newActiveWrap.querySelector(".form_theme-tab_underline");
-    if (!underline) return;
-
-    const state = Flip.getState(fillElement);
-    underline.appendChild(fillElement);
-
-    Flip.from(state, {
-      duration: getAnimationDuration(),
-      ease: "power1.out",
-      absolute: true,
-    });
-  }
-
-  document.addEventListener("click", (event) => {
-    const radio = event.target.closest(".form_theme-radio_wrap");
-    if (!radio) return;
-
-    const currentActive = document.querySelector(
-      ".form_theme-radio_wrap.is-active"
-    );
-
-    if (currentActive && currentActive !== radio) {
-      currentActive.classList.remove("is-active");
-    }
-
-    radio.classList.add("is-active");
-    updateUnderline(radio);
-  });
-
-  function initUnderlinePosition() {
-    const initialActive = document.querySelector(
-      ".form_theme-radio_wrap.is-active"
-    );
-    if (initialActive) {
-      updateUnderline(initialActive);
-    } else {
-      const tabList = document.querySelector(".form_theme-tab_list");
-      if (tabList) {
-        const firstTab = tabList.firstElementChild;
-        if (firstTab) {
-          const underline = firstTab.querySelector(".form_theme-tab_underline");
-          if (underline) {
-            underline.appendChild(fillElement);
-          }
-        }
-      }
-    }
-  }
-
-  const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-    let timeout;
-    return function(...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  };
-
-  window.addEventListener(
-    "resize",
-    debounceFn(() => {
-      const currentActive = document.querySelector(
-        ".form_theme-radio_wrap.is-active"
-      );
-      if (currentActive) {
-        updateUnderline(currentActive);
-      }
-    }, 100)
-  );
-
-  document.addEventListener("DOMContentLoaded", initUnderlinePosition);
-
-  return {
-    updateUnderline,
-  };
-})();
-
-// Filter Module for managing active filters and their display
-const FilterModule = (() => {
-  let activeFilters = {};
-  let previousActiveFilters = {};
-
-  function arraysEqual(a1, a2) {
-    if (a1.length !== a2.length) return false;
-    const sortedA1 = [...a1].sort();
-    const sortedA2 = [...a2].sort();
-    return sortedA1.every((value, index) => value === sortedA2[index]);
-  }
-
-  function updateActiveFilters(filterInstance) {
-    activeFilters = {};
-
-    filterInstance.filtersData.forEach((filter) => {
-      const category = filter.originalFilterKeys[0].toLowerCase();
-
-      if (!activeFilters[category]) {
-        activeFilters[category] = [];
-      }
-
-      filter.values.forEach((value) => {
-        activeFilters[category].push({
-          originalValue: value,
-          displayValue:
-            category === "months"
-              ? value.replace(/\s+\d{4}$/, "").trim()
-              : value,
-        });
-      });
-    });
-  }
-
-  function updateActiveFiltersDisplay(filtersElement) {
-    const viewportWidth =
-      window.innerWidth || document.documentElement.clientWidth;
-
-    document
-      .querySelectorAll("[data-active-filters]")
-      .forEach((element) => {
-        const filterGroup = element
-          .getAttribute("data-active-filters")
-          .toLowerCase();
-        const filterValues = activeFilters[filterGroup] || [];
-
-        const activeFiltersText = filterValues
-          .map((item) => item.displayValue)
-          .join(", ");
-
-        const defaultText = {
-          area: "Anywhere",
-          months: "Anytime",
-          category: "Anything",
-        };
-
-        element.textContent =
-          activeFiltersText || defaultText[filterGroup] || "";
-
-        element.classList.toggle("is-active", filterValues.length > 0);
-      });
-
-    document.querySelectorAll("[data-filter-clear]").forEach((button) => {
-      const filterGroup = button
-        .getAttribute("data-filter-clear")
-        .toLowerCase();
-      const hasActiveFilters =
-        activeFilters[filterGroup] && activeFilters[filterGroup].length > 0;
-
-      const isClearFilterBtn =
-        button.getAttribute("data-clear-filter-btn") === "true";
-
-      if (isClearFilterBtn && viewportWidth <= 991) {
-        button.style.display = "none";
-      } else {
-        button.style.display = hasActiveFilters ? "flex" : "none";
+    const swiper = new Swiper(".form_theme-tab_wrap", {
+      wrapperClass: "form_theme-tab_list",
+      slideClass: "form_theme-tab_item",
+      navigation: {
+        nextEl: '[data-swiper-btn-filter="next"]',
+        prevEl: '[data-swiper-btn-filter="prev"]',
+        disabledClass: "theme_btn_wrap_disabled",
+      },
+      slidesPerView: "auto",
+      slidesPerGroup: 1,
+      watchSlidesProgress: true,
+      resistanceRatio: 0.85,
+      freeMode: true,
+      watchOverflow: true,
+      on: {
+        init: updateSwiperClasses,
+        navigationNext: updateSwiperClasses,
+        navigationPrev: updateSwiperClasses,
+        transitionEnd: updateSwiperClasses,
+        reachBeginning: updateSwiperClasses,
+        reachEnd: updateSwiperClasses,
       }
     });
 
-    const clearAllButton = document.querySelector(
-      '[data-filter-clear-all="true"]'
-    );
-
-    if (clearAllButton) {
-      const hasAnyActiveFilters = ["area", "months", "category"].some(
-        (group) => activeFilters[group] && activeFilters[group].length > 0
-      );
-
-      clearAllButton.classList.toggle("is-active", hasAnyActiveFilters);
-    }
+    window.addEventListener('resize', Utils.debounce(() => {
+      if (window.innerWidth < 992 && swiper) {
+        swiper.destroy(true, true);
+      }
+    }, 100));
   }
 
-  async function resetSelectedFilters(filterInstance, filtersElement) {
-    const promises = [
-      filterInstance.resetFilters(["area"]),
-      filterInstance.resetFilters(["months"]),
-      filterInstance.resetFilters(["category"]),
-    ];
-
-    const themeFilter = filterInstance.filtersData.find(
-      (filter) => filter.originalFilterKeys[0].toLowerCase() === "theme"
-    );
-
-    if (themeFilter) {
-      const isAllExperiencesActive = themeFilter.values.has("All Experiences");
-
-      if (!isAllExperiencesActive) {
-        const allExperiencesElement = themeFilter.elements.find(
-          (element) => element.value === "All Experiences"
-        );
-
-        if (allExperiencesElement) {
-          allExperiencesElement.element.checked = true;
-          const radioWrap = allExperiencesElement.element.closest(
-            ".form_theme-radio_wrap"
-          );
-          if (radioWrap) {
-            radioWrap.classList.add("is-active");
-            document
-              .querySelectorAll(".form_theme-radio_wrap.is-active")
-              .forEach((wrap) => {
-                if (wrap !== radioWrap) {
-                  wrap.classList.remove("is-active");
-                }
-              });
-            UnderlineModule.updateUnderline(radioWrap);
-          }
-
-          await filterInstance.storeFiltersData();
-          await filterInstance.applyFilters();
-        }
-      } else {
-        const allExperiencesElement = themeFilter.elements.find(
-          (element) => element.value === "All Experiences"
-        );
-        if (allExperiencesElement) {
-          const radioWrap = allExperiencesElement.element.closest(
-            ".form_theme-radio_wrap"
-          );
-          if (radioWrap) {
-            radioWrap.classList.add("is-active");
-            UnderlineModule.updateUnderline(radioWrap);
-          }
-        }
-      }
-    }
-
-    await Promise.all(promises);
-    updateActiveFilters(filterInstance);
-    updateActiveFiltersDisplay(filtersElement);
-
-    const viewportWidth =
-      window.innerWidth || document.documentElement.clientWidth;
-
-    if (viewportWidth >= 992) {
-              const swiper = ThemeFilterSwiperModule.getSwiper();
-      if (swiper) {
-        swiper.slideTo(0);
-      }
-    } else {
-      const tabList = document.querySelector(".form_theme-tab_list");
-      if (tabList) {
-        tabList.scrollLeft = 0;
-      }
-    }
-  }
-
-  async function checkAndSetThemeToAllExperiences(
-    filterInstance,
-    filtersElement
-  ) {
-    const hasActiveFilters = ["area", "months", "category"].some(
-      (group) => activeFilters[group] && activeFilters[group].length > 0
-    );
-
-    if (hasActiveFilters) {
-      const themeFilter = filterInstance.filtersData.find(
-        (filter) => filter.originalFilterKeys[0].toLowerCase() === "theme"
-      );
-
-      if (themeFilter) {
-        const isAllExperiencesActive =
-          themeFilter.values.has("All Experiences");
-
-        if (!isAllExperiencesActive) {
-          const allExperiencesElement = themeFilter.elements.find(
-            (element) => element.value === "All Experiences"
-          );
-
-          if (allExperiencesElement) {
-            allExperiencesElement.element.checked = true;
-            const radioWrap = allExperiencesElement.element.closest(
-              ".form_theme-radio_wrap"
-            );
-            if (radioWrap) {
-              radioWrap.classList.add("is-active");
-              document
-                .querySelectorAll(".form_theme-radio_wrap.is-active")
-                .forEach((wrap) => {
-                  if (wrap !== radioWrap) {
-                    wrap.classList.remove("is-active");
-                  }
-                });
-              UnderlineModule.updateUnderline(radioWrap);
-            }
-
-            await filterInstance.storeFiltersData();
-            await filterInstance.applyFilters();
-            updateActiveFilters(filterInstance);
-            updateActiveFiltersDisplay(filtersElement);
-
-            const viewportWidth =
-              window.innerWidth || document.documentElement.clientWidth;
-
-            if (viewportWidth >= 992) {
-              const swiper = ThemeFilterSwiperModule.getSwiper();
-              if (swiper) {
-                swiper.slideTo(0);
-              }
-            } else {
-              const tabList = document.querySelector(".form_theme-tab_list");
-              if (tabList) {
-                tabList.scrollLeft = 0;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  function onFiltersUpdate(filterInstance, filtersElement) {
-    const prevFilters = {};
-    ["area", "months", "category"].forEach((group) => {
-      prevFilters[group] = (previousActiveFilters[group] || []).map(
-        (item) => item.originalValue
-      );
-    });
-
-    updateActiveFilters(filterInstance);
-    updateActiveFiltersDisplay(filtersElement);
-
-    const filtersChanged = ["area", "months", "category"].some((group) => {
-      const prevValues = prevFilters[group] || [];
-      const currentValues = (activeFilters[group] || []).map(
-        (item) => item.originalValue
-      );
-      return !arraysEqual(prevValues, currentValues);
-    });
-
-    if (filtersChanged) {
-      checkAndSetThemeToAllExperiences(filterInstance, filtersElement);
-    }
-
-    previousActiveFilters = {};
-    Object.keys(activeFilters).forEach((group) => {
-      previousActiveFilters[group] = activeFilters[group].map((item) => ({
-        ...item,
-      }));
-    });
-  }
-
-  function setupClearButtons(filterInstance, filtersElement) {
-    const clearAllButton = document.querySelector(
-      '[data-filter-clear-all="true"]'
-    );
-    if (clearAllButton) {
-      clearAllButton.addEventListener("click", () =>
-        resetSelectedFilters(filterInstance, filtersElement)
-      );
-    }
-
-    // Add click handlers for individual filter clear buttons
-    document.querySelectorAll("[data-filter-clear]").forEach((button) => {
-      button.addEventListener("click", async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+  // Initialize everything
+  function init() {
+    if (isInitialized) return;
         
-        const filterGroup = button.getAttribute("data-filter-clear").toLowerCase();
-        
-        if (filterGroup && filterInstance) {
-          await filterInstance.resetFilters([filterGroup]);
-          updateActiveFilters(filterInstance);
-          updateActiveFiltersDisplay(filtersElement);
-        }
-      });
-    });
-  }
-
-  function init(filterInstances) {
-    const targetFilterInstance = filterInstances.find((instance) => {
-      const listElement = instance.listInstance.list;
-      return (
-        listElement &&
-        listElement.getAttribute("fs-cmsfilter-element") === "list-2"
-      );
-    });
-
-    if (!targetFilterInstance) {
-      console.error(
-        'Filter instance with [fs-cmsfilter-element="list-2"] not found.'
-      );
+    // Check for required elements
+    const listElement = document.querySelector('[fs-list-element="list"]');
+    const filtersElement = document.querySelector('[fs-list-element="filters"]');
+    
+    if (!listElement || !filtersElement) {
       return;
     }
-
-    const filtersElement = document.querySelector(
-      '[fs-cmsfilter-element="filters-2"]'
-    );
-    if (!filtersElement) {
-      console.error(
-        'Filters element with [fs-cmsfilter-element="filters-2"] not found.'
-      );
-      return;
-    }
-
-    document.addEventListener("click", (event) => {
-      const clearAllButton = event.target.closest(
-        '[data-filter-empty-clear-all="true"]'
-      );
-      if (clearAllButton) {
-        const existingClearAllButton = document.querySelector(
-          '[data-filter-clear-all="true"]'
-        );
-        if (existingClearAllButton) {
-          existingClearAllButton.click();
-        }
-      }
-    });
-
-    updateActiveFilters(targetFilterInstance);
-    updateActiveFiltersDisplay(filtersElement);
-    setupClearButtons(targetFilterInstance, filtersElement);
-
-    targetFilterInstance.listInstance.on("renderitems", () => {
-      onFiltersUpdate(targetFilterInstance, filtersElement);
-    });
-
-    const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-      let timeout;
-      return function(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-      };
-    };
-
-    window.addEventListener(
-      "resize",
-      debounceFn(() => {
-        updateActiveFiltersDisplay(filtersElement);
-      }, 100)
-    );
+    
+    // Setup all functionality
+    setupEventListeners();
+    setupFilterRows();
+    setupSwiper();
+    updateUnderlinePosition();
+    updateActiveFiltersDisplay();
+    
+    isInitialized = true;
   }
 
-  return {
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Expose for debugging
+  window.FilterSystem = {
     init,
-  };
-})();
-
-// Initialize FilterModule with the filter instances
-window.fsAttributes = window.fsAttributes || [];
-window.fsAttributes.push([
-  "cmsfilter",
-  (filterInstances) => {
-    FilterModule.init(filterInstances);
-  },
-]);
-
-// ScrollTrigger Module for handling scroll-based effects
-const ScrollTriggerModule = (() => {
-
-  // Use the global NavScrollTrigger if available
-  if (typeof window.NavScrollTrigger === 'undefined') {
-    
-    const navbar = document.querySelector(".nav_main_contain");
-    const navbarHeight = navbar ? navbar.offsetHeight : 0;
-
-    const mmSecond = gsap.matchMedia();
-
-    mmSecond.add("(min-width: 480px) and (max-width: 1215px)", () => {
-      ScrollTrigger.create({
-        trigger: ".page_main",
-        start: `top+=${navbarHeight}px top`,
-        onEnter: () => {
-          gsap.to(".nav_main_contain", {
-            yPercent: -100,
-            duration: 0.7,
-            ease: "power2.out",
-          });
-        },
-        onLeaveBack: () => {
-          gsap.to(".nav_main_contain", {
-            yPercent: 0,
-            duration: 0.3,
-            ease: "power2.out",
-          });
-        },
-      });
-    });
-
-    mmSecond.add("(min-width: 1215px)", () => {
-      ScrollTrigger.create({
-        trigger: ".page_main",
-        start: `top+=5px top`,
-        onEnter: () => {
-          gsap.to(".nav_main_link_wrap", {
-            opacity: 0,
-            pointerEvents: "none",
-            duration: 0.2,
-            ease: "power2.out",
-          });
-        },
-        onLeaveBack: () => {
-          gsap.to(".nav_main_link_wrap", {
-            opacity: 1,
-            pointerEvents: "auto",
-            duration: 0.1,
-            ease: "power2.out",
-          });
-        },
-      });
-    });
-  }
-
-
-  // Theme sticky styling
-  gsap.matchMedia().add("(min-width: 480px)", () => {
-    
-    ScrollTrigger.create({
-      trigger: ".form_theme_wrap",
-      start: "top +1px",
-      toggleActions: "play none reverse none",
-      onEnter: () => {
-        gsap.set(".form_theme_underline", { opacity: 1 });
-      },
-      onLeaveBack: () => {
-        gsap.set(".form_theme_underline", { opacity: 0 });
-      },
-    });
-
-    // Theme wrap max-width animation
-    ScrollTrigger.create({
-      trigger: ".form_theme_wrap",
-      start: "top +1px",
-      toggleActions: "play none reverse none",
-      onEnter: () => {
-        gsap.to(".theme_wrap", { 
-          maxWidth: "100%", 
-          duration: 0.7, 
-          ease: "power4.out" 
-        });
-      },
-      onLeaveBack: () => {
-        gsap.to(".theme_wrap", { 
-          maxWidth: "95rem", 
-          duration: 0.5, 
-          ease: "power4.out" 
-        });
-      },
-    });
-    
-    return () => {
-      // Cleanup when context is invalidated
-    };
-  });
-
-})();
-
-// Handle filter section scrolling
-const ScrollAnchorModule = (() => {
-  document.addEventListener("DOMContentLoaded", () => {
-    const filterElements = document.querySelectorAll(
-      ".form_theme-radio_wrap, .form_filter-check_wrap"
-    );
-
-    const debounceFn = typeof Utils !== 'undefined' ? Utils.debounce : function(func, delay) {
-      let timer;
-      return function(...args) {
-        clearTimeout(timer);
-        timer = setTimeout(() => func.apply(this, args), delay);
-      };
-    };
-
-    const handleFilterClick = debounceFn(function() {
-      const target = document.querySelector(".form_theme_wrap");
-      if (!target) return;
-      const targetPosition =
-        target.getBoundingClientRect().top + window.scrollY + 12; // 0.75rem = 12px
-      if (Math.abs(window.scrollY - targetPosition) > 10) {
-        window.scrollTo({ 
-          top: targetPosition, 
-          behavior: "smooth" 
-        });
-      }
-    }, 100);
-
-    document.addEventListener("click", (event) => {
-      const element = event.target.closest(
-        ".form_theme-radio_wrap, .form_filter-check_wrap"
-      );
-      if (!element) return;
-      handleFilterClick();
-    });
-  });
-})();
-
-// Handle filter row activation
-const FilterRowsModule = (() => {
-  function activateFilter(targetAttribute) {
-    const activeRow = document.querySelector("[data-filter-row].is-active");
-    if (activeRow) {
-      activeRow.classList.remove("is-active");
-    }
-
-    const targetRow = document.querySelector(
-      `[data-filter-row="${targetAttribute}"]`
-    );
-    if (targetRow) {
-      targetRow.classList.add("is-active");
-    }
-  }
-
-  document.addEventListener("click", (event) => {
-    const element = event.target.closest(
-      "[data-filter-row], [data-filter-button]"
-    );
-    if (!element) return;
-
-    const targetAttribute =
-      element.getAttribute("data-filter-row") ||
-      element.getAttribute("data-filter-button");
-    if (targetAttribute) {
-      activateFilter(targetAttribute);
-    }
-  });
-})();
-
-// Prevent click propagation on clear filter buttons
-document.querySelectorAll('[data-clear-filter-btn="true"]').forEach((btn) => {
-  btn.addEventListener("click", (event) => {
-    event.stopPropagation();
-  });
-});
-
-// Toggle visibility based on results count
-const resultsCount = document.querySelector(
-  '[fs-cmsfilter-element="results-count-2"]'
-);
-const filterCount = document.querySelector(".filter_main_list_count");
-const pagination = document.querySelector(".filter_main_list_pagination");
-
-if (resultsCount && filterCount && pagination) {
-  const toggleVisibility = () => {
-    const isHidden = resultsCount.textContent.trim() === "0";
-    filterCount.classList.toggle("is-hidden", isHidden);
-    pagination.classList.toggle("is-hidden", isHidden);
+    updateActiveFiltersDisplay,
+    updateUnderlinePosition,
+    getActiveFilters: () => activeFilters
   };
 
-  const observer = new MutationObserver(toggleVisibility);
-  observer.observe(resultsCount, { childList: true });
-
-  toggleVisibility();
-}
-
-
-
-
-const initHomeScrollEffects = () => {
-  const filterMediaMatcher = gsap.matchMedia();
-
-  filterMediaMatcher.add("(min-width: 768px)", () => {
-    gsap.set(".home_bg_img_wrap > *", { opacity: 0});
-    
-    setTimeout(() => {
-      ScrollTrigger.create({
-        trigger: ".filter_main_sticky",
-        start: "top top+=30",
-        onEnter: () => {
-          gsap.killTweensOf(".home_bg_img_wrap > *");
-          gsap.to(".home_bg_img_wrap > *", {
-            opacity: 0.3,
-            duration: 1.5, 
-            ease: "power1.out",
-            stagger: 0.2
-          });
-        },
-        onLeaveBack: () => {
-          gsap.killTweensOf(".home_bg_img_wrap > *");
-          gsap.to(".home_bg_img_wrap > *", {
-            opacity: 0,
-            duration: 0.8, 
-            ease: "power1.out"
-          });
-        }
-      });
-    }, 100);
-
-    return () => {};
-  });
-};
-
-document.addEventListener("DOMContentLoaded", initHomeScrollEffects);
-
-window.BackgroundAnimations = {
-  init: initHomeScrollEffects
-};
-
+})();

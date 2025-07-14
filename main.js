@@ -153,42 +153,6 @@ lenis.on("scroll", ScrollTrigger.update);
 gsap.ticker.add((time) => lenis.raf(time * 1000));
 gsap.ticker.lagSmoothing(0);
 
-// Initialize Finsweet Attributes
-document.addEventListener("DOMContentLoaded", function () {
-  window.fsAttributes = window.fsAttributes || [];
-  
-  window.fsAttributes.push([
-    "cmsload",
-    (listInstances) => {
-      const packageLoadInstance = listInstances.find(instance => 
-        instance.el && instance.el.getAttribute('fs-cmsload-element') === 'list-2'
-      );
-      
-      if (packageLoadInstance) {
-        packageLoadInstance.on('renderitems', (renderedItems) => {
-          const newPackageCards = [];
-          renderedItems.forEach(item => {
-            const packageCards = item.querySelectorAll('.packages_card');
-            if (packageCards.length) {
-              packageCards.forEach(card => newPackageCards.push(card));
-            }
-          });
-          
-          if (typeof attachPackageCardHandlers === 'function' && newPackageCards.length > 0) {
-            attachPackageCardHandlers(newPackageCards);
-          }
-        });
-      }
-    }
-  ]);
-  
-  window.fsAttributes.push([
-    "cmsnest",
-    (listInstances) => {
-      window.fsAttributes.cmsfilter.init();
-    },
-  ]);
-});
 
 // Initialize form field counters
 const initializeCountersInScope = (scope = document) => {
@@ -1258,114 +1222,6 @@ window.NavScrollTrigger = (() => {
   };
 })();
 
-// CMS Filter Feature Toggle Manager
-const CMSFilterManager = (() => {
-  // Core state references
-  let filterInstance = null;
-  let lastFiltersActive = false;
-  
-  // Element selectors
-  const SELECTORS = {
-    featuredCheckbox: 'input[data-name="Featured Checkbox"]',
-    searchInput: '[fs-cmsfilter-field="name, category, competition, destination"]',
-    categorySelect: '[fs-cmsfilter-field="category"]'
-  };
-
-  // Initializes filter toggle functionality with Finsweet CMS Filter
-  const setupFeaturedFilterToggle = (filterInstances) => {
-    filterInstance = filterInstances[0];
-    if (!filterInstance) {
-      return;
-    }
-    
-    const featuredCheckbox = document.querySelector(SELECTORS.featuredCheckbox);
-    if (!featuredCheckbox) {
-      return;
-    }
-    
-    const debouncedUpdate = Utils.debounce(() => updateFeaturedFilter(featuredCheckbox), 50);
-    
-    // Set up all required event listeners
-    filterInstance.listInstance.on('renderitems', debouncedUpdate);
-    filterInstance.listInstance.on('change', debouncedUpdate);
-    
-    const searchInput = document.querySelector(SELECTORS.searchInput);
-    const categorySelect = document.querySelector(SELECTORS.categorySelect);
-    
-    if (searchInput) searchInput.addEventListener('input', debouncedUpdate);
-    if (categorySelect) categorySelect.addEventListener('change', debouncedUpdate);
-    
-    updateFeaturedFilter(featuredCheckbox);
-  };
-  
-  // Updates featured filter state based on other active filters
-  const updateFeaturedFilter = (checkbox) => {
-    if (!filterInstance || !checkbox) {
-      return;
-    }
-    
-    const hasActiveFilters = isAnyFilterActive();
-    
-    if (hasActiveFilters !== lastFiltersActive) {
-      const shouldBeChecked = !hasActiveFilters;
-      
-      if (checkbox.checked !== shouldBeChecked) {
-        simulateClick(checkbox);
-      }
-      
-      lastFiltersActive = hasActiveFilters;
-    }
-  };
-  
-  // Checks if any non-featured filters are currently active
-  const isAnyFilterActive = () => {
-    const hasActiveFilterValues = filterInstance.filtersData.some(filter => 
-      !filter.originalFilterKeys.includes('featured') && 
-      filter.values?.length > 0
-    );
-    
-    if (hasActiveFilterValues) {
-      return true;
-    }
-    
-    const searchInput = document.querySelector(SELECTORS.searchInput);
-    const categorySelect = document.querySelector(SELECTORS.categorySelect);
-    
-    const result = (searchInput && searchInput.value.trim() !== '') || 
-           (categorySelect && categorySelect.value !== '');
-    return result;
-  };
-  
-  // Simulates a mouse click on the specified element
-  const simulateClick = (element) => {
-    if (!element) {
-      return;
-    }
-    
-    try {
-      element.dispatchEvent(new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: true
-      }));
-    } catch (error) {
-      const evt = document.createEvent('MouseEvents');
-      evt.initMouseEvent('click', true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-      element.dispatchEvent(evt);
-    }
-  };
-  
-  return {
-    init: () => {
-      window.fsAttributes = window.fsAttributes || [];
-      window.fsAttributes.push(['cmsfilter', setupFeaturedFilterToggle]);
-    }
-  };
-})();
-
-// Initialize the CMS Filter Manager
-document.addEventListener('DOMContentLoaded', CMSFilterManager.init);
-
 
 // Set review score to one decimal place
 
@@ -1544,11 +1400,6 @@ const ExperienceCardVideoManager = (() => {
     init: () => {
       document.addEventListener('DOMContentLoaded', initializeVideoInteractions);
       window.addEventListener('resize', handleResize);
-      if (window.fsAttributes) {
-        window.fsAttributes.push(["cmsload", (listInstances) => {
-          listInstances.forEach(instance => instance.on('renderitems', () => setTimeout(initializeVideoInteractions, 100)));
-        }]);
-      }
     },
     reinitialize: initializeVideoInteractions,
     cleanup: cleanup
@@ -1557,3 +1408,130 @@ const ExperienceCardVideoManager = (() => {
 
 // Initialize the manager
 ExperienceCardVideoManager.init();
+
+
+// Static Border Glow Effect for Fixture Cards
+
+const initDynamicLighting = () => {
+  const svgFilterContainer = document.querySelector('.g_fixture_filter');
+  const filterTemplate = document.getElementById('lighting');
+
+  if (!svgFilterContainer || !filterTemplate) {
+    console.error('SVG filter template or container not found.');
+    return;
+  }
+
+  const lightWraps = document.querySelectorAll('[data-light-wrap]');
+  const lightFixtures = [];
+
+  lightWraps.forEach((wrap, index) => {
+    const light1Element = wrap.querySelector('[data-light="light1"]');
+    const light2Element = wrap.querySelector('[data-light="light2"]');
+    const color1 = light1Element ? light1Element.getAttribute('data-light-color') : 'transparent';
+    const color2 = light2Element ? light2Element.getAttribute('data-light-color') : 'transparent';
+
+    const newFilter = filterTemplate.cloneNode(true);
+    const uniqueId = `lighting-instance-${index}`;
+    newFilter.id = uniqueId;
+
+    const newLight1 = newFilter.querySelector('#light1');
+    const newLight2 = newFilter.querySelector('#light2');
+
+    if (newLight1) newLight1.setAttribute('lighting-color', color1);
+    if (newLight2) newLight2.setAttribute('lighting-color', color2);
+
+    svgFilterContainer.appendChild(newFilter);
+    wrap.style.setProperty('--dynamic-filter-url', `url(#${uniqueId})`);
+
+    lightFixtures.push({
+      wrap,
+      light1Element,
+      light2Element,
+      pointLight1: newFilter.querySelector('#light1 fePointLight'),
+      pointLight2: newFilter.querySelector('#light2 fePointLight'),
+    });
+  });
+
+  const updateLightPositions = () => {
+    lightFixtures.forEach(({ wrap, light1Element, light2Element, pointLight1, pointLight2 }) => {
+      const wrapRect = wrap.getBoundingClientRect();
+
+      if (pointLight1 && light1Element) {
+        const light1ElementRect = light1Element.getBoundingClientRect();
+        const light1CenterX = light1ElementRect.left + light1ElementRect.width / 2;
+        const light1CenterY = light1ElementRect.top + light1ElementRect.height / 2;
+        const relativeX = light1CenterX - wrapRect.left;
+        const relativeY = light1CenterY - wrapRect.top;
+        pointLight1.setAttribute('x', relativeX);
+        pointLight1.setAttribute('y', relativeY);
+      }
+
+      if (pointLight2 && light2Element) {
+        const light2ElementRect = light2Element.getBoundingClientRect();
+        const light2CenterX = light2ElementRect.left + light2ElementRect.width / 2;
+        const light2CenterY = light2ElementRect.top + light2ElementRect.height / 2;
+        const relativeX = light2CenterX - wrapRect.left;
+        const relativeY = light2CenterY - wrapRect.top;
+        pointLight2.setAttribute('x', relativeX);
+        pointLight2.setAttribute('y', relativeY);
+      }
+    });
+  };
+
+  updateLightPositions();
+  window.addEventListener('resize', Utils.debounce(updateLightPositions, 100));
+};
+
+window.addEventListener('load', initDynamicLighting);
+
+
+// TOGGLE EXP CARD PACKAGES ACCORDION
+
+document.addEventListener('click', function(event) {
+  // Find the closest ancestor button with the target attribute
+  const toggleButton = event.target.closest('[data-packages-btn-toggle]');
+
+  // If a toggle button was clicked
+  if (toggleButton) {
+    // Find the main card container for this button
+    const cardWrapper = toggleButton.closest('.exp_card_wrap');
+    
+    // If a card wrapper is found, find the accordion content within it
+    if (cardWrapper) {
+      const content = cardWrapper.querySelector('.exp_card_accordion_content');
+      
+      // If the content container is found, toggle the visibility class
+      if (content) {
+        content.classList.toggle('is-hidden');
+      }
+    }
+  }
+});
+
+
+// SET EXP CARD PACKAGES IMAGE
+document.addEventListener('DOMContentLoaded', function() {
+  // Select all card components on the page
+  const allCards = document.querySelectorAll('.exp_card_wrap');
+
+  // Iterate over each card component
+  allCards.forEach(card => {
+    // Find the first package image within the current card
+    const sourceImage = card.querySelector('.exp_packages_img');
+
+    // If no package image exists in this card, skip to the next one
+    if (!sourceImage) {
+      return;
+    }
+
+    // Find all target image elements where the src will be placed
+    const targetImages = card.querySelectorAll('.exp_card_header_btn_img_wrap.is-1 .exp_card_header_btn_img');
+
+    // If any target images are found, loop through them and update their src
+    if (targetImages.length > 0) {
+      targetImages.forEach(targetImage => {
+        targetImage.src = sourceImage.src;
+      });
+    }
+  });
+});
