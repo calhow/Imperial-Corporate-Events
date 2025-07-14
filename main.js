@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => initializeCountersInScope())
 
 // MODAL ANIMATION
 const modalStates = {}; // Tracks state for each modal group
+window.modalStates = modalStates; // Expose to window for other modules
 const autoplayVideos = new WeakSet(); // Tracks videos that were autoplaying
 
 function updateLiveChatVisibility() {
@@ -374,6 +375,11 @@ document.addEventListener("click", (event) => {
         modalStates[modalGroup] = false;
         handleVideosOnModalClose(modalGroup);
         updateLiveChatVisibility();
+        
+        // Update filter display when filter modal closes
+        if (modalGroup === 'filter' && typeof window.FilterSystem !== 'undefined') {
+          window.FilterSystem.updateActiveFiltersDisplay();
+        }
       }
       
       // Always clear filter
@@ -386,6 +392,11 @@ document.addEventListener("click", (event) => {
 
   if (isOpening) {
     modalStates[modalGroup] = true;
+    
+    // Update filter display when filter modal opens
+    if (modalGroup === 'filter' && typeof window.FilterSystem !== 'undefined') {
+      window.FilterSystem.updateActiveFiltersDisplay();
+    }
     
     modalTl
       .set(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`, {

@@ -75,13 +75,8 @@
     clearButtons.forEach(button => {
       const filterGroup = button.getAttribute("data-filter-clear").toLowerCase();
       const hasActiveFilters = activeFilters[filterGroup] && activeFilters[filterGroup].length > 0;
-      const isClearFilterBtn = button.getAttribute("data-clear-filter-btn") === "true";
-
-      if (isClearFilterBtn && window.innerWidth <= 991) {
-        button.style.display = "none";
-      } else {
-        button.style.display = hasActiveFilters ? "flex" : "none";
-      }
+      
+      button.style.display = hasActiveFilters ? "flex" : "none";
     });
 
     // Update clear all button
@@ -91,6 +86,17 @@
         group => activeFilters[group] && activeFilters[group].length > 0
       );
       clearAllButton.classList.toggle("is-active", hasAnyActiveFilters);
+    }
+
+    // Update mobile clear wrap
+    const mobileClearWrap = document.querySelector('[data-filter-mobile-clear-wrap]');
+    if (mobileClearWrap) {
+      const hasAnyActiveFilters = ["area", "months", "category"].some(
+        group => activeFilters[group] && activeFilters[group].length > 0
+      );
+      const isMobile = window.innerWidth <= 991;
+      const isFilterModalOpen = window.modalStates && window.modalStates['filter'];
+      mobileClearWrap.style.display = (hasAnyActiveFilters && isMobile && !isFilterModalOpen) ? "flex" : "none";
     }
   }
 
@@ -166,6 +172,18 @@
     document.addEventListener('change', (e) => {
       if (e.target.matches('.form_theme-radio_wrap input[type="radio"]')) {
         updateUnderlinePosition();
+      }
+    });
+
+    // External clear all buttons
+    document.addEventListener('click', (e) => {
+      if (e.target.matches('[data-filter-empty-clear-all="true"], [data-filter-mobile-clear-all="true"]') || 
+          e.target.closest('[data-filter-empty-clear-all="true"], [data-filter-mobile-clear-all="true"]')) {
+        
+        const clearButton = document.querySelector('[fs-list-element="clear"][data-filter-clear-all="true"]');
+        if (clearButton) {
+          clearButton.click();
+        }
       }
     });
 
