@@ -1669,3 +1669,202 @@ if (packageModalTarget) {
     characterData: false
   });
 } 
+
+// Packages Swiper Management System - Standalone
+const PackagesSwiperManager = (() => {
+  let swiperInstances = [];
+  
+  // Toggle visibility of navigation buttons based on swiper state
+  const toggleButtonWrapper = (swiper) => {
+    if (!swiper || !swiper.comboClass) return;
+    
+    const { comboClass } = swiper;
+    const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
+    
+    if (!btnWrap) return;
+    
+    // Determine the correct display value
+    const displayValue = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
+    
+    // Only update if needed to avoid unnecessary repaints
+    if (btnWrap.style.display !== displayValue) {
+      btnWrap.style.display = displayValue;
+    }
+  };
+
+  // Initialize swiper with navigation and event handlers
+  const initializeSwiper = (config) => {
+    const {
+      selector,
+      comboClass,
+      slidesPerView,
+      breakpoints,
+      parallax,
+      speed,
+      autoplay,
+      pagination,
+    } = config;
+    
+    // Pre-initialize the button wrapper before Swiper is created
+    const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
+    if (btnWrap) {
+      // Ensure it's visible during initialization
+      btnWrap.style.display = "flex";
+    }
+    
+    const swiperConfig = {
+      speed: speed || 500,
+      slidesPerView,
+      spaceBetween: 0,
+      parallax,
+      autoplay,
+      navigation: {
+        nextEl: `[data-swiper-button-next="${comboClass}"]`,
+        prevEl: `[data-swiper-button-prev="${comboClass}"]`,
+      },
+      breakpoints,
+      on: {
+        init(swiper) {
+          toggleButtonWrapper(swiper);
+        },
+        slideChangeTransitionEnd(swiper) {
+          toggleButtonWrapper(swiper);
+        },
+        resize: toggleButtonWrapper,
+      },
+    };
+    
+    // Only add pagination if it exists
+    if (pagination) {
+      swiperConfig.pagination = pagination;
+    }
+    
+    const swiper = new Swiper(selector, swiperConfig);
+    swiper.comboClass = comboClass;
+    return swiper;
+  };
+
+  // Reset button wrappers to default state
+  const resetButtonWrappers = () => {
+    const buttonWrappers = document.querySelectorAll('[data-swiper-combo*="is-packages"]');
+    buttonWrappers.forEach((btnWrap) => {
+      btnWrap.style.display = "none";
+    });
+  };
+
+  // Initialize or destroy swipers based on viewport width
+  const managePackagesSwipers = () => {
+    const isSwiperEnabled = window.innerWidth > 991;
+
+    if (isSwiperEnabled) {
+      if (swiperInstances.length === 0) {
+        // First reset all button wrappers to ensure clean state
+        resetButtonWrappers();
+        
+        // Handle multiple .is-packages instances per page
+        const packageSwipers = document.querySelectorAll(".swiper.is-packages");
+        packageSwipers.forEach((swiperContainer) => {
+          const slides = swiperContainer.querySelectorAll(".swiper-slide");
+          if (slides.length > 0) {
+            // Use a unique comboClass for each instance to support multiple navs
+            const uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
+            swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
+            
+            // Update nav button wrappers for this instance
+            const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
+            if (btnWrap) btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
+            
+            // Update nav buttons for this instance
+            const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
+            const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
+            if (nextBtn) nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
+            if (prevBtn) prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
+            
+            // Create config for this instance
+            const instanceConfig = {
+              selector: `[data-swiper-unique='${uniqueCombo}']`,
+              comboClass: uniqueCombo,
+              slidesPerView: "auto",
+            };
+            
+            const swiper = initializeSwiper(instanceConfig);
+            swiperInstances.push(swiper);
+            
+            if (swiper && swiper.initialized) {
+              toggleButtonWrapper(swiper);
+            }
+          }
+        });
+      } else {
+        // Update existing swipers
+        swiperInstances.forEach(swiper => {
+          if (swiper) {
+            toggleButtonWrapper(swiper);
+          }
+        });
+      }
+    } else {
+      // Reset button wrappers and destroy all swipers on mobile
+      resetButtonWrappers();
+      
+      // Destroy all swipers
+      for (let i = swiperInstances.length - 1; i >= 0; i--) {
+        const swiper = swiperInstances[i];
+        if (swiper) {
+          swiper.destroy(true, true);
+          swiperInstances.splice(i, 1);
+        }
+      }
+    }
+  };
+
+  // Debounce utility for resize events
+  const debounce = (func, wait) => {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  };
+
+  // Initialize the system
+  const init = () => {
+    // Initial setup
+    managePackagesSwipers();
+    
+    // Handle resize events
+    window.addEventListener("resize", debounce(managePackagesSwipers, 200));
+    
+    // Handle DOM content loaded
+    document.addEventListener("DOMContentLoaded", () => {
+      managePackagesSwipers();
+    });
+    
+    // Handle window load
+    window.addEventListener('load', () => {
+      swiperInstances.forEach(swiper => {
+        if (swiper && swiper.initialized) {
+          toggleButtonWrapper(swiper);
+        }
+      });
+    });
+  };
+
+  // Public API
+  return {
+    init,
+    getSwipers: () => swiperInstances,
+    refresh: managePackagesSwipers,
+    destroy: () => {
+      swiperInstances.forEach(swiper => {
+        if (swiper) {
+          swiper.destroy(true, true);
+        }
+      });
+      swiperInstances = [];
+    }
+  };
+})();
+
+// Initialize the packages swiper system
+PackagesSwiperManager.init(); 

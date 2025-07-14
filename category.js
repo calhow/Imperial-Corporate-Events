@@ -59,11 +59,7 @@ const swiperConfigs = [
     comboClass: "is-competitions",
     slidesPerView: "auto",
   },
-  {
-    selector: ".swiper.is-packages",
-    comboClass: "is-packages",
-    slidesPerView: "auto",
-  },
+
 ];
 
 // Video management for swiper slides (HLS Version)
@@ -365,42 +361,14 @@ const manageCategorySwipers = () => {
       
       // Initialize all swipers
       swiperConfigs.forEach((config) => {
-        // Special handling for .is-packages: may be multiple per page
-        if (config.comboClass === "is-packages") {
-          const packageSwipers = document.querySelectorAll(config.selector);
-          packageSwipers.forEach((swiperContainer) => {
-            const slides = swiperContainer.querySelectorAll(".swiper-slide");
-            if (slides.length > 0) {
-              // Use a unique comboClass for each instance to support multiple navs
-              const uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
-              swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
-              // Update nav button wrappers for this instance
-              const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
-              if (btnWrap) btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
-              // Update nav buttons for this instance
-              const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
-              const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
-              if (nextBtn) nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
-              if (prevBtn) prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
-              // Create config for this instance
-              const instanceConfig = { ...config, comboClass: uniqueCombo, selector: `[data-swiper-unique='${uniqueCombo}']` };
-              const swiper = initializeSwiper(instanceConfig);
-              swiperInstances.push(swiper);
-              if (swiper && swiper.initialized) {
-                toggleCategoryButtonWrapper(swiper);
-              }
-            }
-          });
-        } else {
-          const swiperContainer = document.querySelector(config.selector);
-          if (swiperContainer) {
-            const slides = swiperContainer.querySelectorAll(".swiper-slide");
-            if (slides.length > 0) {
-              const swiper = initializeSwiper(config);
-              swiperInstances.push(swiper);
-              if (swiper && swiper.initialized) {
-                toggleCategoryButtonWrapper(swiper);
-              }
+        const swiperContainer = document.querySelector(config.selector);
+        if (swiperContainer) {
+          const slides = swiperContainer.querySelectorAll(".swiper-slide");
+          if (slides.length > 0) {
+            const swiper = initializeSwiper(config);
+            swiperInstances.push(swiper);
+            if (swiper && swiper.initialized) {
+              toggleCategoryButtonWrapper(swiper);
             }
           }
         }
