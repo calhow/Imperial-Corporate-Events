@@ -1449,15 +1449,12 @@ document.addEventListener('click', function(event) {
 
 // SET EXP CARD PACKAGES IMAGE
 document.addEventListener('DOMContentLoaded', function() {
-  // Select all card components on the page
-  const allCards = document.querySelectorAll('.exp_card_wrap');
-
-  // Iterate over each card component
-  allCards.forEach(card => {
+  // Process card packages image for a single card
+  function processCard(card) {
     // Find the first package image within the current card
     const sourceImage = card.querySelector('.exp_packages_img');
 
-    // If no package image exists in this card, skip to the next one
+    // If no package image exists in this card, skip
     if (!sourceImage) {
       return;
     }
@@ -1471,5 +1468,36 @@ document.addEventListener('DOMContentLoaded', function() {
         targetImage.src = sourceImage.src;
       });
     }
+  }
+
+  // Process all existing cards on page load
+  const existingCards = document.querySelectorAll('.exp_card_wrap');
+  existingCards.forEach(processCard);
+
+  // Watch for new cards added to the DOM
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      mutation.addedNodes.forEach(node => {
+        // Skip if not an element
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+        // Check if the added node is a card
+        if (node.classList && node.classList.contains('exp_card_wrap')) {
+          processCard(node);
+        }
+
+        // Check for cards within the added node
+        const newCards = node.querySelectorAll && node.querySelectorAll('.exp_card_wrap');
+        if (newCards) {
+          newCards.forEach(processCard);
+        }
+      });
+    });
+  });
+
+  // Start observing
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
   });
 });
