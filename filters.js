@@ -279,6 +279,75 @@
     }, 100));
   }
 
+  // Add this function to inject empty facet styles after Finsweet initialization
+  function injectEmptyFacetStyles() {
+    const styles = `
+      .is-list-emptyfacet, .is-list-emptyfacet * {
+        pointer-events: none !important;
+        cursor: default !important;
+      }
+
+      .form_checkbox_row.is-active {
+        cursor: default !important;	
+      }
+
+      .form_filters_item.is-list-emptyfacet, .form_theme-tab_item.is-list-emptyfacet {
+        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);  
+        opacity: 0.3;
+        filter: grayscale(1);
+      }
+    `;
+
+    // Create and inject the style element
+    const styleElement = document.createElement('style');
+    styleElement.setAttribute('data-empty-facet-styles', 'true');
+    styleElement.textContent = styles;
+    document.head.appendChild(styleElement);
+  }
+
+  // Detect when Finsweet has finished initialization
+  function waitForFinsweetInitialization() {
+    // Check if Finsweet has removed the initial empty class
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const target = mutation.target;
+          
+          // If this element had the class and now doesn't, Finsweet has likely initialized
+          if (target.classList.contains('form_theme-tab_item') && 
+              mutation.oldValue && 
+              mutation.oldValue.includes('is-list-emptyfacet') && 
+              !target.classList.contains('is-list-emptyfacet')) {
+            
+            // Finsweet has removed the initial class, now inject our styles
+            injectEmptyFacetStyles();
+            
+            // Stop observing
+            observer.disconnect();
+          }
+        }
+      });
+    });
+
+    // Start observing the theme tab items for class changes
+    const themeTabItems = document.querySelectorAll('.form_theme-tab_item');
+    themeTabItems.forEach(item => {
+      observer.observe(item, {
+        attributes: true,
+        attributeOldValue: true,
+        attributeFilter: ['class']
+      });
+    });
+
+    // Fallback: If no class changes detected within 2 seconds, inject styles anyway
+    setTimeout(() => {
+      if (!document.querySelector('[data-empty-facet-styles]')) {
+        injectEmptyFacetStyles();
+        observer.disconnect();
+      }
+    }, 2000);
+  }
+
   // Initialize everything
   function init() {
     if (isInitialized) return;
@@ -297,6 +366,9 @@
     setupSwiper();
     updateUnderlinePosition();
     updateActiveFiltersDisplay();
+    
+    // Wait for Finsweet initialization and inject styles when ready
+    waitForFinsweetInitialization();
     
     isInitialized = true;
   }
