@@ -140,6 +140,42 @@ function insertSVGFromCMS(container = document) {
 
 insertSVGFromCMS();
 
+// Watch for new SVG elements added to the DOM
+const svgObserver = new MutationObserver(mutations => {
+  let hasNewSVGElements = false;
+  
+  mutations.forEach(mutation => {
+    mutation.addedNodes.forEach(node => {
+      // Skip if not an element
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      
+      // Check if the added node itself needs SVG processing
+      if (node.classList && (node.classList.contains('svg-code') || node.hasAttribute('data-svg-needs-processing'))) {
+        hasNewSVGElements = true;
+      }
+      
+      // Check for SVG elements within the added node
+      if (node.querySelectorAll) {
+        const newSVGElements = node.querySelectorAll(".svg-code, [data-svg-needs-processing='true']");
+        if (newSVGElements.length > 0) {
+          hasNewSVGElements = true;
+        }
+      }
+    });
+  });
+  
+  // Only process if we found new SVG elements
+  if (hasNewSVGElements) {
+    insertSVGFromCMS();
+  }
+});
+
+// Start observing for SVG elements
+svgObserver.observe(document.body, {
+  childList: true,
+  subtree: true
+});
+
 // Initialize smooth scrolling
 const lenis = new Lenis({
   lerp: 0.1,
