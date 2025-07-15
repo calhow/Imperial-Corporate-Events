@@ -307,30 +307,52 @@
 
   // Detect when Finsweet has finished initialization
   function waitForFinsweetInitialization() {
-    // Check if Finsweet has removed the initial empty class
+    const themeTabItems = document.querySelectorAll('.form_theme-tab_item');
+    
+    // If no theme tab items exist, inject styles immediately
+    if (themeTabItems.length === 0) {
+      injectEmptyFacetStyles();
+      return;
+    }
+
+    // Check if all elements currently have the empty facet class removed
+    function checkAllElementsCleared() {
+      const elementsWithEmptyClass = document.querySelectorAll('.form_theme-tab_item.is-list-emptyfacet');
+      return elementsWithEmptyClass.length === 0;
+    }
+
+    // If already cleared, inject styles immediately
+    if (checkAllElementsCleared()) {
+      injectEmptyFacetStyles();
+      return;
+    }
+
+    // Check if Finsweet has removed the initial empty class from ALL elements
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
           const target = mutation.target;
           
-          // If this element had the class and now doesn't, Finsweet has likely initialized
+          // If this is a theme tab item that lost the empty facet class
           if (target.classList.contains('form_theme-tab_item') && 
               mutation.oldValue && 
               mutation.oldValue.includes('is-list-emptyfacet') && 
               !target.classList.contains('is-list-emptyfacet')) {
             
-            // Finsweet has removed the initial class, now inject our styles
-            injectEmptyFacetStyles();
-            
-            // Stop observing
-            observer.disconnect();
+            // Check if ALL theme tab items have had their empty facet class removed
+            if (checkAllElementsCleared()) {
+              // All elements cleared, now inject our styles
+              injectEmptyFacetStyles();
+              
+              // Stop observing
+              observer.disconnect();
+            }
           }
         }
       });
     });
 
-    // Start observing the theme tab items for class changes
-    const themeTabItems = document.querySelectorAll('.form_theme-tab_item');
+    // Start observing all theme tab items for class changes
     themeTabItems.forEach(item => {
       observer.observe(item, {
         attributes: true,
