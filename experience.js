@@ -30,17 +30,6 @@ const swiperConfigs = [
     selector: ".swiper.is-package-featured",
     comboClass: "is-package-featured",
     slidesPerView: "auto",
-  },
-  {
-    selector: ".swiper.is-package-all",
-    comboClass: "is-package-all",
-    slidesPerView: 1,
-    spaceBetween: 32,
-    speed: 600,
-    grid: {
-      rows: 4,
-      fill: "column"
-    }
   }
 ];
 
@@ -213,311 +202,12 @@ const SwiperManager = {
   }
 };
 
-// Main gallery slider initialization
-(() => {
-  const videoSlidePrePositioned = prepareGalleryVideoSlide();
-  
-  const gallerySwiper = new Swiper(".swiper.is-gallery", {
-    slidesPerView: 1,
-    slideActiveClass: "is-active",
-    effect: "fade",
-    fadeEffect: { crossFade: true },
-    loop: true,
-    preventClicks: false,
-    preventClicksPropagation: false,
-    speed: 400,
-    easing: 'ease-out',
-    navigation: {
-      nextEl: '[data-swiper-button-next="is-gallery"]',
-      prevEl: '[data-swiper-button-prev="is-gallery"]',
-      disabledClass: "is-disabled"
-    },
-    pagination: {
-      el: ".swiper-pagination.is-gallery",
-      type: "bullets",
-      dynamicBullets: true
-    },
-    on: {
-      init(swiper) {
-        if (videoSlidePrePositioned) {
-          swiper.slideTo(0, 0, false);
-        }
-        
-        SwiperManager.toggleNavigationVisibility(swiper, {
-          galleryBtnWrap: document.querySelector(".gallery_btn_wrap"),
-          prevBtn: document.querySelector('[data-swiper-button-prev="is-gallery"]'),
-          nextBtn: document.querySelector('[data-swiper-button-next="is-gallery"]')
-        });
-        
-        // Initialize the background image manager with this swiper
-        BackgroundImageManager.initialize(swiper);
-      }
-    }
-  });
-  
-  return gallerySwiper;
-})();
-
-
-// Parallax animations setup
-const expGallery = document.querySelector(".gallery_img");
-const videoElement = document.querySelector(".video_gallery_player");
-const posterElement = document.querySelector(".video_gallery_poster");
-const testimonialThumb = document.querySelector(".testimonial_thumb_img");
-const testimonialBg = document.querySelector(".testimonial_content_bg-img");
-
-const getPaddingTop = el =>
-  parseFloat(getComputedStyle(el).paddingTop) || 0;
-const expContent = document.querySelector(".exp_content");
-const galleryWrap = document.querySelector(".gallery_wrap");
-const expContentPadding = expContent ? getPaddingTop(expContent) : 0;
-const galleryWrapPadding = galleryWrap ? getPaddingTop(galleryWrap) : 0;
-const totalGalleryOffset = expContentPadding + galleryWrapPadding;
-
-// Create variables but don't initialize them outside the media query
-let testimonialThumbParallax;
-let testimonialBgParallax;
-let expGalleryParallax;
-let videoPosterParallax;
-
-// Enable parallax for devices above 479px
-let expMediaMatcher = gsap.matchMedia();
-expMediaMatcher.add("(min-width: 479px)", () => {
-  
-  
-  if (testimonialThumb) {
-    testimonialThumbParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: testimonialThumb,
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    testimonialThumbParallax.to(".testimonial_thumb_img", { y: "3rem" });
-  }
-  
-  if (testimonialBg) {
-    testimonialBgParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: testimonialBg,
-        start: "top bottom",
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    testimonialBgParallax.to(".testimonial_content_bg-img", { y: "3rem" });
-  }
-  
-  if (expGallery) {
-    expGalleryParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: expGallery,
-        start: `top ${totalGalleryOffset}px`, 
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    expGalleryParallax.to(".gallery_img", { y: "3rem" });
-  }
-  
-  if (videoElement && posterElement) {
-    videoPosterParallax = gsap.timeline({
-      scrollTrigger: {
-        trigger: posterElement,
-        start: `top ${totalGalleryOffset}px`,
-        end: "bottom top",
-        scrub: true,
-      },
-    });
-    videoPosterParallax.to(".video_gallery_poster", { y: "3rem" });
-  }
-});
-
-
-// Swiper Module for exp nav links
-const ExpNavSwiperModule = (() => {
-  let swiper;
-  let isAnchorScrolling = false; // Prevents navigation jumps during smooth scrolling
-
-  function initSwiper() {
-    if (window.innerWidth >= 992) {
-      if (!swiper) {
-        swiper = new Swiper(".exp_nav_wrap", {
-          wrapperClass: "exp_nav_list",
-          slideClass: "exp_nav_item",
-          navigation: {
-            nextEl: '[data-swiper-btn-exp="next"]',
-            prevEl: '[data-swiper-btn-exp="prev"]',
-            disabledClass: "exp_nav_btn_wrap_disabled",
-          },
-          slidesPerView: "auto",
-          slidesPerGroup: 1,
-          watchSlidesProgress: true,
-          resistanceRatio: 0.85,
-          freeMode: true,
-          watchOverflow: true,
-          on: {
-            init: function() {
-              updateSwiperClasses();
-              slideToCurrentAnchor(this);
-            },
-            slideChange: updateSwiperClasses,
-            reachEnd: updateSwiperClasses,
-            reachBeginning: updateSwiperClasses,
-            setTranslate: updateSwiperClasses,
-          },
-        });
-
-        observeAnchorChanges();
-        setupAnchorClickHandlers();
-      }
-    } else {
-      if (swiper) {
-        swiper.destroy(true, true);
-        swiper = undefined;
-      }
-    }
-  }
-
-  // Centers the currently active nav item with adjustment for navigation buttons
-  function slideToCurrentAnchor(swiperInstance) {
-    if (isAnchorScrolling) return;
-    
-    const activeAnchorItem = document.querySelector('.exp_nav_item a.w--current');
-    if (activeAnchorItem && swiperInstance) {
-      const slideElement = activeAnchorItem.closest('.exp_nav_item');
-      if (slideElement) {
-        const slideIndex = Array.from(slideElement.parentNode.children).indexOf(slideElement);
-        if (slideIndex !== -1) {
-          const swiperWidth = swiperInstance.width;
-          const slideWidth = slideElement.offsetWidth;
-          const slideLeft = slideElement.offsetLeft;
-          
-          const prevButton = document.querySelector('[data-swiper-btn-exp="prev"]');
-          const buttonOffset = prevButton ? prevButton.offsetWidth + 10 : 0; // Extra padding prevents overlap
-          
-          let offset = slideLeft - (swiperWidth / 2) + (slideWidth / 2) - buttonOffset;
-          offset = Math.max(0, Math.min(offset, swiperInstance.maxTranslate() * -1));
-          
-          swiperInstance.translateTo(-offset, 300);
-          
-          setTimeout(() => {
-            swiperInstance.updateProgress();
-            swiperInstance.updateActiveIndex();
-            updateSwiperClasses();
-          }, 350);
-        }
-      }
-    }
-  }
-
-  // Prevents navigation jumps during anchor link scrolling
-  function setupAnchorClickHandlers() {
-    document.querySelectorAll('.exp_nav_item a').forEach(anchor => {
-      anchor.addEventListener('click', function(e) {
-        if (swiper) {
-          const slideElement = this.closest('.exp_nav_item');
-          if (slideElement) {
-            const slideIndex = Array.from(slideElement.parentNode.children).indexOf(slideElement);
-            if (slideIndex !== -1) {
-              isAnchorScrolling = true;
-              slideToCurrentAnchor(swiper);
-              
-              // Reset flag after estimated scroll animation completes
-              setTimeout(() => {
-                isAnchorScrolling = false;
-              }, 1500);
-            }
-          }
-        }
-      });
-    });
-  }
-
-  // Tracks navigation state changes from scrolling and hash changes
-  function observeAnchorChanges() {
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && 
-            mutation.attributeName === 'class' && 
-            mutation.target.classList.contains('w--current')) {
-          
-          if (swiper && !isAnchorScrolling) {
-            slideToCurrentAnchor(swiper);
-          }
-        }
-      });
-    });
-
-    document.querySelectorAll('.exp_nav_item a').forEach(anchor => {
-      observer.observe(anchor, { attributes: true });
-    });
-    
-    window.addEventListener('hashchange', () => {
-      if (swiper) {
-        isAnchorScrolling = true;
-        setTimeout(() => slideToCurrentAnchor(swiper), 100);
-        setTimeout(() => {
-          isAnchorScrolling = false;
-        }, 1500);
-      }
-    });
-    
-    const scrollHandler = Utils.debounce(() => {
-      if (swiper && !isAnchorScrolling) {
-        slideToCurrentAnchor(swiper);
-      }
-    }, 200);
-    
-    window.addEventListener('scroll', scrollHandler, { passive: true });
-  }
-
-  // Updates navigation button states based on swiper position
-  function updateSwiperClasses() {
-    const swiperContainer = document.querySelector(".exp_nav_wrap");
-    const nextButton = document.querySelector(
-      '[data-swiper-btn-exp="next"]'
-    );
-    const prevButton = document.querySelector(
-      '[data-swiper-btn-exp="prev"]'
-    );
-
-    if (!swiperContainer || !nextButton || !prevButton) return;
-
-    swiperContainer.classList.remove("is-next", "is-both", "is-prev");
-
-    if (prevButton.classList.contains("exp_nav_btn_wrap_disabled") && nextButton.classList.contains("exp_nav_btn_wrap_disabled")) {
-      return;
-    } else if (nextButton.classList.contains("exp_nav_btn_wrap_disabled")) {
-      swiperContainer.classList.add("is-prev");
-    } else if (prevButton.classList.contains("exp_nav_btn_wrap_disabled")) {
-      swiperContainer.classList.add("is-next");
-    } else {
-      swiperContainer.classList.add("is-both");
-    }
-  }
-
-
-
-  window.addEventListener("load", initSwiper);
-  
-  window.addEventListener("resize", Utils.debounce(initSwiper, 100));
-
-  return {
-    initSwiper,
-    getSwiper: () => swiper,
-    slideToCurrentAnchor: () => slideToCurrentAnchor(swiper)
-  };
-})();
-
-
 // SHARE BUTTON
 
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('shareBtn');
-  const textEl = btn.querySelector('.btn_default_text');
-  const originalText = textEl.textContent;
+  const textElements = btn.querySelectorAll('.btn_default_text');
+  const originalTexts = Array.from(textElements).map(el => el.textContent);
 
   btn.addEventListener('click', async () => {
     const shareData = {
@@ -535,9 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       try {
         await navigator.clipboard.writeText(shareData.url);
-        textEl.textContent = 'Link copied';
+        textElements.forEach(el => el.textContent = 'Link copied');
         setTimeout(() => {
-          textEl.textContent = originalText;
+          textElements.forEach((el, index) => {
+            el.textContent = originalTexts[index];
+          });
         }, 3000);
       } catch (err) {
         console.error('Could not copy link:', err);
@@ -563,6 +255,250 @@ stickyOptionsMatchMedia.add("(max-width: 991px)", () => {
   });
 });
 
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Scope variables to be managed by init/destroy functions
+  let expandTimeline, heroExpandWidth, expandBtn, hero, heroVidBg;
+  let isInitialized = false;
+
+  const toggleAnimation = () => {
+    if (!isInitialized) return;
+
+    // Toggle all necessary classes to manage state
+    expandBtn.classList.toggle('is-alt');
+    document.body.classList.toggle('no-scroll');
+    hero.classList.toggle('u-modal-prevent-scroll');
+
+    if (expandBtn.classList.contains('is-alt')) {
+      // Animate forward
+      gsap.to(expandTimeline, {
+        progress: 1,
+        duration: 0.7,
+        ease: 'power2.out',
+        onStart: () => {
+          gsap.set(hero, { zIndex: 9999 });
+          gsap.set(heroVidBg, { display: 'block' });
+        }
+      });
+    } else {
+      // Animate backward
+      gsap.to(expandTimeline, {
+        progress: 0,
+        duration: 0.4,
+        ease: 'power2.out',
+        onComplete: () => {
+          gsap.set(hero, { zIndex: 'auto' });
+          gsap.set(heroVidBg, { display: 'none' });
+        }
+      });
+    }
+  };
+
+  const init = () => {
+    // Select elements
+    expandBtn = document.querySelector('[data-video-control="expand"]');
+    hero = document.querySelector('.exp_hero');
+    heroVidBg = document.querySelector('.exp_hero_vid_bg');
+
+    if (!expandBtn || !hero || !heroVidBg) return;
+
+    // Perform initial calculation
+    heroExpandWidth = gsap.getProperty(":root", "--exp-hero-expand-width");
+
+    // Create the timeline
+    expandTimeline = gsap.timeline({ paused: true })
+      .to(hero, {
+        width: () => heroExpandWidth, // Use a function to make it dynamic on each run
+        '--hero-before-opacity': 1
+      }, 0)
+      .to(heroVidBg, { opacity: 1 }, 0);
+
+    // Add event listeners
+    expandBtn.addEventListener('click', toggleAnimation);
+    heroVidBg.addEventListener('click', toggleAnimation);
+
+    isInitialized = true;
+  };
+
+  const destroy = () => {
+    if (!isInitialized) return;
+
+    // Remove listeners to prevent memory leaks
+    expandBtn.removeEventListener('click', toggleAnimation);
+    heroVidBg.removeEventListener('click', toggleAnimation);
+
+    // Completely stop and remove animations and reset styles
+    gsap.killTweensOf(expandTimeline);
+    expandTimeline.kill();
+    // Remove all state-managing classes
+    expandBtn.classList.remove('is-alt');
+    document.body.classList.remove('no-scroll');
+    hero.classList.remove('u-modal-prevent-scroll');
+    // Set final resting state explicitly
+    gsap.set(hero, {
+      width: '100%',
+      zIndex: 'auto',
+      '--hero-before-opacity': 0
+    });
+    gsap.set(heroVidBg, { clearProps: 'display,opacity' });
+
+    isInitialized = false;
+  };
+
+  const handleResize = () => {
+    if (window.innerWidth >= 992) {
+      if (!isInitialized) {
+        init(); // Setup if entering desktop viewport
+      } else {
+        // If already initialized, just reset state and recalculate width
+        gsap.killTweensOf(expandTimeline);
+        expandTimeline.progress(0);
+        // Remove classes during reset
+        expandBtn.classList.remove('is-alt');
+        document.body.classList.remove('no-scroll');
+        hero.classList.remove('u-modal-prevent-scroll');
+        // Set styles
+        gsap.set(hero, { zIndex: 'auto', width: '100%' });
+        gsap.set(heroVidBg, { display: 'none' });
+        
+        heroExpandWidth = gsap.getProperty(":root", "--exp-hero-expand-width");
+      }
+    } else {
+      destroy(); // Teardown if leaving desktop viewport
+    }
+  };
+
+  // --- Initial Setup ---
+  
+  // Run the check once on page load
+  handleResize();
+
+  // Add the debounced resize listener
+  window.addEventListener('resize', Utils.debounce(handleResize, 250));
+
+});
+
+
+// Simplified Single Video Player for Experience Pages
+const SingleHLSPlayer = {
+  video: null,
+  hls: null,
+  controls: {},
 
 
 
+  isDesktop: () => window.innerWidth >= 992,
+
+  init(containerSelector) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    this.video = container.querySelector('video.exp_video');
+    const source = container.querySelector('source.exp_vid_src');
+    const poster = container.querySelector('img.exp_poster');
+
+    if (!this.video || !source?.dataset.hlsSrc) return;
+
+    // Set poster if available
+    if (poster?.src) this.video.poster = poster.src;
+
+    // Get control elements
+    this.controls = {
+      play: document.querySelector('[data-video-control="play"]'),
+      sound: document.querySelector('[data-video-control="sound"]')
+    };
+
+    this.setupEventListeners();
+    this.handleResize();
+    
+    window.addEventListener('resize', Utils.debounce(this.handleResize.bind(this), 250));
+  },
+
+  setupEventListeners() {
+    const { play, sound } = this.controls;
+    
+    if (play) {
+      play.addEventListener('click', () => {
+        this.video.paused ? this.playVideo() : this.pauseVideo();
+      });
+    }
+    
+    if (sound) {
+      sound.addEventListener('click', () => {
+        this.video.muted = !this.video.muted;
+      });
+    }
+
+    // Update button states
+    this.video.addEventListener('play', () => play?.classList.remove('is-alt'));
+    this.video.addEventListener('pause', () => play?.classList.add('is-alt'));
+    this.video.addEventListener('volumechange', () => {
+      sound?.classList.toggle('is-alt', !this.video.muted);
+    });
+
+    // Set initial states
+    play?.classList.add('is-alt');
+    sound?.classList.toggle('is-alt', !this.video.muted);
+  },
+
+  handleResize() {
+    const shouldBeActive = this.isDesktop();
+    
+    if (shouldBeActive && !this.hls) {
+      this.startHLS();
+    } else if (!shouldBeActive && this.hls) {
+      this.stopHLS();
+    }
+  },
+
+  startHLS() {
+    if (!Hls.isSupported()) return;
+    
+    const source = this.video.querySelector('source.exp_vid_src');
+    if (!source?.dataset.hlsSrc) return;
+
+    this.hls = new Hls({
+      capLevelToPlayerSize: true,
+      startLevel: -1,
+      maxBufferLength: 15
+    });
+
+    this.hls.loadSource(source.dataset.hlsSrc);
+    this.hls.attachMedia(this.video);
+    
+    gsap.set(this.video, { opacity: 0 });
+    
+    // Auto-play after a short delay
+    setTimeout(() => this.playVideo(), 1000);
+  },
+
+  stopHLS() {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    
+    this.video.pause();
+    gsap.set(this.video, { opacity: 0 });
+  },
+  
+  playVideo() {
+    if (!this.video) return;
+
+    this.video.play().then(() => {
+      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
+    }).catch(() => {
+      // Silent error handling
+    });
+  },
+
+  pauseVideo() {
+    if (this.video && !this.video.paused) {
+      this.video.pause();
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  SingleHLSPlayer.init('.exp_media_wrap');
+});

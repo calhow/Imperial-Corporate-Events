@@ -1342,12 +1342,6 @@ const initializeModalContent = async (contentElement) => {
         () => {
             // Check for SVG elements before CMS nesting
             processSVGElements(packageModalTarget);
-            
-            // Initialize videos if VideoManager is available
-            if (typeof VideoManager !== 'undefined') {
-                packageModalTarget.querySelectorAll('.video_contain')
-                    .forEach(container => VideoManager.setupVideo(container));
-            }
             cmsNest();
         }
     ];

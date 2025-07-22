@@ -215,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => initializeCountersInScope())
 // MODAL ANIMATION
 const modalStates = {}; // Tracks state for each modal group
 window.modalStates = modalStates; // Expose to window for other modules
-const autoplayVideos = new WeakSet(); // Tracks videos that were autoplaying
 
 function updateLiveChatVisibility() {
   const anyModalOpen = Object.values(modalStates).some((state) => state);
@@ -265,52 +264,9 @@ function toggleBodyScrollAndAnimate(modalGroup) {
   }
 }
 
-function handleVideosOnModalOpen(modalGroup) {
-  if (modalGroup === 'filter' || modalGroup === 'nav') {
-    return;
-  }
 
-  document.querySelectorAll("video").forEach((video) => {
-    const isInModal = video.closest(
-      `[data-modal-element='content'][data-modal-group='${modalGroup}']`
-    );
-    if (!isInModal && !video.paused) {
-      video.pause();
-    }
-    if (video.autoplay) {
-      autoplayVideos.add(video);
-    }
-  });
 
-  const modalVideos = document.querySelectorAll(
-    `[data-modal-element='content'][data-modal-group='${modalGroup}'] video`
-  );
-  
-  modalVideos.forEach((video) => {
-    if (modalGroup !== 'package' && modalGroup !== 'experience') {
-      video.play().catch(err => {});
-    }
-  });
-}
 
-function handleVideosOnModalClose(modalGroup) {
-  if (modalGroup === 'filter' || modalGroup === 'nav') {
-    return;
-  }
-  
-  document.querySelectorAll("video").forEach((video) => {
-    const isInModal = video.closest(
-      `[data-modal-element='content'][data-modal-group='${modalGroup}']`
-    );
-    if (isInModal && !video.paused) {
-      video.pause();
-    }
-    if (autoplayVideos.has(video)) {
-      video.play();
-      autoplayVideos.delete(video);
-    }
-  });
-}
 
 document.addEventListener("click", (event) => {
   const modalToggleBtn = event.target.closest(
@@ -355,7 +311,6 @@ document.addEventListener("click", (event) => {
     onStart: () => {
       if (isOpening) {
         updateLiveChatVisibility();
-        handleVideosOnModalOpen(modalGroup);
         
         // Initialize paragraph toggles for modal content
         requestAnimationFrame(() => {
@@ -409,7 +364,6 @@ document.addEventListener("click", (event) => {
           { display: "none" }
         );
         modalStates[modalGroup] = false;
-        handleVideosOnModalClose(modalGroup);
         updateLiveChatVisibility();
         
         // Update filter display when filter modal closes
@@ -476,14 +430,9 @@ document.addEventListener("click", (event) => {
           .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
           .to("[menu-category-label='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4) 
           .to("[menu-category-cms-list='1']", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.42)
-          .to("[menu-category-pag='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.44)
           .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46)
           .to("[menu-category-label='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46) 
-          .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.48)
-          .to("[menu-category-pag='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.5)
-          .to("[menu-category-label='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.52) 
-          .to("[menu-category-cms-list='3']", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.54)
-          .to("[menu-category-pag='3']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.56);
+          .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.48);
 
       } else if (trayModalType === 'package') {
         modalTl
@@ -580,15 +529,10 @@ document.addEventListener("click", (event) => {
           .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-pag='1']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-pag='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-pag='3']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0) 
-          .to("[menu-category-label='3']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
           .to("[menu-category-cms-list='1']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-cms-list='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0) 
-          .to("[menu-category-cms-list='3']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
+          .to("[menu-category-cms-list='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
           .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
           .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
           .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
@@ -1213,175 +1157,402 @@ document.querySelectorAll('.exp_card_reviews').forEach(el => {
   el.style.width = `${el.dataset.reviewScore * 0.75}rem`;
 });
 
-// Experience Card Video Interaction Handler (HLS Lazy-Loading Version)
-const ExperienceCardVideoManager = (() => {
-  let scrollTriggers = [];
+// Unified Video Manager - High Performance & Simple
+const UnifiedVideoManager = (() => {
+  // HLS instance pool for reuse
+  const hlsPool = new Map();
+  const activeVideos = new Set();
+  let intersectionObserver = null;
   let currentDevice = null;
-  // Use a Map to store and manage HLS instances for each video element
-  const hlsInstances = new Map();
-
-  const initializeVideoInteractions = () => {
-    const deviceType = Utils.isMobile() ? 'mobile' : 'desktop';
-    if (currentDevice === deviceType && scrollTriggers.length > 0) return;
-
-    cleanup();
-    currentDevice = deviceType;
-
-    const experienceCards = document.querySelectorAll('.exp_card_wrap');
-    experienceCards.forEach(card => {
-      const video = card.querySelector('.exp_card_video');
-      const poster = card.querySelector('.exp_card_poster');
-      if (!video || !poster || !hasValidVideoSource(video)) return;
-
-      // --- ONE-TIME SETUP ---
-      // Set the video's poster attribute.
-      if (poster.src) {
-        video.poster = poster.src;
-      }
-      // Set the initial state: video is transparent, letting the poster show through.
-      gsap.set(video, { opacity: 0 });
-      
-      // Add the video fade-in listener ONCE. This will fire whenever playback starts.
-      video.addEventListener('playing', () => {
-        // Ensure we only fade the video in if it's currently invisible.
-        if (gsap.getProperty(video, "opacity") < 1) {
-          requestAnimationFrame(() => {
-            gsap.to(video, { opacity: 1, duration: 0.5, ease: "power2.out" });
-          });
-        }
-      });
-      // --- END ONE-TIME SETUP ---
-
-      if (deviceType === 'mobile') {
-        setupMobileInteraction(card, video, poster);
-      } else {
-        setupDesktopInteraction(card, video, poster);
-      }
-    });
-  };
-
-  const hasValidVideoSource = (video) => {
-    const source = video.querySelector('source');
-    return source && source.dataset.hlsSrc;
+  
+  // Simple configuration
+  const config = {
+    fadeInDuration: 0.5,
+    fadeOutDuration: 0.3,
+    playDelay: 150,
+    hlsConfig: {
+      capLevelToPlayerSize: true,
+      startLevel: -1,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 15
+    }
   };
   
-  // This function is triggered by hover or scroll
-  const playVideoAndHidePoster = (video) => {
-    // A small delay ensures we only play if the user's intent is clear,
-    // preventing race conditions from rapid scroll or hover events.
-    video.playTimeout = setTimeout(() => {
-      if (hlsInstances.has(video)) {
-        const hls = hlsInstances.get(video);
-        hls.startLoad();
-        video.play().catch((e) => {});
-      } else if (Hls.isSupported()) {
-        const hlsUrl = video.querySelector('source').dataset.hlsSrc;
-        if (!hlsUrl) {
-            return;
-        }
-
-        const hls = new Hls({
-          capLevelToPlayerSize: true,
-          startLevel: -1,
-        });
-
-        hls.loadSource(hlsUrl);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch((e) => {});
-        });
-
-        hls.on(Hls.Events.ERROR, (event, data) => {});
-
-        hlsInstances.set(video, hls);
-      }
-    }, 200); // 200ms delay to confirm user intent
-  };
-
-  const pauseVideoAndShowPoster = (video, poster) => {
-    // Immediately clear any pending play command.
-    if (video.playTimeout) {
-      clearTimeout(video.playTimeout);
+  // Get or create HLS instance
+  const getHLSInstance = (video) => {
+    const source = video.querySelector('source');
+    const hlsUrl = source?.dataset.hlsSrc;
+    
+    if (!hlsUrl || !Hls.isSupported()) return null;
+    
+    if (hlsPool.has(video)) {
+      return hlsPool.get(video);
     }
-
-    video.pause();
-
-    // Fade the video OUT to reveal the poster underneath.
-    gsap.to(video, { opacity: 0, duration: 0.3, ease: "power2.out" });
+    
+    const hls = new Hls(config.hlsConfig);
+    hls.loadSource(hlsUrl);
+    hls.attachMedia(video);
+    
+    hlsPool.set(video, hls);
+    return hls;
   };
-
-  const setupMobileInteraction = (card, video, poster) => {
-    const trigger = ScrollTrigger.create({
-      trigger: card,
-      start: "bottom bottom",
-      end: "top top+=72",
-      onEnter: () => {
-        playVideoAndHidePoster(video);
-      },
-      onLeave: () => {
-        pauseVideoAndShowPoster(video, poster);
-      },
-      onEnterBack: () => {
-        playVideoAndHidePoster(video);
-      },
-      onLeaveBack: () => {
-        pauseVideoAndShowPoster(video, poster);
+  
+  // Play video with fade in
+  const playVideo = (video) => {
+    if (!video || activeVideos.has(video)) return;
+    
+    const source = video.querySelector('source');
+    if (!source?.dataset.hlsSrc) return;
+    
+    activeVideos.add(video);
+    
+    // Clear any existing timeout
+    if (video._playTimeout) {
+      clearTimeout(video._playTimeout);
+    }
+    
+    video._playTimeout = setTimeout(() => {
+      const hls = getHLSInstance(video);
+      
+      if (hls) {
+        hls.startLoad();
       }
+      
+      video.play().then(() => {
+        requestAnimationFrame(() => {
+          gsap.to(video, { 
+            opacity: 1, 
+            duration: config.fadeInDuration, 
+            ease: "power2.out" 
+          });
+        });
+      }).catch(() => {
+        // Silent error handling
+        activeVideos.delete(video);
+      });
+    }, config.playDelay);
+  };
+  
+  // Pause video with fade out
+  const pauseVideo = (video) => {
+    if (!video) return;
+    
+    activeVideos.delete(video);
+    
+    if (video._playTimeout) {
+      clearTimeout(video._playTimeout);
+      video._playTimeout = null;
+    }
+    
+    if (!video.paused) {
+      video.pause();
+    }
+    
+    gsap.to(video, { 
+      opacity: 0, 
+      duration: config.fadeOutDuration, 
+      ease: "power2.out" 
     });
-    scrollTriggers.push(trigger);
   };
-
-  const setupDesktopInteraction = (card, video, poster) => {
-    const handleMouseEnter = () => {
-        playVideoAndHidePoster(video);
-    };
-    const handleMouseLeave = () => {
-        pauseVideoAndShowPoster(video, poster);
-    };
-
-    card.addEventListener('mouseenter', handleMouseEnter);
-    card.addEventListener('mouseleave', handleMouseLeave);
-    card._videoEventHandlers = { mouseenter: handleMouseEnter, mouseleave: handleMouseLeave };
+  
+  // Desktop hover handlers using event delegation
+  const handleMouseEnter = (event) => {
+    const card = event.target.closest('.exp_card_wrap');
+    if (!card) return;
+    
+    const video = card.querySelector('.exp_card_video');
+    if (video && hasValidVideoSource(video)) {
+      playVideo(video);
+    }
   };
-
-  const cleanup = () => {
-    // Kill all existing ScrollTriggers
-    scrollTriggers.forEach(trigger => trigger.kill());
-    scrollTriggers = [];
-
-    // Remove hover listeners from all cards
-    document.querySelectorAll('.exp_card_wrap').forEach(card => {
-      if (card._videoEventHandlers) {
-        card.removeEventListener('mouseenter', card._videoEventHandlers.mouseenter);
-        card.removeEventListener('mouseleave', card._videoEventHandlers.mouseleave);
-        delete card._videoEventHandlers;
+  
+  const handleMouseLeave = (event) => {
+    const card = event.target.closest('.exp_card_wrap');
+    if (!card) return;
+    
+    const video = card.querySelector('.exp_card_video');
+    if (video) {
+      pauseVideo(video);
+    }
+  };
+  
+  // Mobile scroll detection - handles both vertical and horizontal scrolling
+  const setupMobileObserver = () => {
+    if (intersectionObserver) {
+      intersectionObserver.disconnect();
+    }
+    
+    // Separate videos into horizontal scrollers and standalone videos
+    const horizontalScrollerVideos = new Map();
+    const standaloneVideos = [];
+    
+    document.querySelectorAll('.exp_card_video').forEach(video => {
+      if (!hasValidVideoSource(video)) return;
+      
+      // Setup initial state for all videos
+      video.isVisuallyActive = false;
+      const poster = video.parentElement?.querySelector('.exp_card_poster');
+      if (poster?.src) video.poster = poster.src;
+      gsap.set(video, { opacity: 0 });
+      
+      // Add playing listener if not already added
+      if (!video.hasPlayingListener) {
+        video.addEventListener('playing', () => {
+          if (gsap.getProperty(video, "opacity") < 1) {
+            requestAnimationFrame(() => {
+              gsap.to(video, { opacity: 1, duration: config.fadeInDuration, ease: "power2.out" });
+            });
+          }
+        });
+        video.hasPlayingListener = true;
+      }
+      
+      // Check if video is in a horizontal scroller
+      const card = video.closest('.exp_card_wrap');
+      const scroller = card?.closest('.swiper-wrapper');
+      
+      if (scroller && scroller.scrollWidth > scroller.clientWidth) {
+        if (!horizontalScrollerVideos.has(scroller)) {
+          horizontalScrollerVideos.set(scroller, []);
+        }
+        horizontalScrollerVideos.get(scroller).push(video);
+      } else {
+        standaloneVideos.push(video);
       }
     });
     
-    // Destroy HLS instances only for videos that are no longer in the DOM.
-    hlsInstances.forEach((hls, video) => {
-        if (!document.body.contains(video)) {
-            hls.destroy();
-            hlsInstances.delete(video);
-        }
+    // Setup Intersection Observer for standalone videos (vertical scrolling)
+    if (standaloneVideos.length > 0) {
+      intersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const video = entry.target;
+          
+          if (entry.isIntersecting) {
+            video.isVisuallyActive = true;
+            playVideo(video);
+          } else {
+            video.isVisuallyActive = false;
+            pauseVideo(video);
+          }
+        });
+      }, {
+        threshold: 0.5,
+        rootMargin: '0px 0px -72px 0px' // Account for sticky nav
+      });
+      
+      standaloneVideos.forEach(video => {
+        intersectionObserver.observe(video);
+      });
+    }
+    
+    // Setup horizontal scroll detection for swiper containers
+    horizontalScrollerVideos.forEach((videos, scroller) => {
+      setupHorizontalScrollDetection(scroller, videos);
     });
   };
-
-  const handleResize = Utils.debounce(() => initializeVideoInteractions(), 150);
-
+  
+  // Handle horizontal scroll detection within swiper containers
+  const setupHorizontalScrollDetection = (scroller, videos) => {
+    const checkHorizontalVisibility = Utils.debounce(() => {
+      const viewportCenter = window.innerWidth / 2;
+      
+      videos.forEach(video => {
+        const card = video.closest('.exp_card_wrap');
+        if (!card) return;
+        
+        const rect = card.getBoundingClientRect();
+        const cardCenter = rect.left + rect.width / 2;
+        const tolerance = card.offsetWidth * 0.45;
+        const isHorizontallyVisible = Math.abs(cardCenter - viewportCenter) < tolerance;
+        
+        if (isHorizontallyVisible && !video.isVisuallyActive) {
+          video.isVisuallyActive = true;
+          playVideo(video);
+        } else if (!isHorizontallyVisible && video.isVisuallyActive) {
+          video.isVisuallyActive = false;
+          pauseVideo(video);
+        }
+      });
+    }, 150);
+    
+    // Listen to scroll events on the scroller
+    scroller.addEventListener('scroll', checkHorizontalVisibility, { passive: true });
+    
+    // Also check visibility when the scroller enters/leaves the viewport
+    const scrollerObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          // Scroller is visible, check horizontal visibility
+          checkHorizontalVisibility();
+        } else {
+          // Scroller is not visible, pause all videos in it
+          videos.forEach(video => {
+            if (video.isVisuallyActive) {
+              video.isVisuallyActive = false;
+              pauseVideo(video);
+            }
+          });
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -72px 0px'
+    });
+    
+    scrollerObserver.observe(scroller);
+    
+    // Store references for cleanup
+    if (!scroller._videoScrollHandler) {
+      scroller._videoScrollHandler = checkHorizontalVisibility;
+      scroller._videoScrollObserver = scrollerObserver;
+    }
+  };
+  
+  // Desktop event listeners
+  const setupDesktopListeners = () => {
+    document.addEventListener('mouseenter', handleMouseEnter, true);
+    document.addEventListener('mouseleave', handleMouseLeave, true);
+  };
+  
+  const removeDesktopListeners = () => {
+    document.removeEventListener('mouseenter', handleMouseEnter, true);
+    document.removeEventListener('mouseleave', handleMouseLeave, true);
+  };
+  
+  // Check if video has valid source
+  const hasValidVideoSource = (video) => {
+    const source = video.querySelector('source');
+    return source && source.dataset.hlsSrc && source.dataset.hlsSrc.trim() !== '';
+  };
+  
+  // Device management
+  const handleDeviceChange = () => {
+    const deviceType = Utils.isMobile() ? 'mobile' : 'desktop';
+    
+    if (currentDevice === deviceType) return;
+    
+    // Cleanup current setup
+    cleanup();
+    currentDevice = deviceType;
+    
+    // Setup for new device
+    if (deviceType === 'mobile') {
+      setupMobileObserver();
+    } else {
+      setupDesktopListeners();
+      
+      // Setup initial states for desktop videos
+      document.querySelectorAll('.exp_card_video').forEach(video => {
+        if (hasValidVideoSource(video)) {
+          const poster = video.parentElement?.querySelector('.exp_card_poster');
+          if (poster?.src) video.poster = poster.src;
+          gsap.set(video, { opacity: 0 });
+          
+          if (!video.hasPlayingListener) {
+            video.addEventListener('playing', () => {
+              if (gsap.getProperty(video, "opacity") < 1) {
+                requestAnimationFrame(() => {
+                  gsap.to(video, { opacity: 1, duration: config.fadeInDuration, ease: "power2.out" });
+                });
+              }
+            });
+            video.hasPlayingListener = true;
+          }
+        }
+      });
+    }
+  };
+  
+  // Cleanup function
+  const cleanup = () => {
+    // Pause all active videos
+    activeVideos.forEach(video => {
+      if (video && !video.paused) {
+        video.pause();
+      }
+      if (video._playTimeout) {
+        clearTimeout(video._playTimeout);
+        video._playTimeout = null;
+      }
+    });
+    activeVideos.clear();
+    
+    // Cleanup HLS instances
+    hlsPool.forEach((hls, video) => {
+      if (!document.body.contains(video)) {
+        hls.destroy();
+        hlsPool.delete(video);
+      }
+    });
+    
+    // Remove event listeners and observers
+    removeDesktopListeners();
+    if (intersectionObserver) {
+      intersectionObserver.disconnect();
+      intersectionObserver = null;
+    }
+    
+    // Cleanup horizontal scroll listeners
+    document.querySelectorAll('.swiper-wrapper').forEach(scroller => {
+      if (scroller._videoScrollHandler) {
+        scroller.removeEventListener('scroll', scroller._videoScrollHandler);
+        scroller._videoScrollHandler = null;
+      }
+      if (scroller._videoScrollObserver) {
+        scroller._videoScrollObserver.disconnect();
+        scroller._videoScrollObserver = null;
+      }
+    });
+  };
+  
+  // Public API
   return {
-    init: () => {
-      document.addEventListener('DOMContentLoaded', initializeVideoInteractions);
-      window.addEventListener('resize', handleResize);
+    init() {
+      if (!window.gsap) return;
+      
+      handleDeviceChange();
+      window.addEventListener('resize', Utils.debounce(handleDeviceChange, 250));
+      
+      // Handle new videos added to DOM
+      new MutationObserver(mutations => {
+        let hasNewVideos = false;
+        
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.classList?.contains('exp_card_wrap') || 
+                  node.querySelector?.('.exp_card_wrap')) {
+                hasNewVideos = true;
+              }
+            }
+          });
+        });
+        
+        if (hasNewVideos) {
+          Utils.debounce(() => handleDeviceChange(), 100)();
+        }
+      }).observe(document.body, { childList: true, subtree: true });
     },
-    reinitialize: initializeVideoInteractions,
-    cleanup: cleanup
+    
+    cleanup,
+    
+    // Utility for cleaning up invalid videos
+    cleanupInvalidVideoElements(scope = document) {
+      const cards = scope.querySelectorAll('.exp_card_wrap');
+      let cleanedCount = 0;
+      
+      cards.forEach(card => {
+        const video = card.querySelector('.exp_card_video');
+        if (video && !hasValidVideoSource(video)) {
+          video.remove();
+          cleanedCount++;
+        }
+      });
+      
+      return cleanedCount;
+    }
   };
 })();
-
-// Initialize the manager
-ExperienceCardVideoManager.init();
 
 
 // Static Border Glow Effect for Fixture Cards
@@ -1391,7 +1562,6 @@ const initDynamicLighting = () => {
   const filterTemplate = document.getElementById('lighting');
 
   if (!svgFilterContainer || !filterTemplate) {
-    console.error('SVG filter template or container not found.');
     return;
   }
 
@@ -1537,3 +1707,17 @@ document.addEventListener('DOMContentLoaded', function() {
     subtree: true
   });
 });
+
+// Initialize the manager and expose globally  
+window.ExperienceCardVideoManager = UnifiedVideoManager;
+window.UnifiedVideoManager = UnifiedVideoManager;
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', UnifiedVideoManager.init);
+} else {
+  UnifiedVideoManager.init();
+}
+
+
+
