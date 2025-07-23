@@ -321,11 +321,68 @@
       return elementsWithEmptyClass.length === 0;
     }
 
-    // If already cleared, inject styles immediately
+    // Check if CMS nest is complete
+    function checkCMSNestComplete() {
+      return new Promise((resolve) => {
+        // Initialize FinsweetAttributes if not already present
+        window.FinsweetAttributes ||= [];
+        
+        // Push a callback to run when list attribute is loaded
+        window.FinsweetAttributes.push([
+          'list',
+          async (listInstances) => {
+            try {
+              // Wait for all list instances and their nested items to be fully loaded
+              const nestingPromises = [];
+              
+              for (const listInstance of listInstances) {
+                // Wait for paginated items to load
+                if (listInstance.loadingPaginatedItems) {
+                  nestingPromises.push(listInstance.loadingPaginatedItems);
+                }
+                
+                // Wait for all items' nesting to complete
+                listInstance.items.value.forEach(item => {
+                  if (item.nesting) {
+                    nestingPromises.push(item.nesting);
+                  }
+                });
+              }
+              
+              // Wait for all nesting promises to resolve
+              await Promise.all(nestingPromises);
+              resolve();
+            } catch (error) {
+              console.warn('CMS nest check encountered an error:', error);
+              resolve(); // Resolve anyway to prevent blocking
+            }
+          },
+        ]);
+      });
+    }
+
+    // If already cleared, check CMS nest and inject styles
     if (checkAllElementsCleared()) {
-      injectEmptyFacetStyles();
+      checkCMSNestComplete().then(() => {
+        injectEmptyFacetStyles();
+      });
       return;
     }
+
+    let facetClassesCleared = false;
+    let cmsNestComplete = false;
+
+    function tryInjectStyles() {
+      if (facetClassesCleared && cmsNestComplete) {
+        injectEmptyFacetStyles();
+      }
+    }
+
+    // Check CMS nest completion
+    checkCMSNestComplete().then(() => {
+      cmsNestComplete = true;
+      tryInjectStyles();
+    });
 
     // Check if Finsweet has removed the initial empty class from ALL elements
     const observer = new MutationObserver((mutations) => {
@@ -341,8 +398,8 @@
             
             // Check if ALL theme tab items have had their empty facet class removed
             if (checkAllElementsCleared()) {
-              // All elements cleared, now inject our styles
-              injectEmptyFacetStyles();
+              facetClassesCleared = true;
+              tryInjectStyles();
               
               // Stop observing
               observer.disconnect();
@@ -361,13 +418,13 @@
       });
     });
 
-    // Fallback: If no class changes detected within 2 seconds, inject styles anyway
+    // Fallback: If no class changes detected within 3 seconds, inject styles anyway
     setTimeout(() => {
       if (!document.querySelector('[data-empty-facet-styles]')) {
         injectEmptyFacetStyles();
         observer.disconnect();
       }
-    }, 2000);
+    }, 3000);
   }
 
   // Initialize everything
