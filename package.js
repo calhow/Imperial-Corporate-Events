@@ -1,5 +1,296 @@
 // Package Modal Management System
 
+// Packages Swiper Management System - Integrated with UniversalSwiperManager
+let PackagesSwiperManager;
+
+// Single function to check if packages swipers exist or are likely to exist
+const shouldInitializePackagesSwipers = () => {
+  const hasExistingPackages = document.querySelectorAll(".swiper.is-packages").length > 0;
+  const mightGetPackages = document.querySelector('.exp_card_wrap, .package_modal_wrap, [data-package-card]') !== null;
+  return hasExistingPackages || mightGetPackages;
+};
+
+// Create packages swiper manager that handles multiple .is-packages instances
+const createPackagesSwiperManager = () => {
+  // Ensure UniversalSwiperManager is available
+  if (!window.UniversalSwiperManager) {
+    return {
+      manageSwipers: () => {},
+      setupResizeListener: () => {},
+      swiperInstances: [],
+      refresh: () => {},
+      destroy: () => {}
+    };
+  }
+
+  let swiperInstances = [];
+  
+  // Simple swiper initialization for packages
+  const initializePackageSwiper = ({
+    selector,
+    comboClass,
+    slidesPerView,
+    breakpoints,
+    grid,
+    speed,
+    spaceBetween
+  }) => {
+    const swiperConfig = {
+      speed: speed || 400,
+      slidesPerView,
+      spaceBetween: spaceBetween || 0,
+      navigation: {
+        nextEl: `[data-swiper-button-next="${comboClass}"]`,
+        prevEl: `[data-swiper-button-prev="${comboClass}"]`,
+      },
+      breakpoints,
+      on: {
+        init() {
+          // Basic init logic
+        },
+        slideChange() {
+          // Basic slideChange logic
+        },
+        resize() {
+          // Basic resize logic
+        },
+      },
+    };
+
+    // Add grid configuration if provided
+    if (grid) {
+      swiperConfig.grid = grid;
+    }
+
+    const swiper = new Swiper(selector, swiperConfig);
+    return swiper;
+  };
+
+  // Create a base manager for packages
+  const createBaseManager = () => {
+    return window.UniversalSwiperManager.createManager({
+      name: 'Packages',
+      swiperConfigs: [], // Will be populated dynamically
+      initializeSwiper: initializePackageSwiper,
+      desktopBreakpoint: 991,
+      initDelay: 50,
+      verificationDelay: 100
+    });
+  };
+
+  const baseManager = createBaseManager();
+
+  // Custom packages swiper management with multiple instance support
+  const managePackagesSwipers = () => {
+    // Check for packages swipers each time this runs (they may be added/removed dynamically)
+    const packageSwipers = document.querySelectorAll(".swiper.is-packages");
+    if (packageSwipers.length === 0) {
+      // Clean up any existing instances if packages were removed
+      if (swiperInstances.length > 0) {
+        swiperInstances.forEach(swiper => {
+          if (swiper && swiper.comboClass) {
+            swiper.destroy(true, true);
+          }
+        });
+        swiperInstances.length = 0;
+      }
+      return; // Exit early if no packages swipers found
+    }
+
+    const isSwiperEnabled = window.innerWidth > 991;
+
+    if (isSwiperEnabled) {
+      if (swiperInstances.length === 0) {
+        // Reset all packages button wrappers
+        const packageButtonWrappers = document.querySelectorAll('[data-swiper-combo*="is-packages"]');
+        packageButtonWrappers.forEach((btnWrap) => {
+          btnWrap.style.display = "none";
+        });
+        
+        // Handle multiple .is-packages instances per page
+        packageSwipers.forEach((swiperContainer) => {
+          const slides = swiperContainer.querySelectorAll(".swiper-slide");
+          if (slides.length > 0) {
+            // Use a unique comboClass for each instance to support multiple navs
+            const uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
+            swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
+            
+            // Update nav button wrappers for this instance
+            const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
+            if (btnWrap) btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
+            
+            // Update nav buttons for this instance
+            const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
+            const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
+            if (nextBtn) nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
+            if (prevBtn) prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
+            
+            // Create config for this instance
+            const instanceConfig = {
+              selector: `[data-swiper-unique='${uniqueCombo}']`,
+              comboClass: uniqueCombo,
+              slidesPerView: "auto",
+            };
+            
+            // Use the enhanced initializer from base manager
+            const enhancedInitializer = baseManager.createInitializeSwiper(initializePackageSwiper);
+            const swiper = enhancedInitializer(instanceConfig);
+            swiperInstances.push(swiper);
+          }
+        });
+        
+        // Final verification step for packages swipers
+        setTimeout(() => {
+          swiperInstances.forEach((swiper) => {
+            if (swiper && swiper.comboClass) {
+              baseManager.toggleButtonWrapper(swiper);
+            }
+          });
+        }, 100);
+        
+      } else {
+        // Update existing swipers
+        swiperInstances.forEach(swiper => {
+          if (swiper && swiper.comboClass) {
+            baseManager.toggleButtonWrapper(swiper);
+          }
+        });
+      }
+    } else {
+      // Reset button wrappers and destroy all swipers on mobile
+      const packageButtonWrappers = document.querySelectorAll('[data-swiper-combo*="is-packages"]');
+      packageButtonWrappers.forEach((btnWrap) => {
+        btnWrap.style.display = "none";
+      });
+      
+      // Destroy all swipers
+      while (swiperInstances.length > 0) {
+        const swiper = swiperInstances.pop();
+        if (swiper && swiper.comboClass) {
+          swiper.destroy(true, true);
+        }
+      }
+    }
+  };
+
+  return {
+    manageSwipers: managePackagesSwipers,
+    swiperInstances,
+    setupResizeListener: () => {
+      const debouncedManagePackagesSwipers = (typeof Utils !== 'undefined' && Utils.debounce) 
+        ? Utils.debounce(managePackagesSwipers, 200)
+        : (() => {
+            let timeout;
+            return () => {
+              clearTimeout(timeout);
+              timeout = setTimeout(managePackagesSwipers, 200);
+            };
+          })();
+      
+      window.addEventListener("resize", debouncedManagePackagesSwipers);
+      
+      // Initial call
+      managePackagesSwipers();
+    },
+    refresh: managePackagesSwipers,
+    destroy: () => {
+      swiperInstances.forEach(swiper => {
+        if (swiper) {
+          swiper.destroy(true, true);
+        }
+      });
+      swiperInstances.length = 0;
+    }
+  };
+};
+
+// Function to initialize packages swiper manager
+const initializePackagesSwiperManager = () => {
+  if (window.UniversalSwiperManager) {
+    PackagesSwiperManager = createPackagesSwiperManager();
+    PackagesSwiperManager.setupResizeListener();
+    return true;
+  }
+  return false;
+};
+
+// Try to initialize packages swiper manager
+const initializePackagesSwipers = () => {
+  if (!initializePackagesSwiperManager()) {
+    // If not available, wait for DOM content loaded and try again
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!initializePackagesSwiperManager()) {
+        // If still not available, wait a bit more
+        setTimeout(() => {
+          initializePackagesSwiperManager();
+        }, 100);
+      }
+    });
+  }
+};
+
+// Only initialize if packages swipers exist or are likely to exist
+if (shouldInitializePackagesSwipers()) {
+  initializePackagesSwipers();
+}
+
+// Public API for refreshing packages swipers when new packages are added
+window.refreshPackagesSwipers = () => {
+  if (PackagesSwiperManager && PackagesSwiperManager.refresh) {
+    PackagesSwiperManager.refresh();
+  } else if (shouldInitializePackagesSwipers()) {
+    // Try to initialize if manager doesn't exist but packages do
+    initializePackagesSwipers();
+  }
+};
+
+// Watch for new .is-packages swipers added to the DOM
+const watchForNewPackagesSwipers = () => {
+  const observer = new MutationObserver((mutations) => {
+    let hasNewPackages = false;
+    
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Check if the added node contains .is-packages swipers
+          if (node.classList && node.classList.contains('is-packages')) {
+            hasNewPackages = true;
+          } else if (node.querySelector && node.querySelector('.swiper.is-packages')) {
+            hasNewPackages = true;
+          }
+        }
+      });
+    });
+    
+    if (hasNewPackages) {
+      // Initialize manager if it doesn't exist yet
+      if (!PackagesSwiperManager) {
+        initializePackagesSwipers();
+      } else if (PackagesSwiperManager.refresh) {
+        // Debounce the refresh to avoid multiple calls
+        clearTimeout(window.packagesRefreshTimeout);
+        window.packagesRefreshTimeout = setTimeout(() => {
+          PackagesSwiperManager.refresh();
+        }, 200);
+      }
+    }
+  });
+  
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+};
+
+// Start watching for new packages swipers after DOM is ready (only if we're managing packages)
+document.addEventListener('DOMContentLoaded', () => {
+  if (PackagesSwiperManager || shouldInitializePackagesSwipers()) {
+    setTimeout(() => {
+      watchForNewPackagesSwipers();
+    }, 500);
+  }
+});
+
 // Fetches and injects nested CMS content
 function cmsNest() {
   const items = document.querySelectorAll("[data-cms-nest^='item']");
@@ -303,9 +594,7 @@ function adjustHotelStars() {
 
 // Package modal content management
 const cardsSelector = '[data-package-card="true"]';
-
 const contentSelector = ".package_contain";
-
 const packageModal = document.querySelector(".package_modal");
 const packageModalTarget = packageModal?.querySelector(".package_modal_wrap");
 
@@ -329,7 +618,7 @@ class AnimationStateManager {
 
   getElements() {
     this.elements = {
-      bar: this.modalTarget.querySelector('[data-modal-element="bar"][data-modal-group="package"]'),
+      bars: this.modalTarget.querySelectorAll('[data-modal-element="bar"][data-modal-group="package"]'),
       content: this.modalTarget.querySelector('[data-tab-element="content"][data-modal-group="package"]')
     };
     return this.elements;
@@ -370,8 +659,8 @@ class AnimationStateManager {
         : { ...props, force3D: true };
     };
 
-        if (elements.bar) {
-      this.timeline.to(elements.bar, getOptimizedProps({
+        if (elements.bars && elements.bars.length > 0) {
+      this.timeline.to(elements.bars, getOptimizedProps({
         opacity: 1,
         duration: 0.2,
         ease: "power1.out"
@@ -632,7 +921,7 @@ const createContentAnimation = (elements) => {
     // Base animations
     const animations = [
         {
-            targets: elements.bar,
+            targets: elements.bars,
             props: { opacity: 1 }
         },
         {
@@ -642,7 +931,7 @@ const createContentAnimation = (elements) => {
     ];
 
     animations.forEach(({ targets, props }) => {
-        if (!targets) return;
+        if (!targets || (targets.length !== undefined && targets.length === 0)) return;
         timeline.to(targets, {
             ...props,
             duration: 0.2,
@@ -653,6 +942,8 @@ const createContentAnimation = (elements) => {
     TimelineManager.add(timeline);
     return timeline;
 }; 
+
+
 
 // Triggers modal opening and content loading
 const openModalForUrl = async (url) => {
@@ -668,6 +959,7 @@ const openModalForUrl = async (url) => {
   btn.style.opacity = '0';
   btn.style.pointerEvents = 'none';
   document.body.appendChild(btn);
+  
   btn.click();
   
   requestAnimationFrame(() => {
@@ -706,40 +998,88 @@ const openModalForUrl = async (url) => {
         content: contentClone.querySelector('[data-tab-element="content"][data-modal-group="package"]')
       };
       
-      const setInitialStates = () => {
-        // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
-        // Only trigger a reflow to ensure CSS has been applied
-        packageModalTarget.offsetHeight;
-      };
+      // Single setInitialStates function that only runs once
+      const setInitialStatesOnce = (() => {
+        let hasRun = false;
+        return () => {
+          if (hasRun) {
+            return;
+          }
+          hasRun = true;
+          
+          // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
+          // Only trigger a reflow to ensure CSS has been applied
+          packageModalTarget.offsetHeight; // This forces a layout
+        };
+      })();
       
       packageModalTarget.appendChild(contentClone);
       
-      setInitialStates();
+      // Set initial states only once
+      setInitialStatesOnce();
 
-      requestAnimationFrame(() => {
-        initializeModalContent(contentClone);
-        
-        setInitialStates();
-        
-        modalAnimationComplete.then(() => {
+      // Initialize content IMMEDIATELY in parallel with base animations
+      const contentInitResult = await initializeModalContent(contentClone);
+
+              // Wait for BOTH base animation AND content initialization to complete
+        // Handle both old return format (Promise) and new format ({ cmsNestPromise, deferredOperations })
+        const cmsPromise = contentInitResult && typeof contentInitResult === 'object' && contentInitResult.cmsNestPromise 
+          ? contentInitResult.cmsNestPromise 
+          : (contentInitResult || Promise.resolve());
+          
+        Promise.all([modalAnimationComplete, cmsPromise]).then(() => {
+          // Content is now ready - animate immediately with no delay
           requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setInitialStates();
-              
-              const contentTl = gsap.timeline();
-              
-              // Use the helper functions from main.js for consistency
-              if (typeof addBarCloseEntryAnimations === 'function') {
-                addBarCloseEntryAnimations(contentTl, 'package', 0, 0);
-              }
-              
-              if (typeof addContentEntryAnimation === 'function') {
-                addContentEntryAnimation(contentTl, 'package', 0.05);
+            // Check if required elements exist before animating - use querySelectorAll for multiple bars
+            const bars = packageModalTarget.querySelectorAll('[data-modal-element="bar"][data-modal-group="package"]');
+            const content = packageModalTarget.querySelector('[data-tab-element="content"][data-modal-group="package"]');
+            const closeBtn = packageModalTarget.querySelector('[data-modal-element="close-btn"][data-modal-group="package"]');
+            
+            const contentTl = gsap.timeline({
+              onComplete: () => {
+                // Run heavy operations AFTER animations complete
+                if (contentInitResult && contentInitResult.deferredOperations) {
+                  // Use requestIdleCallback for heavy operations or setTimeout fallback
+                  if ('requestIdleCallback' in window) {
+                    requestIdleCallback(contentInitResult.deferredOperations, { timeout: 100 });
+                  } else {
+                    setTimeout(contentInitResult.deferredOperations, 16); // ~1 frame delay
+                  }
+                }
               }
             });
+            
+            // Animate all bar elements
+            if (bars.length > 0) {
+              contentTl.to(bars, { 
+                opacity: 1, 
+                duration: 0.2, 
+                ease: "power1.out" 
+              }, 0);
+            }
+            
+            if (closeBtn) {
+              contentTl.to(closeBtn, { 
+                opacity: 1, 
+                duration: 0.2, 
+                ease: "power1.out" 
+              }, 0);
+            }
+            
+            if (content) {
+              contentTl.to(content, {
+                opacity: 1, 
+                duration: 0.2, 
+                ease: "power1.out"
+              }, 0.05);
+            }
+            
+            // If no elements found, complete immediately
+            if (bars.length === 0 && !content && !closeBtn) {
+              contentTl.set({}, {}, 0.2); // Dummy animation to trigger onComplete
+            }
           });
         });
-      });
     }
   } else {
     const elements = {
@@ -747,30 +1087,53 @@ const openModalForUrl = async (url) => {
       content: packageModalTarget.querySelector('[data-tab-element="content"][data-modal-group="package"]')
     };
     
-    const setInitialStates = () => {
+    // Single setInitialStates for existing content
+    const setInitialStatesExisting = () => {
       // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
       // Only trigger a reflow to ensure CSS has been applied
       packageModalTarget.offsetHeight;
     };
     
-    setInitialStates();
+    setInitialStatesExisting();
     
     modalAnimationComplete.then(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setInitialStates();
-          
-          const contentTl = gsap.timeline();
-          
-          // Use the helper functions from main.js for consistency
-          if (typeof addBarCloseEntryAnimations === 'function') {
-            addBarCloseEntryAnimations(contentTl, 'package', 0, 0);
-          }
-          
-          if (typeof addContentEntryAnimation === 'function') {
-            addContentEntryAnimation(contentTl, 'package', 0);
-          }
-        });
+        // Check if required elements exist for existing content - use querySelectorAll for multiple bars
+        const bars = packageModalTarget.querySelectorAll('[data-modal-element="bar"][data-modal-group="package"]');
+        const content = packageModalTarget.querySelector('[data-tab-element="content"][data-modal-group="package"]');
+        const closeBtn = packageModalTarget.querySelector('[data-modal-element="close-btn"][data-modal-group="package"]');
+        
+        const contentTl = gsap.timeline();
+        
+        // Animate all bar elements
+        if (bars.length > 0) {
+          contentTl.to(bars, { 
+            opacity: 1, 
+            duration: 0.2, 
+            ease: "power1.out" 
+          }, 0);
+        }
+        
+        if (closeBtn) {
+          contentTl.to(closeBtn, { 
+            opacity: 1, 
+            duration: 0.2, 
+            ease: "power1.out" 
+          }, 0);
+        }
+        
+        if (content) {
+          contentTl.to(content, {
+            opacity: 1, 
+            duration: 0.2, 
+            ease: "power1.out"
+          }, 0);
+        }
+        
+        // If no elements found, complete immediately
+        if (bars.length === 0 && !content && !closeBtn) {
+          contentTl.set({}, {}, 0.2); // Dummy animation to trigger onComplete
+        }
       });
     });
   }
@@ -787,96 +1150,16 @@ const fetchContent = async (url) => {
     
     const text = await response.text();
     
-    // Set up Web Worker for content processing if not already done
-    if (!window.contentProcessorReady) {
-      setupContentProcessor();
+    // Force main thread processing - web worker was causing failures
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, "text/html");
+    const content = doc.querySelector(contentSelector);
+    
+    if (!content) {
+      throw new Error("Content not found in fetched document");
     }
     
-    // Use the web worker if available, otherwise fall back to main thread processing
-    if (window.contentProcessor) {
-      return new Promise((resolve) => {
-        // Set up one-time handler for this specific URL
-        const messageHandler = (e) => {
-          const { processedUrl, content, error } = e.data;
-          
-          if (processedUrl === url) {
-            // Remove the event listener once we've received the right response
-            window.contentProcessor.removeEventListener('message', messageHandler);
-            
-            if (error) {
-              fallbackToMainThreadProcessing();
-              return;
-            }
-            
-            try {
-              // Convert the processed content back to DOM nodes
-              const tempDiv = document.createElement('div');
-              tempDiv.innerHTML = content || '';
-              const processedContent = tempDiv.querySelector(contentSelector);
-              
-              if (!processedContent) {
-                fallbackToMainThreadProcessing();
-                return;
-              }
-              
-              resolve(processedContent);
-            } catch (e) {
-              fallbackToMainThreadProcessing();
-            }
-          }
-        };
-        
-        // Fallback function for when worker fails
-        const fallbackToMainThreadProcessing = () => {
-          try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(text, "text/html");
-            const content = doc.querySelector(contentSelector);
-            
-            if (!content) {
-              resolve(null);
-              return;
-            }
-            
-            resolve(content);
-          } catch (e) {
-            resolve(null);
-          }
-        };
-        
-        window.contentProcessor.addEventListener('message', messageHandler);
-        
-        // Set timeout for worker response
-        const timeoutId = setTimeout(() => {
-          window.contentProcessor.removeEventListener('message', messageHandler);
-          fallbackToMainThreadProcessing();
-        }, 3000);
-        
-        // Send the HTML for processing
-        try {
-          window.contentProcessor.postMessage({ 
-            action: 'processContent', 
-            html: text, 
-            url: url,
-            selector: contentSelector
-          });
-        } catch (e) {
-          clearTimeout(timeoutId);
-          fallbackToMainThreadProcessing();
-        }
-      });
-    } else {
-      // Fallback to synchronous processing
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, "text/html");
-      const content = doc.querySelector(contentSelector);
-      
-      if (!content) {
-        throw new Error("Content not found in fetched document");
-      }
-      
-      return content;
-    }
+    return content;
   } catch (error) {
     return null;
   }
@@ -1033,6 +1316,10 @@ function initializePackageAccordion() {
 
 // Initializes swipers for all modal galleries
 function initializeGallerySwipers() {
+  if (typeof Swiper === 'undefined') {
+    return;
+  }
+
   const galleryTypes = [
     { class: "is-hotel-gallery", attr: "data-swiper-hotel" },
     { class: "is-room-gallery", attr: "data-swiper-room" },
@@ -1053,7 +1340,7 @@ function initializeGallerySwipers() {
         fadeEffect: {
           crossFade: true,
         },
-        loop: true,
+        loop: slideCount > 1,
         preventClicks: false,
         preventClicksPropagation: false,
         navigation: {
@@ -1089,8 +1376,6 @@ function initializeGallerySwipers() {
     });
   });
 }
-
-
 
 // Check for scope-specific counters init in experience modal and duplicate for package modal 
 const initializeDataCountersInScope = (scope) => {
@@ -1132,28 +1417,77 @@ const initializeDataCountersInScope = (scope) => {
     // Initialize state
     updateValue(currentValue);
   });
+  
+  // Fallback: If no data-counter-element groups found, try to initialize based on HTML structure
+  if (counterGroups.size === 0) {
+    initializeCountersByStructure(scope);
+  }
+};
+
+// Alternative counter initialization based on actual HTML structure
+const initializeCountersByStructure = (scope) => {
+  if (!scope) return;
+  
+  const counterWraps = scope.querySelectorAll('.form_field_counter_wrap');
+  
+  counterWraps.forEach((wrap) => {
+    // Find the input field
+    const input = wrap.querySelector('.form_field_input.is-counter, input[type="number"]');
+    
+    if (!input) return;
+    
+    // Find minus button (first .btn_counter_wrap)
+    const minusBtn = wrap.querySelector('.form_field_button_wrap:not(.is-right) .btn_counter_wrap');
+    
+    // Find plus button (.btn_counter_wrap inside .is-right)
+    const plusBtn = wrap.querySelector('.form_field_button_wrap.is-right .btn_counter_wrap');
+    
+    if (!minusBtn || !plusBtn) return;
+    
+    // Get min/max values from input attributes
+    const minValue = parseInt(input.getAttribute('min')) || 0;
+    const maxValue = parseInt(input.getAttribute('max')) || 99;
+    
+    // Initialize current value
+    let currentValue = parseInt(input.value) || parseInt(input.getAttribute('placeholder')) || minValue;
+    
+    const updateValue = (newValue) => {
+      currentValue = Math.max(minValue, Math.min(maxValue, newValue));
+      input.value = currentValue;
+      
+      // Update button states
+      minusBtn.disabled = currentValue <= minValue;
+      plusBtn.disabled = currentValue >= maxValue;
+      
+      // Trigger input event for any listeners
+      const event = new Event('input', { bubbles: true });
+      input.dispatchEvent(event);
+    };
+    
+    // Add event listeners
+    minusBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      updateValue(currentValue - 1);
+    });
+    
+    plusBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      updateValue(currentValue + 1);
+    });
+    
+    // Initialize state
+    updateValue(currentValue);
+  });
 }; 
 
 // Initializes modal content with all needed functionality
 const initializeModalContent = async (contentElement) => {
     let availabilitySyncCleanup = null; // Store cleanup function
     
-    const initSequence = [
-        () => initializePackageAccordion(),
-        // Setup paragraph toggles for the package modal content
+    // Split initialization into critical and deferred phases
+    const criticalInitSequence = [
         () => {
-            if (packageModalTarget && typeof window.setupParagraphToggles === 'function') {
-                window.setupParagraphToggles(packageModalTarget);
-                
-                // Observe paragraphs for resize events
-                if (typeof window.observeParagraphsForResize === 'function') {
-                    window.observeParagraphsForResize(packageModalTarget);
-                }
-            }
-        },
-        () => {
-            initializeGallerySwipers();
-            adjustHotelStars();
+            initializePackageAccordion();
         },
         () => {
             initializeTabGroupsInScope(packageModalTarget);
@@ -1163,45 +1497,71 @@ const initializeModalContent = async (contentElement) => {
             
             // Initialize availability checkbox sync
             availabilitySyncCleanup = initializeAvailabilitySync(packageModalTarget);
-        },
-        () => {
-            // Destroy and reinitialize Finsweet CMS Select
-            if (typeof window.fsAttributes !== 'undefined' && window.fsAttributes.cmsselect) {
-                try {
-                    // Destroy existing instances
-                    if (window.fsAttributes.cmsselect.destroy) {
-                        window.fsAttributes.cmsselect.destroy();
-                    }
-                    
-                    // Reinitialize for the modal content
-                    if (window.fsAttributes.cmsselect.init) {
-                        window.fsAttributes.cmsselect.init();
-                    }
-                } catch (error) {
-                    console.warn('Failed to reinitialize Finsweet CMS Select:', error);
-                }
-            }
-        },
-        () => {
-            // Check for SVG elements before CMS nesting
-            processSVGElements(packageModalTarget);
-            cmsNest();
         }
     ];
 
-    for (const init of initSequence) {
-        await new Promise(resolve => requestAnimationFrame(() => {
-            init();
-            resolve();
-        }));
+    // Run critical initialization synchronously but efficiently
+    for (const init of criticalInitSequence) {
+        init(); // Run synchronously for speed
     }
 
-    await new Promise(resolve => {
+    // Defer ALL heavy operations until after animations complete
+    const deferredOperations = () => {
+        // These operations can be deferred as they don't affect initial layout
+        const deferredSequence = [
+            () => {
+                if (packageModalTarget && typeof window.setupParagraphToggles === 'function') {
+                    window.setupParagraphToggles(packageModalTarget);
+                    
+                    // Observe paragraphs for resize events
+                    if (typeof window.observeParagraphsForResize === 'function') {
+                        window.observeParagraphsForResize(packageModalTarget);
+                    }
+                }
+            },
+            () => {
+                initializeGallerySwipers();
+                adjustHotelStars();
+            },
+            () => {
+                // Destroy and reinitialize Finsweet CMS Select
+                if (typeof window.fsAttributes !== 'undefined' && window.fsAttributes.cmsselect) {
+                    try {
+                        // Destroy existing instances
+                        if (window.fsAttributes.cmsselect.destroy) {
+                            window.fsAttributes.cmsselect.destroy();
+                        }
+                        
+                        // Reinitialize for the modal content
+                        if (window.fsAttributes.cmsselect.init) {
+                            window.fsAttributes.cmsselect.init();
+                        }
+                    } catch (error) {
+                        // Silent error handling
+                    }
+                }
+            }
+        ];
+
+        // Run deferred operations efficiently
+        deferredSequence.forEach(operation => operation());
+    };
+
+    // Handle SVG and CMS operations efficiently
+    // Check for SVG elements before CMS nesting - defer if not critical
+    const hasSVGElements = processSVGElements(packageModalTarget);
+    
+    // Start CMS nesting immediately but don't block
+    cmsNest();
+    
+    // Don't await CMS nest completion - let it happen in background
+    const cmsNestPromise = new Promise(resolve => {
         let eventFired = false;
         
         document.addEventListener("cmsNestComplete", (event) => {
             eventFired = true;
             
+            // Process SVG and cleanup in the background
             requestAnimationFrame(() => {
                 if (typeof insertSVGFromCMS === 'function') {
                     insertSVGFromCMS(packageModalTarget);
@@ -1211,40 +1571,40 @@ const initializeModalContent = async (contentElement) => {
             });
         }, { once: true });
         
-        // Add a safety fallback in case the event never fires
+        // Fallback timeout - much shorter since we're not blocking
         setTimeout(() => {
             if (!eventFired) {
-                if (packageModalTarget) {
-                    const markedElements = packageModalTarget.querySelectorAll("[data-svg-needs-processing='true']");
-                    
-                    const svgElements = packageModalTarget.querySelectorAll(".svg-code");
-                    
-                    const potentialContainers = packageModalTarget.querySelectorAll('[data-cms-nest^="dropzone-"]');
-                    let nestedSvgCount = 0;
-                    
-                    potentialContainers.forEach(container => {
-                        const nestedSvgs = container.querySelectorAll(".svg-code");
-                        nestedSvgCount += nestedSvgs.length;
-                    });
-                    
-                    if (markedElements.length > 0 || svgElements.length > 0 || nestedSvgCount > 0) {
-                        if (typeof insertSVGFromCMS === 'function') {
-                            insertSVGFromCMS(packageModalTarget);
+                // Handle fallback in background without blocking
+                requestAnimationFrame(() => {
+                    if (packageModalTarget) {
+                        const markedElements = packageModalTarget.querySelectorAll("[data-svg-needs-processing='true']");
+                        const svgElements = packageModalTarget.querySelectorAll(".svg-code");
+                        
+                        if (markedElements.length > 0 || svgElements.length > 0) {
+                            if (typeof insertSVGFromCMS === 'function') {
+                                insertSVGFromCMS(packageModalTarget);
+                            }
                         }
+                        
+                        hideEmptyDivs();
                     }
-                    
-                    hideEmptyDivs();
-                }
-                
-                resolve();
+                    resolve();
+                });
             }
-        }, 2000);
+        }, 500); // Much shorter timeout since we're non-blocking
     });
-    
+
     // Store cleanup function for destruction when modal content changes
     if (availabilitySyncCleanup && packageModalTarget) {
         packageModalTarget._availabilitySyncCleanup = availabilitySyncCleanup;
     }
+    
+    // Return both the completion promise AND deferred operations function
+    // This allows the caller to decide when to run heavy operations
+    return {
+        cmsNestPromise,
+        deferredOperations
+    };
 };
 
 // Initializes and manages package form submission inside *any* modalTarget
@@ -1506,202 +1866,3 @@ if (packageModalTarget) {
     characterData: false
   });
 } 
-
-// Packages Swiper Management System - Standalone
-const PackagesSwiperManager = (() => {
-  let swiperInstances = [];
-  
-  // Toggle visibility of navigation buttons based on swiper state
-  const toggleButtonWrapper = (swiper) => {
-    if (!swiper || !swiper.comboClass) return;
-    
-    const { comboClass } = swiper;
-    const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
-    
-    if (!btnWrap) return;
-    
-    // Determine the correct display value
-    const displayValue = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
-    
-    // Only update if needed to avoid unnecessary repaints
-    if (btnWrap.style.display !== displayValue) {
-      btnWrap.style.display = displayValue;
-    }
-  };
-
-  // Initialize swiper with navigation and event handlers
-  const initializeSwiper = (config) => {
-    const {
-      selector,
-      comboClass,
-      slidesPerView,
-      breakpoints,
-      parallax,
-      speed,
-      autoplay,
-      pagination,
-    } = config;
-    
-    // Pre-initialize the button wrapper before Swiper is created
-    const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
-    if (btnWrap) {
-      // Ensure it's visible during initialization
-      btnWrap.style.display = "flex";
-    }
-    
-    const swiperConfig = {
-      speed: speed || 500,
-      slidesPerView,
-      spaceBetween: 0,
-      parallax,
-      autoplay,
-      navigation: {
-        nextEl: `[data-swiper-button-next="${comboClass}"]`,
-        prevEl: `[data-swiper-button-prev="${comboClass}"]`,
-      },
-      breakpoints,
-      on: {
-        init(swiper) {
-          toggleButtonWrapper(swiper);
-        },
-        slideChangeTransitionEnd(swiper) {
-          toggleButtonWrapper(swiper);
-        },
-        resize: toggleButtonWrapper,
-      },
-    };
-    
-    // Only add pagination if it exists
-    if (pagination) {
-      swiperConfig.pagination = pagination;
-    }
-    
-    const swiper = new Swiper(selector, swiperConfig);
-    swiper.comboClass = comboClass;
-    return swiper;
-  };
-
-  // Reset button wrappers to default state
-  const resetButtonWrappers = () => {
-    const buttonWrappers = document.querySelectorAll('[data-swiper-combo*="is-packages"]');
-    buttonWrappers.forEach((btnWrap) => {
-      btnWrap.style.display = "none";
-    });
-  };
-
-  // Initialize or destroy swipers based on viewport width
-  const managePackagesSwipers = () => {
-    const isSwiperEnabled = window.innerWidth > 991;
-
-    if (isSwiperEnabled) {
-      if (swiperInstances.length === 0) {
-        // First reset all button wrappers to ensure clean state
-        resetButtonWrappers();
-        
-        // Handle multiple .is-packages instances per page
-        const packageSwipers = document.querySelectorAll(".swiper.is-packages");
-        packageSwipers.forEach((swiperContainer) => {
-          const slides = swiperContainer.querySelectorAll(".swiper-slide");
-          if (slides.length > 0) {
-            // Use a unique comboClass for each instance to support multiple navs
-            const uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
-            swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
-            
-            // Update nav button wrappers for this instance
-            const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
-            if (btnWrap) btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
-            
-            // Update nav buttons for this instance
-            const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
-            const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
-            if (nextBtn) nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
-            if (prevBtn) prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
-            
-            // Create config for this instance
-            const instanceConfig = {
-              selector: `[data-swiper-unique='${uniqueCombo}']`,
-              comboClass: uniqueCombo,
-              slidesPerView: "auto",
-            };
-            
-            const swiper = initializeSwiper(instanceConfig);
-            swiperInstances.push(swiper);
-            
-            if (swiper && swiper.initialized) {
-              toggleButtonWrapper(swiper);
-            }
-          }
-        });
-      } else {
-        // Update existing swipers
-        swiperInstances.forEach(swiper => {
-          if (swiper) {
-            toggleButtonWrapper(swiper);
-          }
-        });
-      }
-    } else {
-      // Reset button wrappers and destroy all swipers on mobile
-      resetButtonWrappers();
-      
-      // Destroy all swipers
-      for (let i = swiperInstances.length - 1; i >= 0; i--) {
-        const swiper = swiperInstances[i];
-        if (swiper) {
-          swiper.destroy(true, true);
-          swiperInstances.splice(i, 1);
-        }
-      }
-    }
-  };
-
-  // Debounce utility for resize events
-  const debounce = (func, wait) => {
-    let timeout;
-    return function(...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  };
-
-  // Initialize the system
-  const init = () => {
-    // Initial setup
-    managePackagesSwipers();
-    
-    // Handle resize events
-    window.addEventListener("resize", debounce(managePackagesSwipers, 200));
-    
-    // Handle DOM content loaded
-    document.addEventListener("DOMContentLoaded", () => {
-      managePackagesSwipers();
-    });
-    
-    // Handle window load
-    window.addEventListener('load', () => {
-      swiperInstances.forEach(swiper => {
-        if (swiper && swiper.initialized) {
-          toggleButtonWrapper(swiper);
-        }
-      });
-    });
-  };
-
-  // Public API
-  return {
-    init,
-    getSwipers: () => swiperInstances,
-    refresh: managePackagesSwipers,
-    destroy: () => {
-      swiperInstances.forEach(swiper => {
-        if (swiper) {
-          swiper.destroy(true, true);
-        }
-      });
-      swiperInstances = [];
-    }
-  };
-})();
-
-// Initialize the packages swiper system
-PackagesSwiperManager.init(); 

@@ -223,7 +223,7 @@ const resetInactiveSlides = (swiper) => {
   });
 };
 
-// Initialize Swiper instances with navigation and event handlers
+// Simplified swiper initialization - enhanced callbacks handled by UniversalSwiperManager
 const initializeSwiper = ({
   selector,
   comboClass,
@@ -234,13 +234,6 @@ const initializeSwiper = ({
   autoplay,
   pagination,
 }) => {
-  // Pre-initialize the button wrapper before Swiper is created
-  const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
-  if (btnWrap) {
-    // Ensure it's visible during initialization
-    btnWrap.style.display = "flex";
-  }
-  
   const swiperConfig = {
     speed: speed || 500,
     slidesPerView,
@@ -254,7 +247,7 @@ const initializeSwiper = ({
     breakpoints,
     on: {
       init(swiper) {
-        toggleCategoryButtonWrapper(swiper);
+        // Category-specific initialization logic
         if (comboClass === "is-cat-hero") {
           manageSlideVideos(swiper);
           adjustSwiperParallax();
@@ -293,7 +286,6 @@ const initializeSwiper = ({
       },
       // When the new slide has finished transitioning, set it up for playback.
       slideChangeTransitionEnd(swiper) {
-        toggleCategoryButtonWrapper(swiper);
         if (comboClass === "is-cat-hero") {
           setupActiveSlide(swiper);
           // Ensure autoplay continues after manual interaction
@@ -302,7 +294,6 @@ const initializeSwiper = ({
           }
         }
       },
-      resize: toggleCategoryButtonWrapper,
       // Ensure autoplay restarts with the correct (potentially updated) delay
       autoplayStop(swiper) {
         // MODIFIED: Only restart autoplay if it's NOT paused by the ScrollTrigger.
@@ -319,155 +310,156 @@ const initializeSwiper = ({
   }
   
   const swiper = new Swiper(selector, swiperConfig);
-
-  swiper.comboClass = comboClass;
   return swiper;
 };
 
-// Toggle visibility of navigation buttons based on swiper state for category page
-const toggleCategoryButtonWrapper = (swiper) => {
-  if (!swiper || !swiper.comboClass) return;
-  
-  const { comboClass } = swiper;
-  const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
-  
-  if (!btnWrap) return;
-  
-  // Determine the correct display value
-  const displayValue = swiper.isBeginning && swiper.isEnd ? "none" : "flex";
-  
-  // Only update if needed to avoid unnecessary repaints
-  if (btnWrap.style.display !== displayValue) {
-    btnWrap.style.display = displayValue;
+// Custom swiper manager for category page with special mobile hero handling
+const createCategorySwiperManager = () => {
+  // Ensure UniversalSwiperManager is available
+  if (!window.UniversalSwiperManager) {
+    return {
+      manageSwipers: () => {},
+      toggleButtonWrapper: () => {},
+      resetButtonWrappers: () => {},
+      setupResizeListener: () => {},
+      swiperInstances: [],
+      createInitializeSwiper: () => () => {}
+    };
   }
-};
 
-// Reset button wrappers to default state for category page
-const resetCategoryButtonWrappers = () => {
-  const buttonWrappers = document.querySelectorAll("[data-swiper-combo]");
-  buttonWrappers.forEach((btnWrap) => {
-    btnWrap.style.display = "none";
-  });
-};
+  const config = {
+    name: 'Category',
+    swiperConfigs,
+    initializeSwiper,
+    desktopBreakpoint: 991,
+    initDelay: 50,
+    verificationDelay: 100
+  };
+  
+  const baseManager = window.UniversalSwiperManager.createManager(config);
 
-// Initialize or destroy swipers based on viewport width for category page
-const manageCategorySwipers = () => {
-  const isSwiperEnabled = window.innerWidth > 991;
+  // Override manageSwipers to handle special mobile hero logic
+  const originalManageSwipers = baseManager.manageSwipers;
+  
+  const customManageSwipers = () => {
+    const isSwiperEnabled = window.innerWidth > config.desktopBreakpoint;
 
-  if (isSwiperEnabled) {
-    if (swiperInstances.length === 0) {
-      // First reset all button wrappers to ensure clean state
-      resetCategoryButtonWrappers();
+    if (isSwiperEnabled) {
+      // Use original logic for desktop
+      originalManageSwipers();
+    } else {
+      // Custom mobile logic - keep hero swiper, destroy others
+      baseManager.resetButtonWrappers();
+
+      // Store the hero swiper if it exists before destroying others
+      let heroSwiper = baseManager.swiperInstances.find(s => s.comboClass === "is-cat-hero");
       
-      // Initialize all swipers
-      swiperConfigs.forEach((config) => {
-        const swiperContainer = document.querySelector(config.selector);
-        if (swiperContainer) {
-          const slides = swiperContainer.querySelectorAll(".swiper-slide");
-          if (slides.length > 0) {
-            const swiper = initializeSwiper(config);
-            swiperInstances.push(swiper);
-            if (swiper && swiper.initialized) {
-              toggleCategoryButtonWrapper(swiper);
+      // Destroy all non-hero swipers
+      for (let i = baseManager.swiperInstances.length - 1; i >= 0; i--) {
+        const swiper = baseManager.swiperInstances[i];
+        if (swiper.comboClass !== "is-cat-hero") {
+          swiper.destroy(true, true);
+          baseManager.swiperInstances.splice(i, 1);
+        }
+      }
+      
+      // If we didn't save a hero swiper, create one if needed
+      if (!heroSwiper) {
+        const heroConfig = swiperConfigs.find(configItem => configItem.comboClass === "is-cat-hero");
+        if (heroConfig) {
+          const heroContainer = document.querySelector(heroConfig.selector);
+          if (heroContainer) {
+            const slides = heroContainer.querySelectorAll(".swiper-slide");
+            if (slides.length > 0) {
+              const enhancedInitializer = baseManager.createInitializeSwiper(initializeSwiper);
+              const newHeroSwiper = enhancedInitializer(heroConfig);
+              baseManager.swiperInstances.push(newHeroSwiper);
             }
           }
         }
-      });
-    } else {
-      // Update existing swipers
-      swiperInstances.forEach(swiper => {
-        if (swiper) {
-          toggleCategoryButtonWrapper(swiper);
-        }
-      });
+      }
     }
-  } else {
-    resetCategoryButtonWrappers();
+  };
 
-    // Store the hero swiper if it exists before destroying
-    let heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
-    let heroConfig = null;
-    
-    // Destroy all non-hero swipers
-    for (let i = swiperInstances.length - 1; i >= 0; i--) {
-      const swiper = swiperInstances[i];
-      if (swiper.comboClass !== "is-cat-hero") {
-        swiper.destroy(true, true);
-        swiperInstances.splice(i, 1);
-      }
+  return {
+    ...baseManager,
+    manageSwipers: customManageSwipers,
+    setupResizeListener: () => {
+      const debouncedManageSwipers = Utils.debounce(() => {
+        customManageSwipers();
+      }, 200);
+      
+      window.addEventListener("resize", debouncedManageSwipers);
+      
+      customManageSwipers();
     }
-    
-    // If we didn't save a hero swiper, create one if needed
-    if (!heroSwiper) {
-      const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
-      if (heroConfig) {
-        const heroContainer = document.querySelector(heroConfig.selector);
-        if (heroContainer) {
-          const slides = heroContainer.querySelectorAll(".swiper-slide");
-          if (slides.length > 0) {
-            const newHeroSwiper = initializeSwiper(heroConfig);
-            swiperInstances.push(newHeroSwiper);
-          }
-        }
-      }
-    }
-  }
+  };
 };
 
-// Attach listener to window resize using Utils.debounce if available
-window.addEventListener("resize", (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-})(manageCategorySwipers, 200));
+// Initialize the custom category swiper manager
+let CategorySwiperManager;
+
+// Function to initialize when UniversalSwiperManager is available
+const initializeCategorySwiperManager = () => {
+  if (window.UniversalSwiperManager) {
+    CategorySwiperManager = createCategorySwiperManager();
+    
+    // Setup the swiper management system and run initial setup
+    CategorySwiperManager.setupResizeListener();
+    
+    return true; // Successfully initialized
+  }
+  return false; // Not ready yet
+};
+
+// Try to initialize immediately
+if (!initializeCategorySwiperManager()) {
+  // If not available, wait for DOM content loaded and try again
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!initializeCategorySwiperManager()) {
+      // If still not available, wait a bit more
+      setTimeout(() => {
+        initializeCategorySwiperManager();
+      }, 100);
+    }
+  });
+}
 
 // Run parallax adjustment right away
 adjustSwiperParallax();
 
-// Initialize on page load
-manageCategorySwipers();
-
 // Initialize cat-hero swiper immediately regardless of screen size
 document.addEventListener("DOMContentLoaded", () => {
-  // If the hero swiper doesn't exist yet, create it
-  const heroExists = swiperInstances.some(s => s.comboClass === "is-cat-hero");
+  // Run the parallax adjustment
+  adjustSwiperParallax();
   
-  if (!heroExists) {
-    const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
-    if (heroConfig) {
-      const heroContainer = document.querySelector(heroConfig.selector);
-      if (heroContainer) {
-        const slides = heroContainer.querySelectorAll(".swiper-slide");
-        if (slides.length > 0) {
-          const newHeroSwiper = initializeSwiper(heroConfig);
-          swiperInstances.push(newHeroSwiper);
-          
-          // Ensure button wrapper is correctly initialized
-          if (newHeroSwiper && newHeroSwiper.initialized) {
-            toggleCategoryButtonWrapper(newHeroSwiper);
+  // Wait for CategorySwiperManager to be available
+  const ensureCategorySwiperManager = () => {
+    if (CategorySwiperManager && CategorySwiperManager.swiperInstances) {
+      // Ensure hero swiper is created if needed
+      const heroExists = CategorySwiperManager.swiperInstances.some(s => s.comboClass === "is-cat-hero");
+      
+      if (!heroExists) {
+        const heroConfig = swiperConfigs.find(config => config.comboClass === "is-cat-hero");
+        if (heroConfig) {
+          const heroContainer = document.querySelector(heroConfig.selector);
+          if (heroContainer) {
+            const slides = heroContainer.querySelectorAll(".swiper-slide");
+            if (slides.length > 0) {
+              const enhancedInitializer = CategorySwiperManager.createInitializeSwiper(initializeSwiper);
+              const newHeroSwiper = enhancedInitializer(heroConfig);
+              CategorySwiperManager.swiperInstances.push(newHeroSwiper);
+            }
           }
         }
       }
+    } else {
+      // Try again after a short delay
+      setTimeout(ensureCategorySwiperManager, 50);
     }
-  } else {
-    // Update existing hero swiper's button wrapper
-    const heroSwiper = swiperInstances.find(s => s.comboClass === "is-cat-hero");
-    if (heroSwiper) {
-      toggleCategoryButtonWrapper(heroSwiper);
-    }
-  }
+  };
   
-  // Also update other swipers if they exist
-  swiperInstances.forEach(swiper => {
-    if (swiper && swiper.comboClass !== "is-cat-hero") {
-      toggleCategoryButtonWrapper(swiper);
-    }
-  });
-  
-  // Run the parallax adjustment
-  adjustSwiperParallax();
+  ensureCategorySwiperManager();
 });
 
 // Listen for resize events to adjust parallax values
@@ -631,7 +623,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-
 // Parallax animations setup
 const catCardMedia = document.querySelector(".cat_card_media");
 const catHeaderWrap = document.querySelector(".cat_header_wrap");
@@ -658,17 +649,6 @@ catCardMediaMatcher.add("(min-width: 479px)", () => {
     });
     catCardMediaParallax.to(".cat_card_media > *", { y: "10rem" });
   }
-  
-});
-
-// Also ensure button wrappers are properly initialized on full page load
-window.addEventListener('load', () => {
-  // Update all swiper button wrappers
-  swiperInstances.forEach(swiper => {
-    if (swiper && swiper.initialized) {
-      toggleButtonWrapper(swiper);
-    }
-  });
 });
 
 // Swiper Module for category links
@@ -757,21 +737,7 @@ const CategoryLinkSwiperModule = (() => {
   };
 })();
 
-// Initialize parallax adjustment on load
-document.addEventListener('DOMContentLoaded', adjustSwiperParallax);
-
-// Update on window resize with debounce
-window.addEventListener('resize', (typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-})(adjustSwiperParallax, 100));
-
-
 // SET EXPERIENCE TEXT
-
 document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".link_cat-btn-thumb_subtext").forEach(function (subtextWrap) {
     const subtextElements = subtextWrap.querySelectorAll(".cat_link_subtext");

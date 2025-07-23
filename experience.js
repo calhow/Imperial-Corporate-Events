@@ -33,7 +33,7 @@ const swiperConfigs = [
   }
 ];
 
-// Initializes Swiper with proper navigation and breakpoints
+// Simplified Swiper initialization - enhanced callbacks handled by UniversalSwiperManager
 const initializeSwiper = ({
   selector,
   comboClass,
@@ -53,14 +53,15 @@ const initializeSwiper = ({
     },
     breakpoints,
     on: {
+      // Basic callbacks - UniversalSwiperManager will enhance these
       init() {
-        toggleButtonWrapper(this);
+        // Original init logic can go here if needed
       },
       slideChange() {
-        toggleButtonWrapper(this);
+        // Original slideChange logic can go here if needed
       },
       resize() {
-        toggleButtonWrapper(this);
+        // Original resize logic can go here if needed
       },
     },
   };
@@ -71,67 +72,57 @@ const initializeSwiper = ({
   }
 
   const swiper = new Swiper(selector, swiperConfig);
-
-  swiper.comboClass = comboClass;
   return swiper;
 };
 
-// Toggles button wrapper visibility based on swiper state
-const toggleButtonWrapper = (swiper) => {
-  const { comboClass } = swiper;
-  const btnWrap = document.querySelector(`[data-swiper-combo="${comboClass}"]`);
+// Initialize the Universal Swiper Manager for experience page
+let ExperienceSwiperManager;
 
-  if (!btnWrap) return;
-  const shouldHide = swiper.isBeginning && swiper.isEnd;
-  btnWrap.style.display = shouldHide ? "none" : "flex";
-};
+// Create experience swiper manager using UniversalSwiperManager
+const createExperienceSwiperManager = () => {
+  // Ensure UniversalSwiperManager is available
+  if (!window.UniversalSwiperManager) {
+    return {
+      manageSwipers: () => {},
+      setupResizeListener: () => {},
+      swiperInstances: [],
+      refresh: () => {},
+      destroy: () => {}
+    };
+  }
 
-// Resets button wrappers to default state
-const resetButtonWrappers = () => {
-  const buttonWrappers = document.querySelectorAll("[data-swiper-combo]");
-  buttonWrappers.forEach((btnWrap) => {
-    btnWrap.style.display = "none";
+  return window.UniversalSwiperManager.createManager({
+    name: 'Experience',
+    swiperConfigs,
+    initializeSwiper,
+    desktopBreakpoint: 991,
+    initDelay: 50,
+    verificationDelay: 100
   });
 };
 
-// Manages Swiper initialization based on screen width
-const manageSwipers = () => {
-  const isSwiperEnabled = window.innerWidth > 991;
-
-  if (isSwiperEnabled) {
-    if (swiperInstances.length === 0) {
-      swiperConfigs.forEach((config) => {
-        const swiperContainer = document.querySelector(config.selector);
-        if (swiperContainer) {
-          const slides = swiperContainer.querySelectorAll(".swiper-slide");
-          if (slides.length > 0) {
-            swiperInstances.push(initializeSwiper(config));
-          }
-        }
-      });
-    }
-    // Ensure .gallery_btn_wrap is always recalculated after resize
-    const mainGallerySwiper = document.querySelector('.swiper.is-gallery')?.swiper;
-    if (mainGallerySwiper) {
-      SwiperManager.toggleNavigationVisibility(mainGallerySwiper, {
-        galleryBtnWrap: document.querySelector('.gallery_btn_wrap'),
-        prevBtn: document.querySelector('[data-swiper-button-prev="is-gallery"]'),
-        nextBtn: document.querySelector('[data-swiper-button-next="is-gallery"]')
-      });
-    }
-  } else {
-    resetButtonWrappers();
-
-    while (swiperInstances.length > 0) {
-      const swiper = swiperInstances.pop();
-      swiper.destroy(true, true);
-    }
+// Function to initialize experience swiper manager
+const initializeExperienceSwiperManager = () => {
+  if (window.UniversalSwiperManager) {
+    ExperienceSwiperManager = createExperienceSwiperManager();
+    ExperienceSwiperManager.setupResizeListener();
+    return true;
   }
+  return false;
 };
 
-window.addEventListener("resize", Utils.debounce(manageSwipers, 200));
-
-manageSwipers();
+// Try to initialize experience swiper manager
+if (!initializeExperienceSwiperManager()) {
+  // If not available, wait for DOM content loaded and try again
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!initializeExperienceSwiperManager()) {
+      // If still not available, wait a bit more
+      setTimeout(() => {
+        initializeExperienceSwiperManager();
+      }, 100);
+    }
+  });
+}
 
 
 // Handles key feature card animation on click
@@ -217,26 +208,42 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        console.error('Share failed:', err);
-      }
+              try {
+          await navigator.share(shareData);
+        } catch (err) {
+          // Fallback if native sharing fails
+          copyToClipboard(shareData.url);
+        }
     } else {
-      try {
-        await navigator.clipboard.writeText(shareData.url);
-        textElements.forEach(el => el.textContent = 'Link copied');
-        setTimeout(() => {
-          textElements.forEach((el, index) => {
-            el.textContent = originalTexts[index];
-          });
-        }, 3000);
-      } catch (err) {
-        console.error('Could not copy link:', err);
-      }
+      // No native sharing, use clipboard
+      copyToClipboard(shareData.url);
     }
   });
 });
+
+
+// Copy to clipboard functionality
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(function() {
+    // Success - could show a toast notification
+  }).catch(function() {
+    // Fallback for older browsers
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      document.execCommand('copy');
+      // Success - could show a toast notification
+    } catch (err) {
+      // Error - could show an error message
+    }
+    
+    document.body.removeChild(textArea);
+  });
+}
 
 
 // Sticky button bar on tablet down
@@ -495,6 +502,7 @@ const SingleHLSPlayer = {
   pauseVideo() {
     if (this.video && !this.video.paused) {
       this.video.pause();
+      gsap.to(this.video, { opacity: 0, duration: 0.7, ease: 'power2.out' });
     }
   }
 };

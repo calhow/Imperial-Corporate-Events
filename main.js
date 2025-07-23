@@ -283,26 +283,12 @@ function updateLiveChatVisibility() {
 
 function toggleBodyScrollAndAnimate(modalGroup) {
   const anyModalOpen = Object.values(modalStates).some((state) => state);
-  const navContain = document.querySelector(".nav_main_contain");
-  const navWrap = document.querySelector(".nav_main_wrap");
-  
   if (anyModalOpen) {
     document.body.classList.add("no-scroll");
-    if (modalGroup !== "nav") {
-      navContain?.classList.add("is-disabled");
-      setTimeout(() => {
-        navWrap.style.display = "none";
-      }, 200);
-    }
   } else {
     document.body.classList.remove("no-scroll");
-    navWrap.style.display = "block";
-    navContain?.classList.remove("is-disabled");
   }
 }
-
-
-
 
 
 // Helper function to add common BG & Tray animations
@@ -402,6 +388,7 @@ document.addEventListener("click", (event) => {
   
   const isTrayModal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}'][data-modal-type='tray']`) !== null;
   const trayModalType = isTrayModal ? modalGroup : null;
+
 
 
   let modalTl = gsap.timeline({
@@ -1656,12 +1643,198 @@ document.addEventListener('DOMContentLoaded', function() {
 window.ExperienceCardVideoManager = UnifiedVideoManager;
 window.UnifiedVideoManager = UnifiedVideoManager;
 
+// Universal Swiper Management System
+const UniversalSwiperManager = (() => {
+  
+  // Default configuration that can be overridden
+  const defaultConfig = {
+    desktopBreakpoint: 991,
+    initDelay: 50,
+    verificationDelay: 100,
+    buttonWrapperSelector: 'data-swiper-combo',
+    prevButtonSelector: 'data-swiper-button-prev',
+    nextButtonSelector: 'data-swiper-button-next'
+  };
+  
+  // Create a new swiper manager instance
+  const createManager = (options = {}) => {
+    const config = { ...defaultConfig, ...options };
+    const { name, swiperConfigs, initializeSwiper } = config;
+    const swiperInstances = [];
+    
+    // Toggle button wrapper visibility based on swiper state
+    const toggleButtonWrapper = (swiper) => {
+      const { comboClass } = swiper;
+      
+      const btnWrap = document.querySelector(`[${config.buttonWrapperSelector}="${comboClass}"]`);
+
+      if (!btnWrap) {
+        return;
+      }
+      
+      // More robust hide/show logic
+      const hasMultipleSlides = swiper.slides && swiper.slides.length > 1;
+      const shouldHide = !hasMultipleSlides || (swiper.isBeginning && swiper.isEnd);
+      
+      const newDisplay = shouldHide ? "none" : "flex";
+      
+      btnWrap.style.display = newDisplay;
+    };
+    
+    // Reset button wrappers to default state
+    const resetButtonWrappers = () => {
+      const buttonWrappers = document.querySelectorAll(`[${config.buttonWrapperSelector}]`);
+      
+      buttonWrappers.forEach((btnWrap) => {
+        btnWrap.style.display = "none";
+      });
+    };
+    
+    // Enhanced swiper initialization with timing fixes
+    const createInitializeSwiper = (originalInitializer) => {
+      return (swiperConfig) => {
+        // Pre-initialize button wrapper
+        const btnWrap = document.querySelector(`[${config.buttonWrapperSelector}="${swiperConfig.comboClass}"]`);
+        if (btnWrap) {
+          btnWrap.style.display = "flex";
+        }
+        
+        // Enhance config with proper callbacks
+        const enhancedConfig = {
+          ...swiperConfig,
+          on: {
+            ...swiperConfig.on,
+            init() {
+              // Call original init callback if it exists
+              if (swiperConfig.on?.init) {
+                swiperConfig.on.init.call(this);
+              }
+              
+              // Delay the initial toggle to ensure DOM is ready
+              setTimeout(() => {
+                toggleButtonWrapper(this);
+              }, config.initDelay);
+            },
+            slideChange() {
+              // Call original slideChange callback if it exists
+              if (swiperConfig.on?.slideChange) {
+                swiperConfig.on.slideChange.call(this);
+              }
+              
+              toggleButtonWrapper(this);
+            },
+            resize() {
+              // Call original resize callback if it exists
+              if (swiperConfig.on?.resize) {
+                swiperConfig.on.resize.call(this);
+              }
+              
+              toggleButtonWrapper(this);
+            }
+          }
+        };
+        
+        // Call the original initializer with enhanced config
+        const swiper = originalInitializer(enhancedConfig);
+        
+        if (swiper) {
+          swiper.comboClass = swiperConfig.comboClass;
+        }
+        return swiper;
+      };
+    };
+    
+    // Manage swiper initialization based on screen width
+    const manageSwipers = () => {
+      const isSwiperEnabled = window.innerWidth > config.desktopBreakpoint;
+
+      if (isSwiperEnabled) {
+        if (swiperInstances.length === 0) {
+          // First, ensure all button wrappers start with consistent state
+          const allButtonWrappers = document.querySelectorAll(`[${config.buttonWrapperSelector}]`);
+          allButtonWrappers.forEach((btnWrap) => {
+            btnWrap.style.display = "none"; // Start hidden, will be shown by toggleButtonWrapper if needed
+          });
+          
+          swiperConfigs.forEach((swiperConfig, index) => {
+            const swiperContainer = document.querySelector(swiperConfig.selector);
+            
+            if (swiperContainer) {
+              const slides = swiperContainer.querySelectorAll(".swiper-slide");
+              
+              if (slides.length > 0) {
+                const enhancedInitializer = createInitializeSwiper(initializeSwiper);
+                swiperInstances.push(enhancedInitializer(swiperConfig));
+              }
+            }
+          });
+          
+          // Final verification step - ensure all button wrappers are correctly set
+          setTimeout(() => {
+            swiperInstances.forEach((swiper) => {
+              if (swiper && swiper.comboClass) {
+                toggleButtonWrapper(swiper);
+              }
+            });
+          }, config.verificationDelay);
+          
+        } else {
+          // Update existing swipers
+          swiperInstances.forEach(swiper => {
+            if (swiper && swiper.comboClass) {
+              toggleButtonWrapper(swiper);
+            }
+          });
+        }
+      } else {
+        // Hide all button wrappers for mobile
+        const buttonWrappers = document.querySelectorAll(`[${config.buttonWrapperSelector}]`);
+        buttonWrappers.forEach((btnWrap) => {
+          btnWrap.style.display = "none";
+        });
+
+        while (swiperInstances.length > 0) {
+          const swiper = swiperInstances.pop();
+          if (swiper && swiper.comboClass) {
+            swiper.destroy(true, true);
+          }
+        }
+      }
+    };
+    
+    // Setup resize listener
+    const setupResizeListener = () => {
+      const debouncedManageSwipers = Utils.debounce(() => {
+        manageSwipers();
+      }, 200);
+      
+      window.addEventListener("resize", debouncedManageSwipers);
+      
+      manageSwipers();
+    };
+    
+    // Public API
+    return {
+      manageSwipers,
+      toggleButtonWrapper,
+      resetButtonWrappers,
+      setupResizeListener,
+      swiperInstances,
+      createInitializeSwiper
+    };
+  };
+  
+  return {
+    createManager
+  };
+})();
+
+// Expose globally
+window.UniversalSwiperManager = UniversalSwiperManager;
+
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', UnifiedVideoManager.init);
 } else {
   UnifiedVideoManager.init();
 }
-
-
-
