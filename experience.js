@@ -510,3 +510,142 @@ const SingleHLSPlayer = {
 document.addEventListener('DOMContentLoaded', () => {
   SingleHLSPlayer.init('.exp_media_wrap');
 });
+
+// Mobile Modal Video Player for Experience Video Modal
+const MobileModalVideoPlayer = {
+  video: null,
+  hls: null,
+  modalGroup: 'exp-vid',
+  isInitialized: false,
+
+  isMobile: () => window.innerWidth <= 991,
+
+  init() {
+    if (!this.isMobile()) return;
+    
+    this.video = document.querySelector('[data-modal-group="exp-vid"] .exp_video');
+    if (!this.video) return;
+
+    const source = this.video.querySelector('source.exp_vid_src');
+    if (!source?.dataset.hlsSrc) return;
+
+    this.isInitialized = true;
+    this.setupEventListeners();
+
+    window.addEventListener('resize', Utils.debounce(this.handleResize.bind(this), 250));
+  },
+
+  setupEventListeners() {
+    // Listen for modal open/close events using the existing modal system
+    document.addEventListener('click', (event) => {
+      const modalToggleBtn = Utils.safeClosest(event, "[data-modal-open], [data-modal-close]");
+      if (!modalToggleBtn) return;
+
+      const modalGroup = modalToggleBtn.getAttribute("data-modal-open") || 
+                        modalToggleBtn.getAttribute("data-modal-close");
+      
+      if (modalGroup !== this.modalGroup) return;
+
+      const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
+      
+      if (isOpening && this.isMobile()) {
+        // Start video when modal opens
+        setTimeout(() => this.startVideo(), 300); // Delay to ensure modal is visible
+      } else {
+        // Stop video when modal closes
+        this.stopVideo();
+      }
+    });
+
+    // Also listen for modal state changes via the global modalStates
+    const checkModalState = () => {
+      if (!window.modalStates || !this.isMobile()) return;
+      
+      const isModalOpen = window.modalStates[this.modalGroup];
+      
+      if (isModalOpen && !this.hls) {
+        this.startVideo();
+      } else if (!isModalOpen && this.hls) {
+        this.stopVideo();
+      }
+    };
+
+    // Check modal state periodically
+    setInterval(checkModalState, 500);
+  },
+
+  handleResize() {
+    const shouldBeActive = this.isMobile();
+    
+    if (shouldBeActive && !this.isInitialized) {
+      this.init();
+    } else if (!shouldBeActive) {
+      this.cleanup();
+    }
+  },
+
+  startVideo() {
+    if (!this.video || this.hls || !this.isMobile()) return;
+    
+    const source = this.video.querySelector('source.exp_vid_src');
+    if (!source?.dataset.hlsSrc || !Hls.isSupported()) return;
+
+    this.hls = new Hls({
+      capLevelToPlayerSize: true,
+      startLevel: -1,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 15
+    });
+
+    this.hls.loadSource(source.dataset.hlsSrc);
+    this.hls.attachMedia(this.video);
+    
+    // Set initial opacity
+    gsap.set(this.video, { opacity: 0 });
+    
+    // Auto-play after HLS is ready
+    this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      this.playVideo();
+    });
+
+    // Handle errors
+    this.hls.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        this.stopVideo();
+      }
+    });
+  },
+
+  stopVideo() {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    
+    if (this.video && !this.video.paused) {
+      this.video.pause();
+    }
+    
+    gsap.set(this.video, { opacity: 0 });
+  },
+  
+  playVideo() {
+    if (!this.video || !this.isMobile()) return;
+
+    this.video.play().then(() => {
+      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
+    }).catch(() => {
+      // Silent error handling for autoplay restrictions
+    });
+  },
+
+  cleanup() {
+    this.stopVideo();
+    this.isInitialized = false;
+  }
+};
+
+// Initialize mobile video player
+document.addEventListener('DOMContentLoaded', () => {
+  MobileModalVideoPlayer.init();
+});
