@@ -1504,7 +1504,12 @@ const initDynamicLighting = () => {
     return;
   }
 
-  const lightWraps = document.querySelectorAll('[data-light-wrap]');
+  // Filter out data-light-wrap elements that are direct children of w-condition-invisible elements
+  const allLightWraps = document.querySelectorAll('[data-light-wrap]');
+  const lightWraps = Array.from(allLightWraps).filter(wrap => {
+    return !wrap.parentElement?.classList.contains('w-condition-invisible');
+  });
+  
   const lightFixtures = [];
 
   lightWraps.forEach((wrap, index) => {

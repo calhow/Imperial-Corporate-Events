@@ -80,84 +80,129 @@ const createPackagesSwiperManager = () => {
 
   const baseManager = createBaseManager();
 
-  // Custom packages swiper management with multiple instance support
+  // Enhanced packages swiper management with smart instance tracking
   const managePackagesSwipers = () => {
     // Check for packages swipers each time this runs (they may be added/removed dynamically)
     const packageSwipers = document.querySelectorAll(".swiper.is-packages");
+    const isSwiperEnabled = window.innerWidth > 991;
+    
+    // Create a set of existing swiper unique IDs for comparison
+    const existingSwiperIds = new Set(
+      swiperInstances
+        .filter(swiper => swiper && swiper.comboClass)
+        .map(swiper => swiper.comboClass)
+    );
+    
+    // Track current DOM swipers by their unique IDs
+    const currentDOMSwiperIds = new Set();
+    
     if (packageSwipers.length === 0) {
-      // Clean up any existing instances if packages were removed
+      // Clean up all instances if no packages swipers found
       if (swiperInstances.length > 0) {
         swiperInstances.forEach(swiper => {
-          if (swiper && swiper.comboClass) {
+          if (swiper && swiper.destroy) {
             swiper.destroy(true, true);
           }
         });
         swiperInstances.length = 0;
-      }
-      return; // Exit early if no packages swipers found
-    }
-
-    const isSwiperEnabled = window.innerWidth > 991;
-
-    if (isSwiperEnabled) {
-      if (swiperInstances.length === 0) {
-        // Reset all packages button wrappers
+        
+        // Reset all button wrappers
         const packageButtonWrappers = document.querySelectorAll('[data-swiper-combo*="is-packages"]');
         packageButtonWrappers.forEach((btnWrap) => {
           btnWrap.style.display = "none";
         });
+      }
+      return;
+    }
+
+    if (isSwiperEnabled) {
+      // Process each swiper container
+      packageSwipers.forEach((swiperContainer) => {
+        const slides = swiperContainer.querySelectorAll(".swiper-slide");
+        if (slides.length === 0) return;
         
-        // Handle multiple .is-packages instances per page
-        packageSwipers.forEach((swiperContainer) => {
-          const slides = swiperContainer.querySelectorAll(".swiper-slide");
-          if (slides.length > 0) {
-            // Use a unique comboClass for each instance to support multiple navs
-            const uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
-            swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
-            
-            // Update nav button wrappers for this instance
-            const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
-            if (btnWrap) btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
-            
-            // Update nav buttons for this instance
-            const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
-            const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
-            if (nextBtn) nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
-            if (prevBtn) prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
-            
-            // Create config for this instance
-            const instanceConfig = {
-              selector: `[data-swiper-unique='${uniqueCombo}']`,
-              comboClass: uniqueCombo,
-              slidesPerView: "auto",
-            };
-            
-            // Use the enhanced initializer from base manager
-            const enhancedInitializer = baseManager.createInitializeSwiper(initializePackageSwiper);
-            const swiper = enhancedInitializer(instanceConfig);
+        // Check if this swiper already has a unique ID
+        let uniqueCombo = swiperContainer.getAttribute('data-swiper-unique');
+        
+        // If no unique ID exists, create one
+        if (!uniqueCombo) {
+          uniqueCombo = `is-packages-${Math.random().toString(36).substr(2, 9)}`;
+          swiperContainer.setAttribute('data-swiper-unique', uniqueCombo);
+        }
+        
+        currentDOMSwiperIds.add(uniqueCombo);
+        
+        // Check if this swiper instance already exists
+        const existingSwiper = swiperInstances.find(swiper => 
+          swiper && swiper.comboClass === uniqueCombo
+        );
+        
+        if (!existingSwiper) {
+          // This is a new swiper - initialize it
+          
+          // Reset button wrapper display first
+          const packageButtonWrappers = document.querySelectorAll(`[data-swiper-combo="${uniqueCombo}"]`);
+          packageButtonWrappers.forEach((btnWrap) => {
+            btnWrap.style.display = "none";
+          });
+          
+          // Update nav button wrappers for this instance
+          const btnWrap = swiperContainer.closest('.exp_card_accordion_content')?.querySelector('[data-swiper-combo="is-packages"]');
+          if (btnWrap && btnWrap.getAttribute('data-swiper-combo') === 'is-packages') {
+            btnWrap.setAttribute('data-swiper-combo', uniqueCombo);
+          }
+          
+          // Update nav buttons for this instance
+          const nextBtn = btnWrap?.querySelector('[data-swiper-button-next="is-packages"]');
+          const prevBtn = btnWrap?.querySelector('[data-swiper-button-prev="is-packages"]');
+          if (nextBtn && nextBtn.getAttribute('data-swiper-button-next') === 'is-packages') {
+            nextBtn.setAttribute('data-swiper-button-next', uniqueCombo);
+          }
+          if (prevBtn && prevBtn.getAttribute('data-swiper-button-prev') === 'is-packages') {
+            prevBtn.setAttribute('data-swiper-button-prev', uniqueCombo);
+          }
+          
+          // Create config for this instance
+          const instanceConfig = {
+            selector: `[data-swiper-unique='${uniqueCombo}']`,
+            comboClass: uniqueCombo,
+            slidesPerView: "auto",
+          };
+          
+          // Use the enhanced initializer from base manager
+          const enhancedInitializer = baseManager.createInitializeSwiper(initializePackageSwiper);
+          const swiper = enhancedInitializer(instanceConfig);
+          if (swiper) {
             swiperInstances.push(swiper);
           }
-        });
+        }
+      });
+      
+      // Remove swipers that no longer exist in DOM
+      swiperInstances = swiperInstances.filter(swiper => {
+        if (!swiper || !swiper.comboClass) return false;
         
-        // Final verification step for packages swipers
-        setTimeout(() => {
-          swiperInstances.forEach((swiper) => {
-            if (swiper && swiper.comboClass) {
-              baseManager.toggleButtonWrapper(swiper);
-            }
-          });
-        }, 100);
-        
-      } else {
-        // Update existing swipers
-        swiperInstances.forEach(swiper => {
-          if (swiper && swiper.comboClass) {
+        if (!currentDOMSwiperIds.has(swiper.comboClass)) {
+          // This swiper no longer exists in DOM - destroy it
+          if (swiper.destroy) {
+            swiper.destroy(true, true);
+          }
+          return false;
+        }
+        return true;
+      });
+      
+      // Final verification step for all current swipers
+      setTimeout(() => {
+        swiperInstances.forEach((swiper) => {
+          if (swiper && swiper.comboClass && baseManager.toggleButtonWrapper) {
             baseManager.toggleButtonWrapper(swiper);
           }
         });
-      }
+      }, 100);
+      
     } else {
-      // Reset button wrappers and destroy all swipers on mobile
+      // Mobile: Reset button wrappers and destroy all swipers
       const packageButtonWrappers = document.querySelectorAll('[data-swiper-combo*="is-packages"]');
       packageButtonWrappers.forEach((btnWrap) => {
         btnWrap.style.display = "none";
@@ -166,7 +211,7 @@ const createPackagesSwiperManager = () => {
       // Destroy all swipers
       while (swiperInstances.length > 0) {
         const swiper = swiperInstances.pop();
-        if (swiper && swiper.comboClass) {
+        if (swiper && swiper.destroy) {
           swiper.destroy(true, true);
         }
       }
@@ -244,51 +289,108 @@ window.refreshPackagesSwipers = () => {
   }
 };
 
-// Watch for new .is-packages swipers added to the DOM
+// Enhanced DOM monitoring for new .is-packages swipers
 const watchForNewPackagesSwipers = () => {
+  // Ensure we only create one observer
+  if (window.packagesObserver) {
+    return;
+  }
+  
   const observer = new MutationObserver((mutations) => {
     let hasNewPackages = false;
+    let hasRemovedPackages = false;
     
     mutations.forEach((mutation) => {
+      // Check for added nodes
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          // Check if the added node contains .is-packages swipers
+          // Check if the added node is a packages swiper or contains one
           if (node.classList && node.classList.contains('is-packages')) {
             hasNewPackages = true;
           } else if (node.querySelector && node.querySelector('.swiper.is-packages')) {
             hasNewPackages = true;
           }
+          // Also check for elements that might contain package cards that create swipers
+          else if (node.querySelector && node.querySelector('.exp_card_wrap, .package_modal_wrap, [data-package-card]')) {
+            hasNewPackages = true;
+          }
+        }
+      });
+      
+      // Check for removed nodes
+      mutation.removedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.classList && node.classList.contains('is-packages')) {
+            hasRemovedPackages = true;
+          } else if (node.querySelector && node.querySelector('.swiper.is-packages')) {
+            hasRemovedPackages = true;
+          }
         }
       });
     });
     
-    if (hasNewPackages) {
-      // Initialize manager if it doesn't exist yet
-      if (!PackagesSwiperManager) {
-        initializePackagesSwipers();
-      } else if (PackagesSwiperManager.refresh) {
-        // Debounce the refresh to avoid multiple calls
-        clearTimeout(window.packagesRefreshTimeout);
-        window.packagesRefreshTimeout = setTimeout(() => {
+    // Handle changes with debouncing
+    if (hasNewPackages || hasRemovedPackages) {
+      clearTimeout(window.packagesRefreshTimeout);
+      window.packagesRefreshTimeout = setTimeout(() => {
+        // Always try to refresh if manager exists
+        if (PackagesSwiperManager && PackagesSwiperManager.refresh) {
           PackagesSwiperManager.refresh();
-        }, 200);
-      }
+        }
+        // Initialize if manager doesn't exist but packages are detected
+        else if (!PackagesSwiperManager && shouldInitializePackagesSwipers()) {
+          initializePackagesSwipers();
+        }
+        // If packages were removed and no longer exist, clean up
+        else if (hasRemovedPackages && !shouldInitializePackagesSwipers() && PackagesSwiperManager) {
+          if (PackagesSwiperManager.destroy) {
+            PackagesSwiperManager.destroy();
+          }
+          PackagesSwiperManager = null;
+        }
+      }, 200);
     }
   });
   
+  // Store observer reference for cleanup
+  window.packagesObserver = observer;
+  
   observer.observe(document.body, {
     childList: true,
-    subtree: true
+    subtree: true,
+    attributes: false, // Don't watch attribute changes for better performance
+    characterData: false
   });
+  
+  // Cleanup function
+  return () => {
+    observer.disconnect();
+    window.packagesObserver = null;
+    clearTimeout(window.packagesRefreshTimeout);
+  };
 };
 
-// Start watching for new packages swipers after DOM is ready (only if we're managing packages)
-document.addEventListener('DOMContentLoaded', () => {
-  if (PackagesSwiperManager || shouldInitializePackagesSwipers()) {
-    setTimeout(() => {
-      watchForNewPackagesSwipers();
-    }, 500);
+// Enhanced initialization with better monitoring
+const startPackagesMonitoring = () => {
+  // Always start monitoring regardless of initial state
+  // This ensures we catch packages added dynamically later
+  const cleanup = watchForNewPackagesSwipers();
+  
+  // Store cleanup function globally for potential cleanup
+  window.cleanupPackagesMonitoring = cleanup;
+  
+  // Initial check and setup
+  if (shouldInitializePackagesSwipers()) {
+    initializePackagesSwipers();
   }
+};
+
+// Start monitoring immediately when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  // Small delay to ensure other scripts have loaded
+  setTimeout(() => {
+    startPackagesMonitoring();
+  }, 100);
 });
 
 // Fetches and injects nested CMS content
