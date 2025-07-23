@@ -281,6 +281,12 @@
 
   // Add this function to inject empty facet styles after Finsweet initialization
   function injectEmptyFacetStyles() {
+    // Check if styles already exist
+    const existingStyles = document.querySelector('[data-empty-facet-styles="true"]');
+    if (existingStyles) {
+      return;
+    }
+    
     const styles = `
       .is-list-emptyfacet, .is-list-emptyfacet * {
         pointer-events: none !important;
@@ -307,20 +313,6 @@
 
   // Detect when Finsweet has finished initialization
   function waitForFinsweetInitialization() {
-    const themeTabItems = document.querySelectorAll('.form_theme-tab_item');
-    
-    // If no theme tab items exist, inject styles immediately
-    if (themeTabItems.length === 0) {
-      injectEmptyFacetStyles();
-      return;
-    }
-
-    // Check if all elements currently have the empty facet class removed
-    function checkAllElementsCleared() {
-      const elementsWithEmptyClass = document.querySelectorAll('.form_theme-tab_item.is-list-emptyfacet');
-      return elementsWithEmptyClass.length === 0;
-    }
-
     // Check if CMS nest is complete
     function checkCMSNestComplete() {
       return new Promise((resolve) => {
@@ -353,7 +345,6 @@
               await Promise.all(nestingPromises);
               resolve();
             } catch (error) {
-              console.warn('CMS nest check encountered an error:', error);
               resolve(); // Resolve anyway to prevent blocking
             }
           },
@@ -361,70 +352,10 @@
       });
     }
 
-    // If already cleared, check CMS nest and inject styles
-    if (checkAllElementsCleared()) {
-      checkCMSNestComplete().then(() => {
-        injectEmptyFacetStyles();
-      });
-      return;
-    }
-
-    let facetClassesCleared = false;
-    let cmsNestComplete = false;
-
-    function tryInjectStyles() {
-      if (facetClassesCleared && cmsNestComplete) {
-        injectEmptyFacetStyles();
-      }
-    }
-
-    // Check CMS nest completion
+    // Wait for CMS nest completion and inject styles
     checkCMSNestComplete().then(() => {
-      cmsNestComplete = true;
-      tryInjectStyles();
+      injectEmptyFacetStyles();
     });
-
-    // Check if Finsweet has removed the initial empty class from ALL elements
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-          const target = mutation.target;
-          
-          // If this is a theme tab item that lost the empty facet class
-          if (target.classList.contains('form_theme-tab_item') && 
-              mutation.oldValue && 
-              mutation.oldValue.includes('is-list-emptyfacet') && 
-              !target.classList.contains('is-list-emptyfacet')) {
-            
-            // Check if ALL theme tab items have had their empty facet class removed
-            if (checkAllElementsCleared()) {
-              facetClassesCleared = true;
-              tryInjectStyles();
-              
-              // Stop observing
-              observer.disconnect();
-            }
-          }
-        }
-      });
-    });
-
-    // Start observing all theme tab items for class changes
-    themeTabItems.forEach(item => {
-      observer.observe(item, {
-        attributes: true,
-        attributeOldValue: true,
-        attributeFilter: ['class']
-      });
-    });
-
-    // Fallback: If no class changes detected within 3 seconds, inject styles anyway
-    setTimeout(() => {
-      if (!document.querySelector('[data-empty-facet-styles]')) {
-        injectEmptyFacetStyles();
-        observer.disconnect();
-      }
-    }, 3000);
   }
 
   // Initialize everything
