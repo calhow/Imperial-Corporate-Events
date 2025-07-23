@@ -29,16 +29,7 @@ const Utils = (() => {
   
   // Device detection utility
   const isMobile = () => window.innerWidth <= 767;
-  
-  // Create animation properties without blur
-  const getAnimProps = (props) => {
-    // Always remove filter:blur from animation props
-    if (props.filter && props.filter.includes('blur')) {
-      const { filter, ...otherProps } = props;
-      return otherProps;
-    }
-    return props;
-  };
+
 
   // Timeout fetch utility
   const fetchWithTimeout = (url, options = {}, timeout = 5000) => {
@@ -50,12 +41,58 @@ const Utils = (() => {
     ]);
   };
 
+  // Performance optimization utilities
+  const PerformanceUtils = {
+    // Clean up will-change after animation
+    cleanupWillChange: (elements) => {
+      if (!elements) return;
+      const elementsArray = Array.isArray(elements) ? elements : [elements];
+      elementsArray.forEach(el => {
+        if (el && el.style) {
+          el.style.willChange = 'auto';
+        }
+      });
+    },
+
+    // Get optimized animation properties with GPU acceleration
+    getOptimizedAnimProps: (props) => {
+      return {
+        ...props,
+        force3D: true,
+        ease: props.ease || "power1.out"
+      };
+    },
+
+    // Batch DOM operations to minimize reflows
+    batchDOMOperations: (operations) => {
+      return new Promise(resolve => {
+        requestAnimationFrame(() => {
+          operations.forEach(op => op());
+          resolve();
+        });
+      });
+    }
+  };
+
+  // Safe event handling utilities
+  const safeClosest = (event, selector) => {
+    if (!event?.target?.closest || typeof event.target.closest !== 'function') {
+      return null;
+    }
+    try {
+      return event.target.closest(selector);
+    } catch (e) {
+      return null;
+    }
+  };
+
   return {
     debounce,
     isInViewport,
     isMobile,
-    getAnimProps,
-    fetchWithTimeout
+    fetchWithTimeout,
+    PerformanceUtils,
+    safeClosest
   };
 })();
 
@@ -268,8 +305,90 @@ function toggleBodyScrollAndAnimate(modalGroup) {
 
 
 
+// Helper function to add common BG & Tray animations
+const addBgTrayAnimations = (timeline, modalGroup) => {
+  return timeline
+    .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, 
+      Utils.PerformanceUtils.getOptimizedAnimProps({ 
+        opacity: 1, 
+        duration: 0.3, 
+        ease: "power4.Out"
+      }), 0)
+    .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
+      Utils.PerformanceUtils.getOptimizedAnimProps({ 
+        x: "0%", 
+        duration: 0.35, 
+        ease: "power4.Out"
+      }), 0.1);
+};
+
+// Helper function to add common BG & Tray exit animations
+const addBgTrayExitAnimations = (timeline, modalGroup, startTime = 0) => {
+  return timeline
+    .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
+      opacity: 0, 
+      duration: 0.3, 
+      ease: "power1.in" 
+    }, startTime)
+    .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { 
+      x: "105%", 
+      duration: 0.35, 
+      ease: "power1.in" 
+    }, startTime);
+};
+
+// Helper function to add common Bar & Close Button entry animations
+const addBarCloseEntryAnimations = (timeline, modalGroup, barTime = 0.35, closeBtnTime = 0.35) => {
+  return timeline
+    .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { 
+      opacity: 1, 
+      duration: 0.2, 
+      ease: "power1.out" 
+    }, barTime)
+    .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { 
+      opacity: 1, 
+      duration: 0.2, 
+      ease: "power1.out" 
+    }, closeBtnTime);
+};
+
+// Helper function to add common Bar & Close Button exit animations
+const addBarCloseExitAnimations = (timeline, modalGroup, startTime = 0) => {
+  return timeline
+    .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { 
+      opacity: 0, 
+      duration: 0.2, 
+      ease: "power1.in" 
+    }, startTime)
+    .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { 
+      opacity: 0, 
+      duration: 0.2, 
+      ease: "power1.in" 
+    }, startTime);
+};
+
+// Helper function to add content entry animation
+const addContentEntryAnimation = (timeline, modalGroup, startTime = 0.3) => {
+  return timeline
+    .to(`[data-tab-element="content"][data-modal-group='${modalGroup}']`, Utils.PerformanceUtils.getOptimizedAnimProps({
+      opacity: 1, 
+      duration: 0.2, 
+      ease: "power1.out"
+    }), startTime);
+};
+
+// Helper function to add content exit animation
+const addContentExitAnimation = (timeline, modalGroup, startTime = 0) => {
+  return timeline
+    .to(`[data-tab-element="content"][data-modal-group='${modalGroup}']`, { 
+      opacity: 0, 
+      duration: 0.2, 
+      ease: "power1.out"
+    }, startTime);
+};
+
 document.addEventListener("click", (event) => {
-  const modalToggleBtn = event.target.closest(
+  const modalToggleBtn = Utils.safeClosest(event,
     "[data-modal-open], [data-modal-close]"
   );
   if (!modalToggleBtn) {
@@ -284,28 +403,6 @@ document.addEventListener("click", (event) => {
   const isTrayModal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}'][data-modal-type='tray']`) !== null;
   const trayModalType = isTrayModal ? modalGroup : null;
 
-  // Clear any lingering blur effects on mobile when opening a modal
-  if (isOpening && Utils.isMobile() && (trayModalType === 'nav' || trayModalType === 'reviews')) {
-    const selectors = trayModalType === 'nav' ? [
-      ".menu_link_list > *",
-      ".form_menu_grid > *",
-      ".menu_trending_cms_list > *",
-      ".menu_calendar_list",
-      ".menu_calendar_list_pagination",
-      "[menu-category-pag]",
-      "[menu-category-label]",
-      "[menu-category-cms-list]"
-    ] : [
-      ".reviews_modal_review_list > *"
-    ];
-    
-    selectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length) {
-        gsap.set(elements, { filter: "none" });
-      }
-    });
-  }
 
   let modalTl = gsap.timeline({
     onStart: () => {
@@ -371,12 +468,14 @@ document.addEventListener("click", (event) => {
           window.FilterSystem.updateActiveFiltersDisplay();
         }
       }
-      
-      // Always clear filter
-      gsap.set(
-        `[data-modal-element='content'][data-modal-group='${modalGroup}'] > *`,
-        { filter: "none" }
-      );
+
+      // Performance cleanup: remove will-change and clear filters
+      Utils.PerformanceUtils.batchDOMOperations([
+        () => {
+          const modalElements = document.querySelectorAll(`[data-modal-group='${modalGroup}'] [style*="will-change"]`);
+          Utils.PerformanceUtils.cleanupWillChange(modalElements);
+        }
+      ]);
     }
   });
 
@@ -395,101 +494,32 @@ document.addEventListener("click", (event) => {
       
     if (isTrayModal) {
       if (trayModalType === 'nav') {
-        modalTl
-          // BG & Tray
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
-            opacity: 1, 
-            duration: 0.3, 
-            ease: "power4.Out"
-          }, 0)
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
-            { xPercent: 105 }, 
-            { 
-              xPercent: 0, 
-              duration: 0.35, 
-              ease: "power4.Out"
-            }, 0.1 )
-           // Bar & close buttons
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".nav_modal_close_mob", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
+        addBgTrayAnimations(modalTl, modalGroup);
+        addBarCloseEntryAnimations(modalTl, modalGroup, 0.35, 0.3);
+        modalTl.to(".nav_modal_close_mob", { opacity: 1, duration: 0.2, ease: "power1.out" }, 0.35);
+        addContentEntryAnimation(modalTl, modalGroup, 0.3);
 
-          // Content animations with staggered timing
-          .to(".menu_image_btn", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".menu_link_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".menu_link_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.30)
-          .to(".menu_calendar_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to(".form_search_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to(".menu_calendar_list", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.45)
-          .to(".menu_calendar_list_pagination", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out"}, 0.5)
-          .to(".form_menu_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3)
-          .to(".form_menu_grid > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
-          .to(".menu_availability_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.45)
-          .to(".menu_trending_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".menu_trending_cms_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.02 }, 0.35)
-          .to("[menu-category-wrap='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4)
-          .to("[menu-category-label='1']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4) 
-          .to("[menu-category-cms-list='1']", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.42)
-          .to("[menu-category-wrap='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46)
-          .to("[menu-category-label='2']", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.46) 
-          .to("[menu-category-cms-list='2']", { opacity: 1, x: "0rem", duration: 0.15, ease: "power1.out" }, 0.48);
+        modalTl
+          // Keep separate menu link list animation
+          .to(".menu_link_list > *", Utils.PerformanceUtils.getOptimizedAnimProps({ 
+            opacity: 1, duration: 0.2, ease: "power1.out", stagger: 0.015 
+          }), 0.30);
 
       } else if (trayModalType === 'package') {
-        modalTl
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
-            opacity: 1, 
-            duration: 0.3, 
-            ease: "power4.Out"
-          }, 0)
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
-            { xPercent: 105 }, 
-            { 
-              xPercent: 0, 
-              duration: 0.35, 
-              ease: "power4.Out"
-            }, 0.1 )
+        addBgTrayAnimations(modalTl, modalGroup)
           .add(() => {
             document.dispatchEvent(new CustomEvent('packageModalAnimationComplete'));
           }, 0.35);
 
       } else if (trayModalType === 'experience') {
-        modalTl
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
-            opacity: 1, 
-            duration: 0.3, 
-            ease: "power4.Out"
-          }, 0)
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
-            { xPercent: 105 }, 
-            { 
-              xPercent: 0, 
-              duration: 0.35, 
-              ease: "power4.Out"
-            }, 0.1 )
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".experience_btn_wrap", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".form_experience_heading", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.3) 
-          .to(".form_experience_grid > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.015 }, 0.3)
-          .to(".form_experience_para", { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.4);
+        addBgTrayAnimations(modalTl, modalGroup);
+        addBarCloseEntryAnimations(modalTl, modalGroup, 0.35, 0.35);
+        addContentEntryAnimation(modalTl, modalGroup, 0.3);
           
       } else if (trayModalType === 'reviews') {
-        modalTl
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
-            opacity: 1, 
-            duration: 0.3, 
-            ease: "power4.Out"
-          }, 0)
-          .fromTo(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, 
-            { xPercent: 105 }, 
-            { 
-              xPercent: 0, 
-              duration: 0.35, 
-              ease: "power4.Out"
-            }, 0.1 )
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 1, x: "0rem", duration: 0.2, ease: "power1.out" }, 0.35)
-          .to(".reviews_modal_review_list > *", { opacity: 1, x: "0rem", y: "0rem", duration: 0.2, ease: "power1.out", stagger: 0.05 }, 0.35);
+        addBgTrayAnimations(modalTl, modalGroup);
+        addBarCloseEntryAnimations(modalTl, modalGroup, 0.35, 0.35);
+        addContentEntryAnimation(modalTl, modalGroup, 0.35);
       }
     } else {
       // Regular modal animation
@@ -514,88 +544,31 @@ document.addEventListener("click", (event) => {
     
     if (isTrayModal) {
       if (trayModalType === 'nav') {
+        // Keep separate menu link list closing animation
         modalTl
-          .to(".menu_image_btn", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_link_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_trending_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".form_menu_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_link_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".form_menu_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_trending_cms_list > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_calendar_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_availability_wrap", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".form_search_wrap", { opacity: 0, x: "0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_calendar_list", { opacity: 0, x: "0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".menu_calendar_list_pagination", { opacity: 0, x: "0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-wrap='1']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-wrap='2']", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-label='1']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-label='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-cms-list='1']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to("[menu-category-cms-list='2']", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
-          .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
+          .to(".menu_link_list > *", { opacity: 0, duration: 0.2, ease: "power1.out" }, 0)
+          .to(".nav_modal_close_mob", { opacity: 0, duration: 0.2, ease: "power1.out" }, 0);
+        addContentExitAnimation(modalTl, modalGroup, 0);
+        addBarCloseExitAnimations(modalTl, modalGroup, 0);
+        addBgTrayExitAnimations(modalTl, modalGroup, 0);
       } else if (trayModalType === 'package') {
-        modalTl
-          .to('.package_heading_wrap', { 
-            opacity: 0, 
-            x: "0.5rem", 
-            duration: 0.2, 
-            ease: "power1.in"
-          }, 0)
-          .to('.package_content > *', { 
-            opacity: 0, 
-            x: "1rem", 
-            duration: 0.2, 
-            ease: "power1.in"
-          }, 0)
-          .to('.package_content > * > *', { 
-            opacity: 0, 
-            x: "0.125rem", 
-            y: "-0.25rem", 
-            duration: 0.2, 
-            ease: "power1.in"
-          }, 0)
-          .to('.package_btn_wrap', { 
-            opacity: 0, 
-            x: "0.5rem", 
-            duration: 0.2, 
-            ease: "power1.in"
-          }, 0)
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { 
-            opacity: 0, 
-            duration: 0.3, 
-            ease: "power1.in" 
-          }, 0.1)
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { 
-            xPercent: 105, 
-            duration: 0.35, 
-            ease: "power1.in" 
-          }, 0.1)
+        addBarCloseExitAnimations(modalTl, modalGroup, 0);
+        addContentExitAnimation(modalTl, modalGroup, 0);
+        
+        addBgTrayExitAnimations(modalTl, modalGroup, 0.1)
           .add(() => {
             document.dispatchEvent(new CustomEvent('packageModalClosed'));
           });
       } else if (trayModalType === 'reviews') {
         modalTl
-        .to(".reviews_modal_review_list > *", { opacity: 0, x: "0.25rem", y: "-0.5rem", duration: 0.2, ease: "power1.out" }, 0)  
-        .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
-        .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
-        .to(".nav_modal_close_mob", { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.out" }, 0)
-        .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
-        .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0);
+        .to(".nav_modal_close_mob", { opacity: 0, duration: 0.2, ease: "power1.out" }, 0);
+        addContentExitAnimation(modalTl, modalGroup, 0);
+        addBarCloseExitAnimations(modalTl, modalGroup, 0);
+        addBgTrayExitAnimations(modalTl, modalGroup, 0);
       } else if (trayModalType === 'experience') {
-        modalTl
-          .to(`[data-modal-element='bar'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.in" }, 0)
-          .to(`[data-modal-element='close-btn'][data-modal-group='${modalGroup}']`, { opacity: 0, x: "1rem", duration: 0.2, ease: "power1.in" }, 0)
-          .to(`[data-modal-element='bg'][data-modal-group='${modalGroup}']`, { opacity: 0, duration: 0.3, ease: "power1.in" }, 0)
-          .to(`[data-modal-element='tray-contain'][data-modal-group='${modalGroup}']`, { xPercent: 105, duration: 0.35, ease: "power1.in" }, 0)
-          .to(".form_experience_heading", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".form_experience_grid > *", { opacity: 0, x: "0.125rem", y: "-0.25rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".form_experience_para", { opacity: 0, x: "0.125rem", duration: 0.2, ease: "power1.out" }, 0)
-          .to(".experience_btn_wrap", { opacity: 0, x: "0.5rem", duration: 0.2, ease: "power1.out" }, 0);
+        addContentExitAnimation(modalTl, modalGroup, 0);
+        addBarCloseExitAnimations(modalTl, modalGroup, 0);
+        addBgTrayExitAnimations(modalTl, modalGroup, 0);
       }
     } else {
       // Regular modal exit animation
@@ -632,35 +605,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // Handle resize events for modal visibility management
-  const handleResize = Utils.debounce(() => {
-    // Ensure proper visibility of modal elements on resize
-    const modalElements = [
-      // Nav modal elements
-      ".menu_link_list > *",
-      ".form_menu_grid > *",
-      ".menu_trending_cms_list > *",
-      ".menu_calendar_list",
-      ".menu_calendar_list_pagination",
-      "[menu-category-pag]",
-      "[menu-category-label]",
-      "[menu-category-cms-list]",
-      // Review modal elements
-      ".reviews_modal_review_list > *",
-      // Package modal elements
-      ".package_content > * > *"
-    ];
-    
-    // Reset any potentially problematic styles
-    modalElements.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length) {
-        gsap.set(elements, { filter: "none" });
-      }
-    });
-  }, 150);
-  
-  window.addEventListener("resize", handleResize);
 });
 
 // Tab switch animation system
@@ -830,7 +774,7 @@ async function getUpcomingTab(retries = 5, delay = 100) {
 
 // Handle menu navigation button clicks
 document.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-target-button]");
+  const button = Utils.safeClosest(event, "[data-target-button]");
   if (!button) {
     return;
   }
@@ -1257,7 +1201,7 @@ const UnifiedVideoManager = (() => {
   
   // Desktop hover handlers using event delegation
   const handleMouseEnter = (event) => {
-    const card = event.target.closest('.exp_card_wrap');
+    const card = Utils.safeClosest(event, '.exp_card_wrap');
     if (!card) return;
     
     const video = card.querySelector('.exp_card_video');
@@ -1267,7 +1211,7 @@ const UnifiedVideoManager = (() => {
   };
   
   const handleMouseLeave = (event) => {
-    const card = event.target.closest('.exp_card_wrap');
+    const card = Utils.safeClosest(event, '.exp_card_wrap');
     if (!card) return;
     
     const video = card.querySelector('.exp_card_video');
@@ -1633,7 +1577,7 @@ window.addEventListener('load', initDynamicLighting);
 
 document.addEventListener('click', function(event) {
   // Find the closest ancestor button with the target attribute
-  const toggleButton = event.target.closest('[data-packages-btn-toggle]');
+  const toggleButton = Utils.safeClosest(event, '[data-packages-btn-toggle]');
 
   // If a toggle button was clicked
   if (toggleButton) {

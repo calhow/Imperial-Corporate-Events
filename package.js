@@ -329,10 +329,8 @@ class AnimationStateManager {
 
   getElements() {
     this.elements = {
-      headingWrap: this.modalTarget.querySelector('.package_heading_wrap'),
-      contentChildren: this.modalTarget.querySelectorAll('.package_content > *'),
-      contentGrandchildren: this.modalTarget.querySelectorAll('.package_content > * > *'),
-      btnWrap: this.modalTarget.querySelector('.package_btn_wrap')
+      bar: this.modalTarget.querySelector('[data-modal-element="bar"][data-modal-group="package"]'),
+      content: this.modalTarget.querySelector('[data-tab-element="content"][data-modal-group="package"]')
     };
     return this.elements;
   }
@@ -341,32 +339,11 @@ class AnimationStateManager {
     // Update mobile status
     const wasMobile = this.isMobile;
     this.isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 767;
-    
-    // If device switched to mobile, clear any blur filters
-    if (!wasMobile && this.isMobile && this.elements?.contentGrandchildren?.length) {
-      gsap.set(this.elements.contentGrandchildren, { filter: "none" });
-    }
   }
 
   setInitialState() {
-    const elements = this.getElements();
-    
-    const allElements = [
-      elements.headingWrap,
-      ...(elements.contentChildren || []),
-      ...(elements.contentGrandchildren || []),
-      elements.btnWrap
-    ].filter(Boolean);
-    
-    gsap.set(allElements, { opacity: 0 });
-    
-    if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
-    if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
-    if (elements.contentGrandchildren?.length) {
-      gsap.set(elements.contentGrandchildren, { opacity: 0, x: "0.125rem", y: "-0.25rem" });
-    }
-    if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
-    
+    // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
+    // Only trigger a reflow to ensure CSS has been applied
     this.modalTarget.offsetHeight;
   }
 
@@ -374,47 +351,39 @@ class AnimationStateManager {
     const elements = this.getElements();
     this.timeline = gsap.timeline({
       onComplete: () => {
-        // Timeline completed
+        // Performance cleanup: remove will-change after animation
+        if (typeof Utils !== 'undefined' && Utils.PerformanceUtils) {
+          const allElements = [
+            elements.bar,
+            elements.content
+          ].filter(Boolean);
+          
+          Utils.PerformanceUtils.cleanupWillChange(allElements);
+        }
       }
     });
 
-    if (elements.headingWrap) {
-      this.timeline.to(elements.headingWrap, {
+    // Use performance-optimized animation properties
+    const getOptimizedProps = (props) => {
+      return typeof Utils !== 'undefined' && Utils.PerformanceUtils 
+        ? Utils.PerformanceUtils.getOptimizedAnimProps(props)
+        : { ...props, force3D: true };
+    };
+
+        if (elements.bar) {
+      this.timeline.to(elements.bar, getOptimizedProps({
         opacity: 1,
-        x: "0rem",
         duration: 0.2,
         ease: "power1.out"
-      }, 0);
+      }), 0);
     }
 
-    if (elements.contentChildren?.length) {
-      this.timeline.to(elements.contentChildren, {
+    if (elements.content) {
+      this.timeline.to(elements.content, getOptimizedProps({
         opacity: 1,
-        x: "0rem",
-        duration: 0.2,
-        ease: "power1.out",
-        stagger: 0.03
-      }, 0);
-    }
-
-    if (elements.contentGrandchildren?.length) {
-      this.timeline.to(elements.contentGrandchildren, {
-        opacity: 1,
-        x: "0rem",
-        y: "0rem",
-        duration: 0.2,
-        ease: "power1.out",
-        stagger: 0.015
-      }, 0);
-    }
-
-    if (elements.btnWrap) {
-      this.timeline.to(elements.btnWrap, {
-        opacity: 1,
-        x: "0rem",
         duration: 0.2,
         ease: "power1.out"
-      }, 0);
+      }), 0);
     }
     
     return this.timeline;
@@ -649,27 +618,8 @@ const handleCardClick = (event) => {
 
 // Sets initial animation states
 const setInitialStates = (elements) => {
-    const allElements = [
-        elements.headingWrap,
-        ...(elements.contentChildren || []),
-        ...(elements.contentGrandchildren || []),
-        elements.btnWrap
-    ].filter(Boolean);
-    
-    gsap.set(allElements, { opacity: 0 });
-
-    // Base states for all elements
-    const states = {
-        headingWrap: { opacity: 0, x: "0.5rem" },
-        contentChildren: { opacity: 0, x: "1rem" },
-        contentGrandchildren: { opacity: 0, x: "0.125rem", y: "-0.25rem" },
-        btnWrap: { opacity: 0, x: "0.5rem" }
-    };
-
-    Object.entries(states).forEach(([key, props]) => {
-        const target = elements[key];
-        if (target) gsap.set(target, props);
-    });
+    // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
+    // No GSAP initial state setting needed
 };
 
 // Creates content animation timeline
@@ -682,32 +632,21 @@ const createContentAnimation = (elements) => {
     // Base animations
     const animations = [
         {
-            targets: elements.headingWrap,
-            props: { opacity: 1, x: "0rem" }
+            targets: elements.bar,
+            props: { opacity: 1 }
         },
         {
-            targets: elements.contentChildren,
-            props: { opacity: 1, x: "0rem" },
-            stagger: 0.03
-        },
-        {
-            targets: elements.contentGrandchildren,
-            props: { opacity: 1, x: "0rem", y: "0rem" },
-            stagger: 0.015
-        },
-        {
-            targets: elements.btnWrap,
-            props: { opacity: 1, x: "0rem" }
+            targets: elements.content,
+            props: { opacity: 1 }
         }
     ];
 
-    animations.forEach(({ targets, props, stagger }) => {
+    animations.forEach(({ targets, props }) => {
         if (!targets) return;
         timeline.to(targets, {
             ...props,
             duration: 0.2,
-            ease: "power1.out",
-            ...(stagger && { stagger })
+            ease: "power1.out"
         }, 0);
     });
 
@@ -763,31 +702,13 @@ const openModalForUrl = async (url) => {
       prepareContentForInsertion(contentClone);
       
       const elements = {
-        headingWrap: contentClone.querySelector('.package_heading_wrap'),
-        contentChildren: contentClone.querySelectorAll('.package_content > *'),
-        contentGrandchildren: contentClone.querySelectorAll('.package_content > * > *'),
-        btnWrap: contentClone.querySelector('.package_btn_wrap')
+        bar: contentClone.querySelector('[data-modal-element="bar"][data-modal-group="package"]'),
+        content: contentClone.querySelector('[data-tab-element="content"][data-modal-group="package"]')
       };
       
       const setInitialStates = () => {
-        gsap.set([
-          elements.headingWrap, 
-          ...elements.contentChildren, 
-          ...elements.contentGrandchildren, 
-          elements.btnWrap
-        ].filter(Boolean), { opacity: 0 });
-        
-        if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
-        if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
-        if (elements.contentGrandchildren?.length) {
-          gsap.set(elements.contentGrandchildren, { 
-            opacity: 0, 
-            x: "0.125rem", 
-            y: "-0.25rem"
-          });
-        }
-        if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
-        
+        // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
+        // Only trigger a reflow to ensure CSS has been applied
         packageModalTarget.offsetHeight;
       };
       
@@ -807,43 +728,13 @@ const openModalForUrl = async (url) => {
               
               const contentTl = gsap.timeline();
               
-              if (elements.headingWrap) {
-                contentTl.to(elements.headingWrap, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out"
-                }, 0);
+              // Use the helper functions from main.js for consistency
+              if (typeof addBarCloseEntryAnimations === 'function') {
+                addBarCloseEntryAnimations(contentTl, 'package', 0, 0);
               }
               
-              if (elements.contentChildren?.length) {
-                contentTl.to(elements.contentChildren, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out",
-                  stagger: 0.03
-                }, 0); 
-              }
-              
-              if (elements.contentGrandchildren?.length) {
-                contentTl.to(elements.contentGrandchildren, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  y: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out",
-                  stagger: 0.015
-                }, 0);
-              }
-              
-              if (elements.btnWrap) {
-                contentTl.to(elements.btnWrap, { 
-                  opacity: 1, 
-                  x: "0rem", 
-                  duration: 0.2, 
-                  ease: "power1.out"
-                }, 0);
+              if (typeof addContentEntryAnimation === 'function') {
+                addContentEntryAnimation(contentTl, 'package', 0.05);
               }
             });
           });
@@ -852,31 +743,13 @@ const openModalForUrl = async (url) => {
     }
   } else {
     const elements = {
-      headingWrap: packageModalTarget.querySelector('.package_heading_wrap'),
-      contentChildren: packageModalTarget.querySelectorAll('.package_content > *'),
-      contentGrandchildren: packageModalTarget.querySelectorAll('.package_content > * > *'),
-      btnWrap: packageModalTarget.querySelector('.package_btn_wrap')
+      bar: packageModalTarget.querySelector('[data-modal-element="bar"][data-modal-group="package"]'),
+      content: packageModalTarget.querySelector('[data-tab-element="content"][data-modal-group="package"]')
     };
     
     const setInitialStates = () => {
-      gsap.set([
-        elements.headingWrap, 
-        ...elements.contentChildren, 
-        ...elements.contentGrandchildren, 
-        elements.btnWrap
-      ].filter(Boolean), { opacity: 0 });
-      
-      if (elements.headingWrap) gsap.set(elements.headingWrap, { opacity: 0, x: "0.5rem" });
-      if (elements.contentChildren?.length) gsap.set(elements.contentChildren, { opacity: 0, x: "1rem" });
-      if (elements.contentGrandchildren?.length) {
-        gsap.set(elements.contentGrandchildren, { 
-          opacity: 0, 
-          x: "0.125rem", 
-          y: "-0.25rem"
-        });
-      }
-      if (elements.btnWrap) gsap.set(elements.btnWrap, { opacity: 0, x: "0.5rem" });
-      
+      // Initial states are now handled by CSS with body:not([data-page="package"]) selectors
+      // Only trigger a reflow to ensure CSS has been applied
       packageModalTarget.offsetHeight;
     };
     
@@ -889,43 +762,13 @@ const openModalForUrl = async (url) => {
           
           const contentTl = gsap.timeline();
           
-          if (elements.headingWrap) {
-            contentTl.to(elements.headingWrap, { 
-              opacity: 1, 
-              x: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out"
-            }, 0);
+          // Use the helper functions from main.js for consistency
+          if (typeof addBarCloseEntryAnimations === 'function') {
+            addBarCloseEntryAnimations(contentTl, 'package', 0, 0);
           }
           
-          if (elements.contentChildren?.length) {
-            contentTl.to(elements.contentChildren, { 
-              opacity: 1, 
-              x: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out",
-              stagger: 0.03
-            }, 0); 
-          }
-          
-          if (elements.contentGrandchildren?.length) {
-            contentTl.to(elements.contentGrandchildren, { 
-              opacity: 1, 
-              x: "0rem", 
-              y: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out",
-              stagger: 0.015
-            }, 0);
-          }
-          
-          if (elements.btnWrap) {
-            contentTl.to(elements.btnWrap, { 
-              opacity: 1, 
-              x: "0rem", 
-              duration: 0.2, 
-              ease: "power1.out"
-            }, 0);
+          if (typeof addContentEntryAnimation === 'function') {
+            addContentEntryAnimation(contentTl, 'package', 0);
           }
         });
       });
