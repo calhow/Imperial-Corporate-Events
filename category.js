@@ -1,3 +1,4 @@
+// Category page swiper and video management - Updated for CDN cache refresh
 const swiperInstances = [];
 
 // Function to adjust swiper parallax values based on screen width
