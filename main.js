@@ -1187,9 +1187,13 @@ const UnifiedVideoManager = (() => {
   };
   
   // Desktop hover handlers using event delegation
-  const handleMouseEnter = (event) => {
+  const handleMouseOver = (event) => {
     const card = Utils.safeClosest(event, '.exp_card_wrap');
     if (!card) return;
+    
+    // Check if we're coming from outside the card
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget && card.contains(relatedTarget)) return;
     
     const video = card.querySelector('.exp_card_video');
     if (video && hasValidVideoSource(video)) {
@@ -1197,9 +1201,13 @@ const UnifiedVideoManager = (() => {
     }
   };
   
-  const handleMouseLeave = (event) => {
+  const handleMouseOut = (event) => {
     const card = Utils.safeClosest(event, '.exp_card_wrap');
     if (!card) return;
+    
+    // Check if we're moving to another element within the same card
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget && card.contains(relatedTarget)) return;
     
     const video = card.querySelector('.exp_card_video');
     if (video) {
@@ -1341,13 +1349,13 @@ const UnifiedVideoManager = (() => {
   
   // Desktop event listeners
   const setupDesktopListeners = () => {
-    document.addEventListener('mouseenter', handleMouseEnter, true);
-    document.addEventListener('mouseleave', handleMouseLeave, true);
+    document.addEventListener('mouseover', handleMouseOver, true);
+    document.addEventListener('mouseout', handleMouseOut, true);
   };
   
   const removeDesktopListeners = () => {
-    document.removeEventListener('mouseenter', handleMouseEnter, true);
-    document.removeEventListener('mouseleave', handleMouseLeave, true);
+    document.removeEventListener('mouseover', handleMouseOver, true);
+    document.removeEventListener('mouseout', handleMouseOut, true);
   };
   
   // Check if video has valid source
