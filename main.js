@@ -474,30 +474,16 @@ document.addEventListener("click", (event) => {
       window.FilterSystem.updateActiveFiltersDisplay();
     }
     
+    // Always set display in timeline - redundant calls are harmless
     modalTl
       .set(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`, {
         display: "inline-flex"
       });
 
-    // Immediate mobile focus for nav modal (before any animations)
-    if (isTrayModal && trayModalType === 'nav' && window._pendingMobileFocus) {
-      // Focus immediately and synchronously - no timeline delay
-      requestAnimationFrame(() => {
-        if (window._pendingMobileFocus) {
-          window._pendingMobileFocus.focus();
-          window._pendingMobileFocus.setSelectionRange(
-            window._pendingMobileFocus.value.length,
-            window._pendingMobileFocus.value.length
-          );
-          window._pendingMobileFocus = null;
-          window._mobileFocusRequested = false;
-        }
-      });
-    }
+    // Mobile focus is handled synchronously in touchstart - no modal-specific logic needed
       
     if (isTrayModal) {
       if (trayModalType === 'nav') {
-        
         addBgTrayAnimations(modalTl, modalGroup);
         addBarCloseEntryAnimations(modalTl, modalGroup, 0.35, 0.3);
         modalTl.to(".nav_modal_close_mob", { opacity: 1, duration: 0.2, ease: "power1.out" }, 0.35);
@@ -776,8 +762,8 @@ async function getUpcomingTab(retries = 5, delay = 100) {
   return null;
 }
 
-// Handle mobile touchstart for menu-search buttons (faster than click)
-document.addEventListener("touchstart", (event) => {
+// Handle immediate focus setup on user interaction - works for both mobile and desktop
+const handleSearchButtonInteraction = (event, eventType) => {
   const button = Utils.safeClosest(event, "[data-target-button]");
   if (!button) {
     return;
@@ -786,22 +772,50 @@ document.addEventListener("touchstart", (event) => {
   const targetValue = button.getAttribute("data-target-button");
   const modalGroup = button.getAttribute("data-modal-open");
 
-  if (modalGroup === "nav" && targetValue === "menu-search" && Utils.isMobile()) {
+  if (modalGroup === "nav" && targetValue === "menu-search") {
     const targetField = document.querySelector(
       `[data-target-field="${targetValue}"]`
     );
+    const modalElement = document.querySelector(
+      `[data-modal-element='modal'][data-modal-group='${modalGroup}']`
+    );
     
-    if (targetField) {
-      // Store for immediate focus when modal opens
-      window._pendingMobileFocus = targetField;
-      window._mobileFocusRequested = true;
+    if (targetField && modalElement) {
+      // Use GSAP to set display immediately - preserves animation system
+      gsap.set(modalElement, { display: "inline-flex" });
+      
+      // Store references for use in click handler
+      window._interactionHandled = true;
+      window._storedButton = button; // Store the button for click handler
+      window._targetFieldForFocus = targetField; // Store the field for focus
     }
   }
-}, { passive: true });
+};
 
-// Handle menu navigation button clicks
+// Mobile: touchstart for immediate response
+document.addEventListener("touchstart", (event) => {
+  if (Utils.isMobile()) {
+    handleSearchButtonInteraction(event, "touchstart");
+  }
+}, { passive: false });
+
+// Desktop: mousedown for immediate response  
+document.addEventListener("mousedown", (event) => {
+  if (!Utils.isMobile()) {
+    handleSearchButtonInteraction(event, "mousedown");
+  }
+}, { passive: false });
+
+// Handle menu navigation button clicks - unified for mobile and desktop
 document.addEventListener("click", async (event) => {
-  const button = Utils.safeClosest(event, "[data-target-button]");
+  let button = Utils.safeClosest(event, "[data-target-button]");
+  
+  // If no button found but we have a stored button from interaction, use that
+  if (!button && window._storedButton) {
+    button = window._storedButton;
+    window._storedButton = null; // Clear the reference
+  }
+  
   if (!button) {
     return;
   }
@@ -813,25 +827,96 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  // Store target elements for mobile focus handling (fallback for non-touch devices)
-  if (targetValue === "menu-search") {
+  // Fallback setup - only if initial interaction didn't handle it
+  if (targetValue === "menu-search" && !window._interactionHandled) {
     const targetField = document.querySelector(
       `[data-target-field="${targetValue}"]`
     );
+    const modalElement = document.querySelector(
+      `[data-modal-element='modal'][data-modal-group='${modalGroup}']`
+    );
     
-    if (targetField && Utils.isMobile() && !window._mobileFocusRequested) {
-      // Store the target field for immediate mobile focus
-      window._pendingMobileFocus = targetField;
+    if (targetField && modalElement) {
+      // Set modal display immediately for focus purposes
+      gsap.set(modalElement, { display: "inline-flex" });
+      window._targetFieldForFocus = targetField;
     }
   }
+  
+  // Clear the interaction flag but keep references until we use them
+  window._interactionHandled = false;
 
-  const modalTl = gsap.timeline({
-    onComplete: () => {
-      document.dispatchEvent(
-        new CustomEvent("modalOpenComplete", { detail: modalGroup })
-      );
-    },
-  });
+  // Trigger the main modal system manually since it's not detecting our button
+  const modalToggleBtn = button; // The button we already found
+  
+  // Simulate the main modal system logic
+  const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
+  const isTrayModal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}'][data-modal-type='tray']`) !== null;
+  const trayModalType = isTrayModal ? modalGroup : null;
+
+  if (isOpening) {
+    modalStates[modalGroup] = true;
+    
+    // Update filter display when filter modal opens
+    if (modalGroup === 'filter' && typeof window.FilterSystem !== 'undefined') {
+      window.FilterSystem.updateActiveFiltersDisplay();
+    }
+    
+    let modalTl = gsap.timeline({
+      onStart: () => {
+        updateLiveChatVisibility();
+      },
+      onComplete: () => {
+        document.dispatchEvent(
+          new CustomEvent("modalOpenComplete", { detail: modalGroup })
+        );
+      },
+    });
+
+    // Set display in timeline
+    modalTl.set(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`, {
+      display: "inline-flex"
+    });
+
+    // Focus input immediately after display is set but before animations start - works for both mobile and desktop
+    if (window._targetFieldForFocus) {
+      // Store field reference locally to avoid null reference in callback
+      const fieldToFocus = window._targetFieldForFocus;
+      window._targetFieldForFocus = null; // Clear global reference immediately
+      
+      modalTl.add(() => {
+        if (fieldToFocus) {
+          fieldToFocus.focus();
+          fieldToFocus.setSelectionRange(
+            fieldToFocus.value.length,
+            fieldToFocus.value.length
+          );
+        }
+      }, 0); // Position 0 = immediately after display is set
+    }
+
+    // Add animations based on modal type
+    if (isTrayModal) {
+      if (trayModalType === 'nav') {
+        addBgTrayAnimations(modalTl, modalGroup);
+        addBarCloseEntryAnimations(modalTl, modalGroup, 0.35, 0.3);
+        modalTl.to(".nav_modal_close_mob", { opacity: 1, duration: 0.2, ease: "power1.out" }, 0.35);
+        addContentEntryAnimation(modalTl, modalGroup, 0.3);
+
+        modalTl
+          // Keep separate menu link list animation
+          .to(".menu_link_list > *", Utils.PerformanceUtils.getOptimizedAnimProps({ 
+            opacity: 1, duration: 0.2, ease: "power1.out", stagger: 0.015 
+          }), 0.30);
+      }
+    }
+
+    toggleBodyScrollAndAnimate(modalGroup);
+    
+    // Clear stored button reference
+    window._storedButton = null;
+    // _targetFieldForFocus already cleared above when we captured it locally
+  }
 
   if (targetValue === "menu-search") {
     const targetAnchor = document.querySelector(
@@ -858,17 +943,6 @@ document.addEventListener("click", async (event) => {
         }
 
         targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
-
-        // Desktop focus logic only (mobile handled immediately after display change)
-        if (!Utils.isMobile()) {
-          setTimeout(() => {
-            targetField.focus();
-            targetField.setSelectionRange(
-              targetField.value.length,
-              targetField.value.length
-            );
-          }, 300);
-        }
       },
       { once: true }
     );
