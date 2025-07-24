@@ -373,38 +373,12 @@ const addContentExitAnimation = (timeline, modalGroup, startTime = 0) => {
     }, startTime);
 };
 
-// Handle both click and touchstart for modal toggles
-const handleModalToggle = (event) => {
+document.addEventListener("click", (event) => {
   const modalToggleBtn = Utils.safeClosest(event,
     "[data-modal-open], [data-modal-close]"
   );
   if (!modalToggleBtn) {
     return;
-  }
-
-  // For mobile search, handle focus before modal opens
-  if (Utils.isMobile() && event.type === "touchstart") {
-    const targetButton = Utils.safeClosest(event, "[data-target-button]");
-    if (targetButton && targetButton.getAttribute("data-target-button") === "menu-search") {
-      const modalGroup = modalToggleBtn.getAttribute("data-modal-open");
-      if (modalGroup === "nav") {
-        const modal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`);
-        if (modal) {
-          // Make modal visible immediately (it's already positioned off-screen)
-          gsap.set(modal, { display: "inline-flex" });
-          
-          // Now we can focus the search input since the modal is visible
-          const targetField = document.querySelector(".form_field_input.is-search");
-          if (targetField) {
-            targetField.focus();
-            targetField.setSelectionRange(
-              targetField.value.length,
-              targetField.value.length
-            );
-          }
-        }
-      }
-    }
   }
 
   const modalGroup =
@@ -504,9 +478,26 @@ const handleModalToggle = (event) => {
       .set(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`, {
         display: "inline-flex"
       });
+
+    // Immediate mobile focus for nav modal (before any animations)
+    if (isTrayModal && trayModalType === 'nav' && window._pendingMobileFocus) {
+      // Focus immediately and synchronously - no timeline delay
+      requestAnimationFrame(() => {
+        if (window._pendingMobileFocus) {
+          window._pendingMobileFocus.focus();
+          window._pendingMobileFocus.setSelectionRange(
+            window._pendingMobileFocus.value.length,
+            window._pendingMobileFocus.value.length
+          );
+          window._pendingMobileFocus = null;
+          window._mobileFocusRequested = false;
+        }
+      });
+    }
       
     if (isTrayModal) {
       if (trayModalType === 'nav') {
+        
         addBgTrayAnimations(modalTl, modalGroup);
         addBarCloseEntryAnimations(modalTl, modalGroup, 0.35, 0.3);
         modalTl.to(".nav_modal_close_mob", { opacity: 1, duration: 0.2, ease: "power1.out" }, 0.35);
@@ -601,11 +592,7 @@ const handleModalToggle = (event) => {
   }
 
   toggleBodyScrollAndAnimate(modalGroup);
-};
-
-// Add event listeners for both click and touchstart
-document.addEventListener("click", handleModalToggle);
-document.addEventListener("touchstart", handleModalToggle, { passive: false });
+});
 
 // Add focus styles to search input
 document.addEventListener("DOMContentLoaded", () => {
@@ -789,7 +776,30 @@ async function getUpcomingTab(retries = 5, delay = 100) {
   return null;
 }
 
-// Handle menu navigation button interactions
+// Handle mobile touchstart for menu-search buttons (faster than click)
+document.addEventListener("touchstart", (event) => {
+  const button = Utils.safeClosest(event, "[data-target-button]");
+  if (!button) {
+    return;
+  }
+
+  const targetValue = button.getAttribute("data-target-button");
+  const modalGroup = button.getAttribute("data-modal-open");
+
+  if (modalGroup === "nav" && targetValue === "menu-search" && Utils.isMobile()) {
+    const targetField = document.querySelector(
+      `[data-target-field="${targetValue}"]`
+    );
+    
+    if (targetField) {
+      // Store for immediate focus when modal opens
+      window._pendingMobileFocus = targetField;
+      window._mobileFocusRequested = true;
+    }
+  }
+}, { passive: true });
+
+// Handle menu navigation button clicks
 document.addEventListener("click", async (event) => {
   const button = Utils.safeClosest(event, "[data-target-button]");
   if (!button) {
@@ -801,6 +811,18 @@ document.addEventListener("click", async (event) => {
 
   if (modalGroup !== "nav") {
     return;
+  }
+
+  // Store target elements for mobile focus handling (fallback for non-touch devices)
+  if (targetValue === "menu-search") {
+    const targetField = document.querySelector(
+      `[data-target-field="${targetValue}"]`
+    );
+    
+    if (targetField && Utils.isMobile() && !window._mobileFocusRequested) {
+      // Store the target field for immediate mobile focus
+      window._pendingMobileFocus = targetField;
+    }
   }
 
   const modalTl = gsap.timeline({
@@ -815,7 +837,14 @@ document.addEventListener("click", async (event) => {
     const targetAnchor = document.querySelector(
       `[data-target-anchor="${targetValue}"]`
     );
-    
+    const targetField = document.querySelector(
+      `[data-target-field="${targetValue}"]`
+    );
+
+    if (!targetAnchor || !targetField) {
+      return;
+    }
+
     document.addEventListener(
       "modalOpenComplete",
       async (event) => {
@@ -828,21 +857,16 @@ document.addEventListener("click", async (event) => {
           upcomingTab.click();
         }
 
-        if (targetAnchor) {
-          targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
 
-        // Focus on desktop only (mobile handles this in main modal system)
+        // Desktop focus logic only (mobile handled immediately after display change)
         if (!Utils.isMobile()) {
           setTimeout(() => {
-            const targetField = document.querySelector(".form_field_input.is-search");
-            if (targetField) {
-              targetField.focus();
-              targetField.setSelectionRange(
-                targetField.value.length,
-                targetField.value.length
-              );
-            }
+            targetField.focus();
+            targetField.setSelectionRange(
+              targetField.value.length,
+              targetField.value.length
+            );
           }, 300);
         }
       },
