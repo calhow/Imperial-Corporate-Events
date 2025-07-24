@@ -1592,7 +1592,6 @@ const initializeModalContent = async (contentElement) => {
             initializePackageAccordion();
         },
         () => {
-            initializeTabGroupsInScope(packageModalTarget);
             initializeDataCountersInScope(packageModalTarget);
             initializePackageForm(packageModalTarget);
             initializeTabButtons(packageModalTarget);
@@ -1624,6 +1623,7 @@ const initializeModalContent = async (contentElement) => {
             () => {
                 initializeGallerySwipers();
                 adjustHotelStars();
+                initializeTabGroupsInScope(packageModalTarget);
             },
             () => {
                 // Destroy and reinitialize Finsweet CMS Select
