@@ -793,19 +793,16 @@ document.addEventListener("click", async (event) => {
       return;
     }
 
-    // Mobile focus handling - capture the user interaction immediately
     const isMobileDevice = Utils.isMobile();
-    let mobileFocusHandler = null;
     
+    // On mobile, focus immediately to preserve user interaction context
     if (isMobileDevice) {
-      // Create a mobile-specific focus handler that preserves user interaction context
-      mobileFocusHandler = () => {
-        targetField.focus();
-        targetField.setSelectionRange(
-          targetField.value.length,
-          targetField.value.length
-        );
-      };
+      // Focus must happen synchronously during user interaction on mobile
+      targetField.focus();
+      targetField.setSelectionRange(
+        targetField.value.length,
+        targetField.value.length
+      );
     }
 
     document.addEventListener(
@@ -822,13 +819,8 @@ document.addEventListener("click", async (event) => {
 
         targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
 
-        if (isMobileDevice && mobileFocusHandler) {
-          // On mobile, focus immediately without setTimeout to preserve user interaction context
-          requestAnimationFrame(() => {
-            mobileFocusHandler();
-          });
-        } else {
-          // Desktop behavior with original setTimeout
+        // Desktop behavior - focus after modal opens
+        if (!isMobileDevice) {
           setTimeout(() => {
             targetField.focus();
             targetField.setSelectionRange(

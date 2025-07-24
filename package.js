@@ -1089,6 +1089,11 @@ const openModalForUrl = async (url) => {
     }
 
     if (content) {
+      // Clean up existing drag functionality before replacing content
+      if (packageModalTarget._dragCleanup) {
+        packageModalTarget._dragCleanup();
+      }
+      
       packageModalTarget.innerHTML = "";
       packageModalTarget.setAttribute('data-current-url', url);
       
@@ -1582,6 +1587,286 @@ const initializeCountersByStructure = (scope) => {
   });
 }; 
 
+// Initializes drag-to-scroll for amenities grids on desktop
+const initializeAmenitiesGridDrag = (scope) => {
+    if (!scope || window.innerWidth <= 992) return;
+    
+    const amenitiesGrids = scope.querySelectorAll('.package_amenities_grid');
+    
+    amenitiesGrids.forEach((grid, index) => {
+        // Skip if already initialized
+        if (grid.hasAttribute('data-drag-initialized')) return;
+        grid.setAttribute('data-drag-initialized', 'true');
+        
+        // State variables for drag interaction
+        let isDragging = false;
+        let startX = 0;
+        let scrollLeft = 0;
+        let velocityTracker = [];
+        let animationId = null;
+        let originalScrollSnapType = null;
+        
+        // Enhanced easing function from the article
+        const easeOutQuad = (t) => t * (2 - t);
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+        
+        // Setup grid for dragging
+        grid.style.cursor = 'grab';
+        grid.style.userSelect = 'none';
+        grid.style.overflowX = 'auto';
+        grid.style.scrollBehavior = 'auto'; // Disable native smooth scrolling during drag
+        
+        // Store original scroll-snap-type for toggling
+        const computedStyle = getComputedStyle(grid);
+        originalScrollSnapType = computedStyle.scrollSnapType || 'x mandatory';
+        
+        // Calculate snap points based on visible items
+        const calculateSnapPoints = () => {
+            const items = grid.querySelectorAll('.package_amenities_item, .amenity-item, .grid-item, .amenity_item');
+            if (items.length === 0) return [0];
+            
+            const snapPoints = [0];
+            const containerWidth = grid.clientWidth;
+            const itemMargin = parseInt(getComputedStyle(items[0]).marginRight || 0);
+            
+            items.forEach((item, i) => {
+                if (i > 0) {
+                    const itemWidth = item.offsetWidth + itemMargin;
+                    const position = snapPoints[i - 1] + itemWidth;
+                    const maxScroll = grid.scrollWidth - containerWidth;
+                    
+                    if (position <= maxScroll) {
+                        snapPoints.push(position);
+                    }
+                }
+            });
+            
+            // Always include the end position
+            snapPoints.push(grid.scrollWidth - containerWidth);
+            return [...new Set(snapPoints)].filter(point => point >= 0).sort((a, b) => a - b);
+        };
+        
+        // Find nearest snap point using article's approach
+        const getNearestSnapPoint = (position) => {
+            const snapPoints = calculateSnapPoints();
+            return snapPoints.reduce((nearest, snap) => 
+                Math.abs(snap - position) < Math.abs(nearest - position) ? snap : nearest
+            );
+        };
+        
+        // Velocity-based momentum scrolling with requestAnimationFrame
+        const animateScroll = (startPos, targetPos, duration = 800) => {
+            const startTime = performance.now();
+            const distance = targetPos - startPos;
+            
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Use easing function from the article
+                const easedProgress = easeOutCubic(progress);
+                const currentPos = startPos + (distance * easedProgress);
+                
+                grid.scrollLeft = currentPos;
+                
+                if (progress < 1) {
+                    animationId = requestAnimationFrame(animate);
+                } else {
+                    // Re-enable scroll-snap after animation completes
+                    grid.style.scrollSnapType = originalScrollSnapType;
+                    grid.style.scrollBehavior = 'smooth';
+                }
+            };
+            
+            // Cancel any existing animation
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        };
+        
+        // Calculate velocity using performance.now() for accuracy
+        const updateVelocity = (currentX) => {
+            const now = performance.now();
+            velocityTracker.push({ x: currentX, time: now });
+            
+            // Keep only recent samples for velocity calculation (last 100ms)
+            velocityTracker = velocityTracker.filter(sample => now - sample.time < 100);
+        };
+        
+        // Get current velocity based on recent samples
+        const getCurrentVelocity = () => {
+            if (velocityTracker.length < 2) return 0;
+            
+            const recent = velocityTracker.slice(-5); // Use last 5 samples
+            const timeDelta = recent[recent.length - 1].time - recent[0].time;
+            const positionDelta = recent[recent.length - 1].x - recent[0].x;
+            
+            return timeDelta > 0 ? (positionDelta / timeDelta) * 1000 : 0; // pixels per second
+        };
+        
+        // Mouse down - start dragging
+        const handleMouseDown = (e) => {
+            isDragging = true;
+            startX = e.pageX - grid.offsetLeft;
+            scrollLeft = grid.scrollLeft;
+            velocityTracker = [];
+            
+            // Disable scroll-snap during dragging as per article
+            grid.style.scrollSnapType = 'none';
+            grid.style.scrollBehavior = 'auto';
+            grid.style.cursor = 'grabbing';
+            grid.classList.add('dragging');
+            
+            // Cancel any ongoing animations
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            updateVelocity(e.pageX);
+            e.preventDefault();
+        };
+        
+        // Mouse move - handle dragging
+        const handleMouseMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const currentX = e.pageX - grid.offsetLeft;
+            const walk = (currentX - startX) * 1.5; // Speed multiplier
+            const newScrollLeft = scrollLeft - walk;
+            
+            // Apply overscroll resistance
+            const maxScroll = grid.scrollWidth - grid.clientWidth;
+            let finalScrollLeft;
+            
+            if (newScrollLeft < 0) {
+                // Left overscroll with resistance
+                finalScrollLeft = newScrollLeft * 0.3;
+            } else if (newScrollLeft > maxScroll) {
+                // Right overscroll with resistance  
+                const excess = newScrollLeft - maxScroll;
+                finalScrollLeft = maxScroll + (excess * 0.3);
+            } else {
+                finalScrollLeft = newScrollLeft;
+            }
+            
+            grid.scrollLeft = finalScrollLeft;
+            updateVelocity(e.pageX);
+        };
+        
+        // Mouse up - handle momentum and snapping
+        const handleMouseUp = (e) => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            grid.style.cursor = 'grab';
+            grid.classList.remove('dragging');
+            
+            const currentScroll = grid.scrollLeft;
+            const maxScroll = grid.scrollWidth - grid.clientWidth;
+            const velocity = getCurrentVelocity();
+            
+            // Handle overscroll bounce-back
+            if (currentScroll < 0 || currentScroll > maxScroll) {
+                const bounceTarget = Math.max(0, Math.min(maxScroll, currentScroll));
+                const snapTarget = getNearestSnapPoint(bounceTarget);
+                
+                animateScroll(currentScroll, snapTarget, 600);
+                return;
+            }
+            
+            // Calculate momentum-based target position
+            const momentum = velocity * 0.3; // Momentum factor
+            let targetPosition = currentScroll - momentum;
+            
+            // Clamp to valid range
+            targetPosition = Math.max(0, Math.min(maxScroll, targetPosition));
+            
+            // Find nearest snap point
+            const snapTarget = getNearestSnapPoint(targetPosition);
+            const distanceToSnap = Math.abs(snapTarget - currentScroll);
+            
+            // Determine animation duration based on distance and velocity
+            let duration = Math.max(300, Math.min(1200, distanceToSnap * 2));
+            
+            if (Math.abs(velocity) > 100) {
+                // High velocity - use momentum + snap
+                animateScroll(currentScroll, snapTarget, duration);
+            } else if (distanceToSnap > 10) {
+                // Low velocity - gentle snap
+                animateScroll(currentScroll, snapTarget, 400);
+            } else {
+                // Very close - just re-enable scroll-snap
+                grid.style.scrollSnapType = originalScrollSnapType;
+                grid.style.scrollBehavior = 'smooth';
+            }
+        };
+        
+        // Mouse leave - handle edge case
+        const handleMouseLeave = () => {
+            if (isDragging) {
+                handleMouseUp({ pageX: startX }); // End drag without momentum
+            }
+        };
+        
+        // Add event listeners following article's pattern
+        grid.addEventListener('mousedown', handleMouseDown);
+        grid.addEventListener('mousemove', handleMouseMove);
+        grid.addEventListener('mouseup', handleMouseUp);
+        grid.addEventListener('mouseleave', handleMouseLeave);
+        
+        // Prevent context menu during drag
+        grid.addEventListener('contextmenu', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+            }
+        });
+        
+        // Prevent text selection during drag as mentioned in article
+        grid.addEventListener('selectstart', (e) => {
+            if (isDragging) e.preventDefault();
+        });
+        
+        // Store cleanup function for proper memory management
+        grid._dragCleanup = () => {
+            // Cancel any running animations
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            // Remove all event listeners
+            grid.removeEventListener('mousedown', handleMouseDown);
+            grid.removeEventListener('mousemove', handleMouseMove);
+            grid.removeEventListener('mouseup', handleMouseUp);
+            grid.removeEventListener('mouseleave', handleMouseLeave);
+            grid.removeEventListener('contextmenu', (e) => {
+                if (isDragging) e.preventDefault();
+            });
+            grid.removeEventListener('selectstart', (e) => {
+                if (isDragging) e.preventDefault();
+            });
+            
+            // Reset attributes and styles
+            grid.removeAttribute('data-drag-initialized');
+            grid.classList.remove('dragging');
+            grid.style.cursor = '';
+            grid.style.userSelect = '';
+            grid.style.scrollSnapType = originalScrollSnapType;
+            grid.style.scrollBehavior = '';
+            
+            // Reset state
+            isDragging = false;
+            velocityTracker = [];
+        };
+    });
+};
+
+
+
 // Initializes modal content with all needed functionality
 const initializeModalContent = async (contentElement) => {
     let availabilitySyncCleanup = null; // Store cleanup function
@@ -1598,6 +1883,10 @@ const initializeModalContent = async (contentElement) => {
             
             // Initialize availability checkbox sync
             availabilitySyncCleanup = initializeAvailabilitySync(packageModalTarget);
+        },
+        () => {
+            // Initialize drag-to-scroll for amenities grids
+            initializeAmenitiesGridDrag(packageModalTarget);
         }
     ];
 
@@ -1699,6 +1988,18 @@ const initializeModalContent = async (contentElement) => {
     // Store cleanup function for destruction when modal content changes
     if (availabilitySyncCleanup && packageModalTarget) {
         packageModalTarget._availabilitySyncCleanup = availabilitySyncCleanup;
+    }
+    
+    // Store drag cleanup function
+    if (packageModalTarget) {
+        packageModalTarget._dragCleanup = () => {
+            const amenitiesGrids = packageModalTarget.querySelectorAll('.package_amenities_grid[data-drag-initialized]');
+            amenitiesGrids.forEach(grid => {
+                if (grid._dragCleanup) {
+                    grid._dragCleanup();
+                }
+            });
+        };
     }
     
     // Return both the completion promise AND deferred operations function
@@ -1927,6 +2228,38 @@ document.addEventListener('DOMContentLoaded', () => {
     initializePackageForm(experienceModalTarget);
   }
 }, { passive: true });
+
+// Clean up drag functionality when package modal closes
+document.addEventListener('packageModalClosed', () => {
+  if (packageModalTarget && packageModalTarget._dragCleanup) {
+    packageModalTarget._dragCleanup();
+  }
+});
+
+// Handle window resize for drag functionality
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    if (packageModalTarget) {
+      const isDesktop = window.innerWidth > 992;
+      const hasInitializedGrids = packageModalTarget.querySelectorAll('.package_amenities_grid[data-drag-initialized]').length > 0;
+      
+      if (!isDesktop && hasInitializedGrids) {
+        // Clean up drag functionality on mobile
+        if (packageModalTarget._dragCleanup) {
+          packageModalTarget._dragCleanup();
+        }
+      } else if (isDesktop && !hasInitializedGrids) {
+        // Initialize drag functionality on desktop
+        const amenitiesGrids = packageModalTarget.querySelectorAll('.package_amenities_grid');
+        if (amenitiesGrids.length > 0) {
+          initializeAmenitiesGridDrag(packageModalTarget);
+        }
+      }
+    }
+  }, 150);
+});
 
 // Observer for new package cards added to the DOM
 const packageCardObserver = new MutationObserver((mutations) => {
