@@ -1912,7 +1912,6 @@ const initializeModalContent = async (contentElement) => {
             () => {
                 initializeGallerySwipers();
                 adjustHotelStars();
-                initializeTabGroupsInScope(packageModalTarget);
             },
             () => {
                 // Destroy and reinitialize Finsweet CMS Select
@@ -1944,6 +1943,8 @@ const initializeModalContent = async (contentElement) => {
     
     // Start CMS nesting immediately but don't block
     cmsNest();
+
+    initializeTabGroupsInScope(packageModalTarget);
     
     // Don't await CMS nest completion - let it happen in background
     const cmsNestPromise = new Promise(resolve => {
