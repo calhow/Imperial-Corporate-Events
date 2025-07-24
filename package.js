@@ -1867,6 +1867,239 @@ const initializeAmenitiesGridDrag = (scope) => {
 
 
 
+/**
+ * Cloud animations using GSAP for mobile devices
+ * Handles modal display issues and provides better mobile performance
+ */
+class CloudAnimationController {
+  constructor() {
+    this.animations = [];
+    this.isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 768;
+    this.isAnimating = false;
+    
+    // Initialize only on mobile
+    if (this.isMobile && typeof gsap !== 'undefined') {
+      this.init();
+    }
+  }
+
+  init() {
+    // Set initial positions without animation
+    this.setInitialPositions();
+    
+    // Create animations but don't start them yet
+    this.createAnimations();
+  }
+
+  setInitialPositions() {
+    if (typeof gsap === 'undefined') return;
+    
+    gsap.set('.package_flight_cloud.is-1', {
+      x: '-120%',
+      opacity: 1,
+      force3D: true
+    });
+
+    gsap.set('.package_flight_cloud.is-2', {
+      x: '0%',
+      rotationX: -180,
+      rotationY: -180,
+      opacity: 1,
+      force3D: true
+    });
+
+    gsap.set('.package_flight_cloud.is-3', {
+      x: '-60%',
+      rotationX: -180,
+      opacity: 1,
+      force3D: true
+    });
+
+    gsap.set('.package_flight_cloud.is-4', {
+      x: '60%',
+      rotationY: 180,
+      opacity: 1,
+      force3D: true
+    });
+  }
+
+  createAnimations() {
+    if (typeof gsap === 'undefined') return;
+    
+    // Cloud 1 animation
+    const cloud1Timeline = gsap.timeline({ repeat: -1, paused: true });
+    cloud1Timeline
+      .set('.package_flight_cloud.is-1', { x: '-120%', opacity: 0 })
+      .to('.package_flight_cloud.is-1', { 
+        duration: 0.4, 
+        x: '120%', 
+        opacity: 0, 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-1', { 
+        duration: 0.4, 
+        opacity: 1, 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-1', { 
+        duration: 19.2, 
+        x: '0%', 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-1', { 
+        duration: 20, 
+        x: '-120%', 
+        ease: 'none' 
+      });
+
+    // Cloud 2 animation
+    const cloud2Timeline = gsap.timeline({ repeat: -1, paused: true });
+    cloud2Timeline
+      .set('.package_flight_cloud.is-2', { 
+        x: '0%', 
+        rotationX: -180, 
+        rotationY: -180, 
+        opacity: 1 
+      })
+      .to('.package_flight_cloud.is-2', { 
+        duration: 16.8, 
+        x: '-120%', 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-2', { 
+        duration: 0.35, 
+        opacity: 0, 
+        ease: 'none' 
+      })
+      .set('.package_flight_cloud.is-2', { x: '120%' })
+      .to('.package_flight_cloud.is-2', { 
+        duration: 0.35, 
+        opacity: 1, 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-2', { 
+        duration: 17.5, 
+        x: '0%', 
+        ease: 'none' 
+      });
+
+    // Cloud 3 animation
+    const cloud3Timeline = gsap.timeline({ repeat: -1, paused: true });
+    cloud3Timeline
+      .set('.package_flight_cloud.is-3', { 
+        x: '-60%', 
+        rotationX: -180, 
+        opacity: 1 
+      })
+      .to('.package_flight_cloud.is-3', { 
+        duration: 10.8, 
+        x: '-120%', 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-3', { 
+        duration: 0.45, 
+        opacity: 0, 
+        ease: 'none' 
+      })
+      .set('.package_flight_cloud.is-3', { x: '120%' })
+      .to('.package_flight_cloud.is-3', { 
+        duration: 0.45, 
+        opacity: 1, 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-3', { 
+        duration: 33.3, 
+        x: '-60%', 
+        ease: 'none' 
+      });
+
+    // Cloud 4 animation
+    const cloud4Timeline = gsap.timeline({ repeat: -1, paused: true });
+    cloud4Timeline
+      .set('.package_flight_cloud.is-4', { 
+        x: '60%', 
+        rotationY: 180, 
+        opacity: 1 
+      })
+      .to('.package_flight_cloud.is-4', { 
+        duration: 25.6, 
+        x: '-120%', 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-4', { 
+        duration: 0.4, 
+        opacity: 0, 
+        ease: 'none' 
+      })
+      .set('.package_flight_cloud.is-4', { x: '120%' })
+      .to('.package_flight_cloud.is-4', { 
+        duration: 0.4, 
+        opacity: 1, 
+        ease: 'none' 
+      })
+      .to('.package_flight_cloud.is-4', { 
+        duration: 13.6, 
+        x: '60%', 
+        ease: 'none' 
+      });
+
+    // Store animations
+    this.animations = [cloud1Timeline, cloud2Timeline, cloud3Timeline, cloud4Timeline];
+  }
+
+  // Call this when modal opens
+  startAnimations() {
+    if (!this.isMobile || this.isAnimating || typeof gsap === 'undefined') return;
+    
+    this.isAnimating = true;
+    
+    // Small delay to ensure modal is visible
+    gsap.delayedCall(0.1, () => {
+      this.animations.forEach(animation => {
+        animation.play();
+      });
+    });
+  }
+
+  // Call this when modal closes
+  stopAnimations() {
+    if (!this.isMobile || typeof gsap === 'undefined') return;
+    
+    this.isAnimating = false;
+    
+    this.animations.forEach(animation => {
+      animation.pause();
+    });
+    
+    // Reset to initial positions
+    this.setInitialPositions();
+  }
+
+  // Call this if window resizes
+  handleResize() {
+    const wasMobile = this.isMobile;
+    this.isMobile = typeof Utils !== 'undefined' && Utils.isMobile ? Utils.isMobile() : window.innerWidth <= 768;
+    
+    // If switching from desktop to mobile, initialize
+    if (!wasMobile && this.isMobile && typeof gsap !== 'undefined') {
+      this.init();
+    }
+    // If switching from mobile to desktop, clean up
+    else if (wasMobile && !this.isMobile) {
+      this.stopAnimations();
+    }
+  }
+
+  // Cleanup function
+  destroy() {
+    this.stopAnimations();
+    this.animations = [];
+  }
+}
+
+// Initialize cloud controller
+let cloudController = null;
+
 // Initializes modal content with all needed functionality
 const initializeModalContent = async (contentElement) => {
     let availabilitySyncCleanup = null; // Store cleanup function
@@ -1942,6 +2175,16 @@ const initializeModalContent = async (contentElement) => {
     cmsNest();
 
     initializeTabGroupsInScope(packageModalTarget);
+    
+    // Initialize cloud animations for mobile after tab groups are set up
+    if (!cloudController) {
+        cloudController = new CloudAnimationController();
+    }
+    
+    // Start cloud animations when modal opens (mobile only)
+    if (cloudController && cloudController.isMobile) {
+        cloudController.startAnimations();
+    }
     
     // Don't await CMS nest completion - let it happen in background
     const cmsNestPromise = new Promise(resolve => {
@@ -2235,37 +2478,56 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 }, { passive: true });
 
-// Clean up drag functionality when package modal closes
+// Clean up drag functionality and cloud animations when package modal closes
 document.addEventListener('packageModalClosed', () => {
   if (packageModalTarget && packageModalTarget._dragCleanup) {
     packageModalTarget._dragCleanup();
   }
+  
+  // Stop cloud animations when modal closes
+  if (cloudController) {
+    cloudController.stopAnimations();
+  }
 });
 
-// Handle window resize for drag functionality
-let resizeTimeout;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(() => {
-    if (packageModalTarget) {
-      const isDesktop = window.innerWidth > 992;
-      const hasInitializedGrids = packageModalTarget.querySelectorAll('.package_amenities_grid[data-drag-initialized]').length > 0;
-      
-      if (!isDesktop && hasInitializedGrids) {
-        // Clean up drag functionality on mobile
-        if (packageModalTarget._dragCleanup) {
-          packageModalTarget._dragCleanup();
-        }
-      } else if (isDesktop && !hasInitializedGrids) {
-        // Initialize drag functionality on desktop
-        const amenitiesGrids = packageModalTarget.querySelectorAll('.package_amenities_grid');
-        if (amenitiesGrids.length > 0) {
-          initializeAmenitiesGridDrag(packageModalTarget);
-        }
+// Handle window resize for drag functionality and cloud animations
+const handleResize = () => {
+  if (packageModalTarget) {
+    const isDesktop = window.innerWidth > 992;
+    const hasInitializedGrids = packageModalTarget.querySelectorAll('.package_amenities_grid[data-drag-initialized]').length > 0;
+    
+    if (!isDesktop && hasInitializedGrids) {
+      // Clean up drag functionality on mobile
+      if (packageModalTarget._dragCleanup) {
+        packageModalTarget._dragCleanup();
+      }
+    } else if (isDesktop && !hasInitializedGrids) {
+      // Initialize drag functionality on desktop
+      const amenitiesGrids = packageModalTarget.querySelectorAll('.package_amenities_grid');
+      if (amenitiesGrids.length > 0) {
+        initializeAmenitiesGridDrag(packageModalTarget);
       }
     }
-  }, 150);
-});
+  }
+  
+  // Handle cloud animation resize
+  if (cloudController) {
+    cloudController.handleResize();
+  }
+};
+
+// Use Utils.debounce if available, otherwise fallback to manual debouncing
+const debouncedResize = (typeof Utils !== 'undefined' && Utils.debounce) 
+  ? Utils.debounce(handleResize, 150)
+  : (() => {
+      let timeout;
+      return () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(handleResize, 150);
+      };
+    })();
+
+window.addEventListener('resize', debouncedResize);
 
 // Observer for new package cards added to the DOM
 const packageCardObserver = new MutationObserver((mutations) => {
