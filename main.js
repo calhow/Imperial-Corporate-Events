@@ -373,12 +373,38 @@ const addContentExitAnimation = (timeline, modalGroup, startTime = 0) => {
     }, startTime);
 };
 
-document.addEventListener("click", (event) => {
+// Handle both click and touchstart for modal toggles
+const handleModalToggle = (event) => {
   const modalToggleBtn = Utils.safeClosest(event,
     "[data-modal-open], [data-modal-close]"
   );
   if (!modalToggleBtn) {
     return;
+  }
+
+  // For mobile search, handle focus before modal opens
+  if (Utils.isMobile() && event.type === "touchstart") {
+    const targetButton = Utils.safeClosest(event, "[data-target-button]");
+    if (targetButton && targetButton.getAttribute("data-target-button") === "menu-search") {
+      const modalGroup = modalToggleBtn.getAttribute("data-modal-open");
+      if (modalGroup === "nav") {
+        const modal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`);
+        if (modal) {
+          // Make modal visible immediately (it's already positioned off-screen)
+          gsap.set(modal, { display: "inline-flex" });
+          
+          // Now we can focus the search input since the modal is visible
+          const targetField = document.querySelector(".form_field_input.is-search");
+          if (targetField) {
+            targetField.focus();
+            targetField.setSelectionRange(
+              targetField.value.length,
+              targetField.value.length
+            );
+          }
+        }
+      }
+    }
   }
 
   const modalGroup =
@@ -575,7 +601,11 @@ document.addEventListener("click", (event) => {
   }
 
   toggleBodyScrollAndAnimate(modalGroup);
-});
+};
+
+// Add event listeners for both click and touchstart
+document.addEventListener("click", handleModalToggle);
+document.addEventListener("touchstart", handleModalToggle, { passive: false });
 
 // Add focus styles to search input
 document.addEventListener("DOMContentLoaded", () => {
@@ -760,7 +790,7 @@ async function getUpcomingTab(retries = 5, delay = 100) {
 }
 
 // Handle menu navigation button interactions
-const handleMenuNavigation = async (event) => {
+document.addEventListener("click", async (event) => {
   const button = Utils.safeClosest(event, "[data-target-button]");
   if (!button) {
     return;
@@ -771,32 +801,6 @@ const handleMenuNavigation = async (event) => {
 
   if (modalGroup !== "nav") {
     return;
-  }
-
-  const isMobileDevice = Utils.isMobile();
-
-  // For mobile search, we need special handling to make modal visible before focusing
-  if (targetValue === "menu-search" && isMobileDevice) {
-    const modal = document.querySelector(`[data-modal-element='modal'][data-modal-group='${modalGroup}']`);
-    
-    if (modal) {
-      // Make modal visible immediately (it's already positioned off-screen)
-      gsap.set(modal, { display: "inline-flex" });
-      
-      // Now we can focus the search input since the modal is visible
-      const targetField = document.querySelector(".form_field_input.is-search");
-      if (targetField) {
-        targetField.focus();
-        targetField.setSelectionRange(
-          targetField.value.length,
-          targetField.value.length
-        );
-      }
-      
-      // Trigger a synthetic click to activate the main modal system
-      button.click();
-      return; // Exit early since we've triggered the click
-    }
   }
 
   const modalTl = gsap.timeline({
@@ -812,20 +816,6 @@ const handleMenuNavigation = async (event) => {
       `[data-target-anchor="${targetValue}"]`
     );
     
-    // Define focus function for desktop
-    const focusSearchInput = () => {
-      const targetField = document.querySelector(".form_field_input.is-search");
-      if (targetField) {
-        targetField.focus();
-        targetField.setSelectionRange(
-          targetField.value.length,
-          targetField.value.length
-        );
-        return true;
-      }
-      return false;
-    };
-
     document.addEventListener(
       "modalOpenComplete",
       async (event) => {
@@ -842,9 +832,18 @@ const handleMenuNavigation = async (event) => {
           targetAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
-        // Only focus on desktop (mobile already focused above)
-        if (!isMobileDevice) {
-          setTimeout(focusSearchInput, 300);
+        // Focus on desktop only (mobile handles this in main modal system)
+        if (!Utils.isMobile()) {
+          setTimeout(() => {
+            const targetField = document.querySelector(".form_field_input.is-search");
+            if (targetField) {
+              targetField.focus();
+              targetField.setSelectionRange(
+                targetField.value.length,
+                targetField.value.length
+              );
+            }
+          }, 300);
         }
       },
       { once: true }
@@ -870,14 +869,7 @@ const handleMenuNavigation = async (event) => {
       { once: true }
     );
   }
-};
-
-// Use touch events for mobile, click events for desktop
-if (Utils.isMobile()) {
-  document.addEventListener("touchstart", handleMenuNavigation, { passive: false });
-} else {
-  document.addEventListener("click", handleMenuNavigation);
-}
+});
 
 // Paragraph toggle system
 (function setupParagraphToggles() {
