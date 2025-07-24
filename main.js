@@ -792,6 +792,10 @@ const handleMenuNavigation = async (event) => {
           targetField.value.length
         );
       }
+      
+      // Trigger a synthetic click to activate the main modal system
+      button.click();
+      return; // Exit early since we've triggered the click
     }
   }
 
