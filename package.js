@@ -1884,10 +1884,7 @@ const initializeModalContent = async (contentElement) => {
             // Initialize availability checkbox sync
             availabilitySyncCleanup = initializeAvailabilitySync(packageModalTarget);
         },
-        () => {
-            // Initialize drag-to-scroll for amenities grids
-            initializeAmenitiesGridDrag(packageModalTarget);
-        }
+
     ];
 
     // Run critical initialization synchronously but efficiently
@@ -1959,6 +1956,10 @@ const initializeModalContent = async (contentElement) => {
                     insertSVGFromCMS(packageModalTarget);
                 }
                 hideEmptyDivs();
+                
+                // Initialize drag-to-scroll for amenities grids after CMS Nest completes
+                initializeAmenitiesGridDrag(packageModalTarget);
+                
                 resolve();
             });
         }, { once: true });
@@ -1980,6 +1981,10 @@ const initializeModalContent = async (contentElement) => {
                         
                         hideEmptyDivs();
                     }
+                    
+                    // Initialize drag-to-scroll for amenities grids after fallback timeout
+                    initializeAmenitiesGridDrag(packageModalTarget);
+                    
                     resolve();
                 });
             }
