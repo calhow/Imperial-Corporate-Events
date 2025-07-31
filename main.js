@@ -1602,81 +1602,101 @@ const UnifiedVideoManager = (() => {
 
 // Static Border Glow Effect for Fixture Cards
 
-const initDynamicLighting = () => {
+const manageDynamicLighting = () => {
+  let initialized = false;
+  let lightFixtures = [];
   const svgFilterContainer = document.querySelector('.g_fixture_filter');
   const filterTemplate = document.getElementById('lighting');
 
-  if (!svgFilterContainer || !filterTemplate) {
-    return;
-  }
-
-  // Filter out data-light-wrap elements that are direct children of w-condition-invisible elements
-  const allLightWraps = document.querySelectorAll('[data-light-wrap]');
-  const lightWraps = Array.from(allLightWraps).filter(wrap => {
-    return !wrap.parentElement?.classList.contains('w-condition-invisible');
-  });
-  
-  const lightFixtures = [];
-
-  lightWraps.forEach((wrap, index) => {
-    const light1Element = wrap.querySelector('[data-light="light1"]');
-    const light2Element = wrap.querySelector('[data-light="light2"]');
-    const color1 = light1Element ? light1Element.getAttribute('data-light-color') : 'transparent';
-    const color2 = light2Element ? light2Element.getAttribute('data-light-color') : 'transparent';
-
-    const newFilter = filterTemplate.cloneNode(true);
-    const uniqueId = `lighting-instance-${index}`;
-    newFilter.id = uniqueId;
-
-    const newLight1 = newFilter.querySelector('#light1');
-    const newLight2 = newFilter.querySelector('#light2');
-
-    if (newLight1) newLight1.setAttribute('lighting-color', color1);
-    if (newLight2) newLight2.setAttribute('lighting-color', color2);
-
-    svgFilterContainer.appendChild(newFilter);
-    wrap.style.setProperty('--dynamic-filter-url', `url(#${uniqueId})`);
-
-    lightFixtures.push({
-      wrap,
-      light1Element,
-      light2Element,
-      pointLight1: newFilter.querySelector('#light1 fePointLight'),
-      pointLight2: newFilter.querySelector('#light2 fePointLight'),
-    });
-  });
-
   const updateLightPositions = () => {
+    if (!initialized) return;
     lightFixtures.forEach(({ wrap, light1Element, light2Element, pointLight1, pointLight2 }) => {
       const wrapRect = wrap.getBoundingClientRect();
 
       if (pointLight1 && light1Element) {
-        const light1ElementRect = light1Element.getBoundingClientRect();
-        const light1CenterX = light1ElementRect.left + light1ElementRect.width / 2;
-        const light1CenterY = light1ElementRect.top + light1ElementRect.height / 2;
-        const relativeX = light1CenterX - wrapRect.left;
-        const relativeY = light1CenterY - wrapRect.top;
-        pointLight1.setAttribute('x', relativeX);
-        pointLight1.setAttribute('y', relativeY);
+        const light1Rect = light1Element.getBoundingClientRect();
+        pointLight1.setAttribute('x', light1Rect.left - wrapRect.left + light1Rect.width / 2);
+        pointLight1.setAttribute('y', light1Rect.top - wrapRect.top + light1Rect.height / 2);
       }
 
       if (pointLight2 && light2Element) {
-        const light2ElementRect = light2Element.getBoundingClientRect();
-        const light2CenterX = light2ElementRect.left + light2ElementRect.width / 2;
-        const light2CenterY = light2ElementRect.top + light2ElementRect.height / 2;
-        const relativeX = light2CenterX - wrapRect.left;
-        const relativeY = light2CenterY - wrapRect.top;
-        pointLight2.setAttribute('x', relativeX);
-        pointLight2.setAttribute('y', relativeY);
+        const light2Rect = light2Element.getBoundingClientRect();
+        pointLight2.setAttribute('x', light2Rect.left - wrapRect.left + light2Rect.width / 2);
+        pointLight2.setAttribute('y', light2Rect.top - wrapRect.top + light2Rect.height / 2);
       }
     });
   };
 
-  updateLightPositions();
-  window.addEventListener('resize', Utils.debounce(updateLightPositions, 100));
+  const debouncedUpdatePositions = Utils.debounce(updateLightPositions, 100);
+
+  const destroy = () => {
+    if (!initialized) return;
+    
+    lightFixtures.forEach(({ wrap, filter }) => {
+      wrap.style.removeProperty('--dynamic-filter-url');
+      filter?.remove();
+    });
+
+    lightFixtures = [];
+    window.removeEventListener('resize', debouncedUpdatePositions);
+    initialized = false;
+  };
+  
+  const init = () => {
+    if (initialized || !svgFilterContainer || !filterTemplate) return;
+
+    const lightWraps = Array.from(document.querySelectorAll('[data-light-wrap]'))
+      .filter(wrap => !wrap.parentElement?.classList.contains('w-condition-invisible'));
+    
+    lightWraps.forEach((wrap, index) => {
+      const light1Element = wrap.querySelector('[data-light="light1"]');
+      const light2Element = wrap.querySelector('[data-light="light2"]');
+      const color1 = light1Element?.getAttribute('data-light-color') || 'transparent';
+      const color2 = light2Element?.getAttribute('data-light-color') || 'transparent';
+
+      const newFilter = filterTemplate.cloneNode(true);
+      const uniqueId = `lighting-instance-${index}`;
+      newFilter.id = uniqueId;
+
+      const newLight1 = newFilter.querySelector('#light1');
+      if (newLight1) newLight1.setAttribute('lighting-color', color1);
+      
+      const newLight2 = newFilter.querySelector('#light2');
+      if (newLight2) newLight2.setAttribute('lighting-color', color2);
+
+      svgFilterContainer.appendChild(newFilter);
+      wrap.style.setProperty('--dynamic-filter-url', `url(#${uniqueId})`);
+
+      lightFixtures.push({
+        wrap,
+        light1Element,
+        light2Element,
+        pointLight1: newFilter.querySelector('#light1 fePointLight'),
+        pointLight2: newFilter.querySelector('#light2 fePointLight'),
+        filter: newFilter
+      });
+    });
+
+    initialized = true;
+    updateLightPositions();
+    window.addEventListener('resize', debouncedUpdatePositions);
+  };
+
+  const handleStateChange = () => {
+    if (!Utils.isMobile()) {
+      init();
+    } else {
+      destroy();
+    }
+  };
+
+  if (!svgFilterContainer || !filterTemplate) return;
+
+  handleStateChange();
+  window.addEventListener('resize', Utils.debounce(handleStateChange, 200));
 };
 
-window.addEventListener('load', initDynamicLighting);
+window.addEventListener('load', manageDynamicLighting);
 
 
 // TOGGLE EXP CARD PACKAGES ACCORDION
@@ -1702,61 +1722,6 @@ document.addEventListener('click', function(event) {
   }
 });
 
-
-// SET EXP CARD PACKAGES IMAGE
-document.addEventListener('DOMContentLoaded', function() {
-  // Process card packages image for a single card
-  function processCard(card) {
-    // Find the first package image within the current card
-    const sourceImage = card.querySelector('.exp_packages_img');
-
-    // If no package image exists in this card, skip
-    if (!sourceImage) {
-      return;
-    }
-
-    // Find all target image elements where the src will be placed
-    const targetImages = card.querySelectorAll('.exp_card_header_btn_img_wrap.is-1 .exp_card_header_btn_img');
-
-    // If any target images are found, loop through them and update their src
-    if (targetImages.length > 0) {
-      targetImages.forEach(targetImage => {
-        targetImage.src = sourceImage.src;
-      });
-    }
-  }
-
-  // Process all existing cards on page load
-  const existingCards = document.querySelectorAll('.exp_card_wrap');
-  existingCards.forEach(processCard);
-
-  // Watch for new cards added to the DOM
-  const observer = new MutationObserver(mutations => {
-    mutations.forEach(mutation => {
-      mutation.addedNodes.forEach(node => {
-        // Skip if not an element
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
-
-        // Check if the added node is a card
-        if (node.classList && node.classList.contains('exp_card_wrap')) {
-          processCard(node);
-        }
-
-        // Check for cards within the added node
-        const newCards = node.querySelectorAll && node.querySelectorAll('.exp_card_wrap');
-        if (newCards) {
-          newCards.forEach(processCard);
-        }
-      });
-    });
-  });
-
-  // Start observing
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-});
 
 // Initialize the manager and expose globally  
 window.ExperienceCardVideoManager = UnifiedVideoManager;

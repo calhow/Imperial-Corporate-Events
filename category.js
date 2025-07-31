@@ -474,9 +474,7 @@ window.addEventListener('resize', (typeof Utils !== 'undefined' ? Utils.debounce
 
 // Category tab underline animation
 const tabWraps = document.querySelectorAll(".cat_tab");
-let fillElement = document.createElement("div");
-fillElement.classList.add("cat_tab_underline_fill");
-document.body.appendChild(fillElement);
+let fillElement = document.querySelector(".cat_tab_underline_fill");
 
 // Get animation duration based on viewport width
 const getAnimationDuration = () => {
@@ -488,16 +486,38 @@ const getAnimationDuration = () => {
 // Update underline position with animation
 const updateUnderline = (newActiveTab) => {
   const underline = newActiveTab.querySelector(".cat_tab_underline");
-  if (!underline) return;
+  if (!underline || !fillElement) return;
 
-  const state = Flip.getState(fillElement);
-  underline.appendChild(fillElement);
+  // Get the width of the tab
+  const tabWidth = newActiveTab.offsetWidth;
 
-  Flip.from(state, {
-    duration: getAnimationDuration(),
-    ease: "power1.out",
-    absolute: true,
-  });
+  // Use GSAP Flip for smooth animation if available
+  if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
+    // Record the current state
+    const state = Flip.getState(fillElement);
+    
+    // Make DOM changes
+    underline.appendChild(fillElement);
+    fillElement.style.width = `${tabWidth}px`;
+    
+    // Animate from the previous state
+    Flip.from(state, {
+      duration: getAnimationDuration(),
+      ease: "power1.out",
+      absolute: true,
+    });
+  } else if (typeof gsap !== 'undefined') {
+    // Fallback GSAP animation without Flip
+    gsap.set(fillElement, { clearProps: "all" });
+    underline.appendChild(fillElement);
+    fillElement.style.width = `${tabWidth}px`;
+  } else {
+    // Fallback without GSAP
+    fillElement.style.transform = '';
+    fillElement.style.transition = 'width 0.3s ease';
+    underline.appendChild(fillElement);
+    fillElement.style.width = `${tabWidth}px`;
+  }
 };
 
 // Handle tab click events
@@ -514,23 +534,34 @@ tabWraps.forEach((tab) => {
   });
 });
 
-// Initialize underline position
-const tabList = document.querySelector(".cat_tab_wrap");
-if (tabList) {
-  const firstTab = tabList.firstElementChild;
-  if (firstTab) {
-    const underline = firstTab.querySelector(".cat_tab_underline");
-    if (underline) {
-      underline.appendChild(fillElement);
+// Initialize underline position for the active tab
+const initializeUnderline = () => {
+  if (!fillElement) return;
+  
+  // Find the active tab, fallback to first tab if none is active
+  let activeTab = document.querySelector(".cat_tab.is-active");
+  if (!activeTab) {
+    const tabList = document.querySelector(".cat_tab_wrap");
+    if (tabList) {
+      activeTab = tabList.firstElementChild;
     }
   }
-}
+  
+  if (activeTab) {
+    const underline = activeTab.querySelector(".cat_tab_underline");
+    if (underline) {
+      // Get the width of the active tab
+      const tabWidth = activeTab.offsetWidth;
+      
+      // Move fillElement to the active tab's underline and set its width
+      underline.appendChild(fillElement);
+      fillElement.style.width = `${tabWidth}px`;
+    }
+  }
+};
 
-// Set initial active tab underline
-const initialActive = document.querySelector(".cat_tab.is-active");
-if (initialActive) {
-  updateUnderline(initialActive);
-}
+// Initialize immediately
+initializeUnderline();
 
 // Update underline on window resize
 window.addEventListener("resize", () => {
