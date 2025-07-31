@@ -1191,7 +1191,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Iterates through review scores on experience cards and sets the star wrapper width 
 document.querySelectorAll('.exp_card_reviews').forEach(el => {
-  el.style.width = `${el.dataset.reviewScore * 0.75}rem`;
+  const multiplier = el.classList.contains('is-exp') ? 0.6875 : 0.75;
+  el.style.width = `${el.dataset.reviewScore * multiplier}rem`;
 });
 
 // Unified Video Manager - High Performance & Simple
@@ -1683,10 +1684,9 @@ const manageDynamicLighting = () => {
   };
 
   const handleStateChange = () => {
+    destroy();
     if (!Utils.isMobile()) {
       init();
-    } else {
-      destroy();
     }
   };
 
@@ -1694,6 +1694,21 @@ const manageDynamicLighting = () => {
 
   handleStateChange();
   window.addEventListener('resize', Utils.debounce(handleStateChange, 200));
+
+  new MutationObserver(mutations => {
+    const hasNewLightWrap = mutations.some(mutation =>
+      Array.from(mutation.addedNodes).some(node =>
+        node.nodeType === Node.ELEMENT_NODE && (node.hasAttribute('data-light-wrap') || node.querySelector('[data-light-wrap]'))
+      )
+    );
+
+    if (hasNewLightWrap) {
+      Utils.debounce(handleStateChange, 100)();
+    }
+  }).observe(document.body, {
+    childList: true,
+    subtree: true
+  });
 };
 
 window.addEventListener('load', manageDynamicLighting);
