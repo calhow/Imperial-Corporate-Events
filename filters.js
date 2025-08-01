@@ -7,42 +7,41 @@
   // State management
   let activeFilters = {};
   let isInitialized = false;
+  let listInstances = [];
 
 
         
-  // Get active filters from DOM
+  // Get active filters from Finsweet's reactive state
   function getActiveFilters() {
     const filters = {};
     
-    // Get all filter fields
-    const filterFields = document.querySelectorAll('[fs-list-field]');
-    
-    filterFields.forEach(field => {
-      const category = field.getAttribute('fs-list-field');
-      if (!category) return;
+    // Extract filters from all list instances
+    listInstances.forEach(listInstance => {
+      const finsweetFilters = listInstance.filters.value;
       
-      const categoryLower = category.toLowerCase();
-        let value = null;
-        
-      if (field.type === 'checkbox' && field.checked) {
-        value = field.getAttribute('fs-list-value') || field.value;
-      } else if (field.type === 'radio' && field.checked) {
-        value = field.getAttribute('fs-list-value') || field.value;
-      } else if (field.tagName === 'SELECT' && field.selectedIndex > 0) {
-        value = field.value;
-      } else if (field.type === 'text' && field.value.trim()) {
-        value = field.value.trim();
-        }
-        
-        if (value && value !== 'Radio' && value !== 'on' && value !== '') {
-        if (!filters[categoryLower]) {
-          filters[categoryLower] = [];
-        }
-        filters[categoryLower].push({
-            originalValue: value,
-          displayValue: categoryLower === "months" ? value.replace(/\s+\d{4}$/, "").trim() : value,
+      // Process each filter group
+      finsweetFilters.groups.forEach(group => {
+        group.conditions.forEach(condition => {
+          // Only include conditions that the user has interacted with
+          if (!condition.interacted) return;
+          
+          const categoryLower = condition.fieldKey.toLowerCase();
+          const values = Array.isArray(condition.value) ? condition.value : [condition.value];
+          
+          values.forEach(value => {
+            if (value && value !== 'Radio' && value !== 'on' && value !== '') {
+              if (!filters[categoryLower]) {
+                filters[categoryLower] = [];
+              }
+              
+              filters[categoryLower].push({
+                originalValue: value,
+                displayValue: categoryLower === "months" ? value.replace(/\s+\d{4}$/, "").trim() : value,
+              });
+            }
           });
-      }
+        });
+      });
     });
     
     return filters;
@@ -151,24 +150,18 @@
      }
    }
 
-  // Setup event listeners
+  // Setup reactive listeners using Finsweet's system
   function setupEventListeners() {
-
-    // Filter field changes
-    const filterFields = document.querySelectorAll('[fs-list-field]');
-    filterFields.forEach(field => {
-      if (field.tagName === 'DIV' && !field.type) return;
-      
-      const eventType = field.type === 'text' ? 'input' : 'change';
-      const fieldName = field.getAttribute('fs-list-field');
-      const isThemeFilter = fieldName && fieldName.toLowerCase() === 'theme';
-      
-      field.addEventListener(eventType, Utils.debounce(() => {
+    // Setup reactive watching for filter changes
+    listInstances.forEach(listInstance => {
+      // Watch for filter changes and update display
+      listInstance.effect(() => {
+        // This runs whenever filters change
         updateActiveFiltersDisplay();
-      }, 100));
+      });
     });
 
-    // Theme radio changes for underline
+    // Theme radio changes for underline (keep as manual listener)
     document.addEventListener('change', (e) => {
       if (e.target.matches('.form_theme-radio_wrap input[type="radio"]')) {
         updateUnderlinePosition();
@@ -188,8 +181,20 @@
     });
 
     // Resize handler
-    window.addEventListener('resize', Utils.debounce(() => {
-    updateActiveFiltersDisplay();
+    const resizeDebounce = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    };
+    
+    window.addEventListener('resize', resizeDebounce(() => {
+      updateActiveFiltersDisplay();
       updateUnderlinePosition();
     }, 100));
   }
@@ -272,7 +277,19 @@
       }
     });
 
-    window.addEventListener('resize', Utils.debounce(() => {
+    const swiperResizeDebounce = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    };
+    
+    window.addEventListener('resize', swiperResizeDebounce(() => {
       if (window.innerWidth < 992 && swiper) {
         swiper.destroy(true, true);
       }
@@ -313,53 +330,41 @@
 
   // Detect when Finsweet has finished initialization
   function waitForFinsweetInitialization() {
-    // Check if CMS nest is complete
-    function checkCMSNestComplete() {
-      return new Promise((resolve) => {
-        // Initialize FinsweetAttributes if not already present
-        window.FinsweetAttributes ||= [];
-        
-        // Push a callback to run when list attribute is loaded
-        window.FinsweetAttributes.push([
-          'list',
-          async (listInstances) => {
-            try {
-              // Wait for all list instances and their nested items to be fully loaded
-              const nestingPromises = [];
-              
-              for (const listInstance of listInstances) {
-                // Wait for paginated items to load
-                if (listInstance.loadingPaginatedItems) {
-                  nestingPromises.push(listInstance.loadingPaginatedItems);
-                }
-                
-                // Wait for all items' nesting to complete
-                listInstance.items.value.forEach(item => {
-                  if (item.nesting) {
-                    nestingPromises.push(item.nesting);
-                  }
-                });
-              }
-              
-              // Wait for all nesting promises to resolve
-              await Promise.all(nestingPromises);
-              resolve();
-            } catch (error) {
-              resolve(); // Resolve anyway to prevent blocking
-            }
-          },
-        ]);
-      });
-    }
-
-    // Wait for CMS nest completion and inject styles
-    checkCMSNestComplete().then(() => {
-      injectEmptyFacetStyles();
+    return new Promise((resolve) => {
+      // Initialize FinsweetAttributes if not already present
+      window.FinsweetAttributes ||= [];
+      
+      // Push a callback to run when list attribute is loaded
+      window.FinsweetAttributes.push([
+        'list',
+        async (finsweetListInstances) => {
+          try {
+            // Store list instances for reactive watching
+            listInstances = finsweetListInstances;
+            
+            // Wait for all list instances to finish loading paginated items
+            const paginationPromises = listInstances
+              .map(listInstance => listInstance.loadingPaginatedItems)
+              .filter(promise => promise); // Filter out undefined promises
+            
+            // Wait for all pagination promises to resolve
+            await Promise.all(paginationPromises);
+            
+            // Inject empty facet styles once everything is ready
+            injectEmptyFacetStyles();
+            resolve();
+          } catch (error) {
+            // Inject styles anyway to prevent blocking
+            injectEmptyFacetStyles();
+            resolve();
+          }
+        },
+      ]);
     });
   }
 
   // Initialize everything
-  function init() {
+  async function init() {
     if (isInitialized) return;
         
     // Check for required elements
@@ -370,15 +375,17 @@
       return;
     }
     
-    // Setup all functionality
-    setupEventListeners();
+    // Setup immediate visual elements (no dependency on Finsweet)
+    updateUnderlinePosition();
     setupFilterRows();
     setupSwiper();
-    updateUnderlinePosition();
-    updateActiveFiltersDisplay();
     
-    // Wait for Finsweet initialization and inject styles when ready
-    waitForFinsweetInitialization();
+    // Wait for Finsweet initialization, then setup reactive functionality
+    await waitForFinsweetInitialization();
+    
+    // Setup reactive functionality AFTER Finsweet is ready
+    setupEventListeners();
+    updateActiveFiltersDisplay();
     
     isInitialized = true;
   }
