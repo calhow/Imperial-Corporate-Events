@@ -1859,7 +1859,9 @@ const UniversalSwiperManager = (() => {
             const swiperContainer = document.querySelector(swiperConfig.selector);
             
             if (swiperContainer) {
-              const slides = swiperContainer.querySelectorAll(".swiper-slide");
+              // Use the configured slideClass instead of hardcoded .swiper-slide
+              const slideSelector = swiperConfig.slideClass ? `.${swiperConfig.slideClass}` : ".swiper-slide";
+              const slides = swiperContainer.querySelectorAll(slideSelector);
               
               if (slides.length > 0) {
                 const enhancedInitializer = createInitializeSwiper(initializeSwiper);

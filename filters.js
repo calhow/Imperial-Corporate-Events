@@ -99,56 +99,70 @@
     }
   }
 
-     // Update underline position for theme tabs
-   function updateUnderlinePosition() {
-     let checkedRadio = document.querySelector(".form_theme-radio_wrap input:checked");
-     const fillElement = document.querySelector(".form_theme_underline_fill");
-     
-     // Fallback to first radio if none is checked
-     if (!checkedRadio) {
-       const firstRadioWrap = document.querySelector(".form_theme-radio_wrap:first-child");
-       if (firstRadioWrap) {
-         checkedRadio = firstRadioWrap.querySelector('input[type="radio"]');
-       }
-     }
-     
-     if (checkedRadio && fillElement) {
-       // Find the radio wrapper and underline element within it
-       const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
-       const targetUnderline = radioWrap.querySelector('.form_theme-tab_underline');
-       if (!targetUnderline) return;
-       
-       // Get the width of the radio wrapper
-       const radioWrapWidth = radioWrap.offsetWidth;
-       
-       // Use GSAP Flip for smooth animation if available
-       if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
-         // Record the current state
-         const state = Flip.getState(fillElement);
-         
-         // Make DOM changes
-         targetUnderline.appendChild(fillElement);
-         fillElement.style.width = `${radioWrapWidth}px`;
-         
-         // Animate from the previous state
-         Flip.from(state, {
-           duration: window.innerWidth >= 992 ? 0.4 : 0.3,
-           ease: "power1.out"
-         });
-       } else if (typeof gsap !== 'undefined') {
-         // Fallback GSAP animation without Flip
-         gsap.set(fillElement, { clearProps: "all" });
-         targetUnderline.appendChild(fillElement);
-         fillElement.style.width = `${radioWrapWidth}px`;
-       } else {
-         // Fallback without GSAP
-         fillElement.style.transform = '';
-         fillElement.style.transition = 'width 0.3s ease';
-         targetUnderline.appendChild(fillElement);
-         fillElement.style.width = `${radioWrapWidth}px`;
-       }
-     }
-   }
+        // Update underline position for theme tabs
+  function updateUnderlinePosition() {
+    // Use requestAnimationFrame to ensure layout is complete
+    requestAnimationFrame(() => {
+      let checkedRadio = document.querySelector(".form_theme-radio_wrap input:checked");
+      const fillElement = document.querySelector(".form_theme_underline_fill");
+      
+      // Fallback to first radio if none is checked
+      if (!checkedRadio) {
+        const firstRadioWrap = document.querySelector(".form_theme-radio_wrap:first-child");
+        if (firstRadioWrap) {
+          checkedRadio = firstRadioWrap.querySelector('input[type="radio"]');
+        }
+      }
+      
+      if (checkedRadio && fillElement) {
+        // Find the radio wrapper and underline element within it
+        const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
+        const targetUnderline = radioWrap.querySelector('.form_theme-tab_underline');
+        if (!targetUnderline) return;
+        
+        // Force a reflow to ensure accurate measurements
+        radioWrap.offsetHeight;
+        
+        // Get the width of the radio wrapper - use getBoundingClientRect for more accurate measurements
+        const radioWrapRect = radioWrap.getBoundingClientRect();
+        const radioWrapWidth = radioWrapRect.width;
+        
+        // Ensure we have a valid width before proceeding
+        if (radioWrapWidth <= 0) {
+          // Retry after a short delay if width is invalid
+          setTimeout(() => updateUnderlinePosition(), 50);
+          return;
+        }
+        
+        // Use GSAP Flip for smooth animation if available
+        if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
+          // Record the current state
+          const state = Flip.getState(fillElement);
+          
+          // Make DOM changes
+          targetUnderline.appendChild(fillElement);
+          fillElement.style.width = `${radioWrapWidth}px`;
+          
+          // Animate from the previous state
+          Flip.from(state, {
+            duration: window.innerWidth >= 992 ? 0.4 : 0.3,
+            ease: "power1.out"
+          });
+        } else if (typeof gsap !== 'undefined') {
+          // Fallback GSAP animation without Flip
+          gsap.set(fillElement, { clearProps: "all" });
+          targetUnderline.appendChild(fillElement);
+          fillElement.style.width = `${radioWrapWidth}px`;
+        } else {
+          // Fallback without GSAP
+          fillElement.style.transform = '';
+          fillElement.style.transition = 'width 0.3s ease';
+          targetUnderline.appendChild(fillElement);
+          fillElement.style.width = `${radioWrapWidth}px`;
+        }
+      }
+    });
+  }
 
   // Setup reactive listeners using Finsweet's system
   function setupEventListeners() {
@@ -246,54 +260,54 @@
     }
   }
 
-  // Initialize swiper for theme filters
+  // Initialize swiper for theme filters using UniversalSwiperManager
   function setupSwiper() {
-    if (typeof Swiper === 'undefined' || window.innerWidth < 992) return;
+    if (typeof Swiper === 'undefined' || !window.UniversalSwiperManager) return;
 
     const swiperContainer = document.querySelector(".form_theme-tab_wrap");
     if (!swiperContainer) return;
 
-    const swiper = new Swiper(".form_theme-tab_wrap", {
-      wrapperClass: "form_theme-tab_list",
-      slideClass: "form_theme-tab_item",
-      navigation: {
-        nextEl: '[data-swiper-btn-filter="next"]',
-        prevEl: '[data-swiper-btn-filter="prev"]',
-        disabledClass: "theme_btn_wrap_disabled",
-      },
-      slidesPerView: "auto",
-      slidesPerGroup: 1,
-      watchSlidesProgress: true,
-      resistanceRatio: 0.85,
-      freeMode: true,
-      watchOverflow: true,
-      on: {
-        init: updateSwiperClasses,
-        navigationNext: updateSwiperClasses,
-        navigationPrev: updateSwiperClasses,
-        transitionEnd: updateSwiperClasses,
-        reachBeginning: updateSwiperClasses,
-        reachEnd: updateSwiperClasses,
+    // Create swiper manager instance for theme filters
+    const themeSwiperManager = window.UniversalSwiperManager.createManager({
+      name: 'theme-filters',
+      desktopBreakpoint: 991,
+      buttonWrapperSelector: 'data-swiper-combo',
+      swiperConfigs: [{
+        selector: '.form_theme-tab_wrap',
+        comboClass: 'theme-filter',
+        wrapperClass: "form_theme-tab_list",
+        slideClass: "form_theme-tab_item",
+        navigation: {
+          nextEl: '[data-swiper-btn-filter="next"]',
+          prevEl: '[data-swiper-btn-filter="prev"]',
+          disabledClass: "theme_btn_wrap_disabled",
+        },
+        slidesPerView: "auto",
+        slidesPerGroup: 1,
+        watchSlidesProgress: true,
+        resistanceRatio: 0.85,
+        freeMode: true,
+        watchOverflow: true,
+        on: {
+          init: function() {
+            updateSwiperClasses.call(this);
+            // Update underline position after Swiper is fully initialized
+            setTimeout(() => updateUnderlinePosition(), 100);
+          },
+          navigationNext: updateSwiperClasses,
+          navigationPrev: updateSwiperClasses,
+          transitionEnd: updateSwiperClasses,
+          reachBeginning: updateSwiperClasses,
+          reachEnd: updateSwiperClasses,
+        }
+      }],
+      initializeSwiper: (config) => {
+        return new Swiper(config.selector, config);
       }
     });
 
-    const swiperResizeDebounce = typeof Utils !== 'undefined' ? Utils.debounce : function(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    };
-    
-    window.addEventListener('resize', swiperResizeDebounce(() => {
-      if (window.innerWidth < 992 && swiper) {
-        swiper.destroy(true, true);
-      }
-    }, 100));
+    // Initialize the manager
+    themeSwiperManager.setupResizeListener();
   }
 
   // Add this function to inject empty facet styles after Finsweet initialization
@@ -376,9 +390,11 @@
     }
     
     // Setup immediate visual elements (no dependency on Finsweet)
-    updateUnderlinePosition();
     setupFilterRows();
     setupSwiper();
+    
+    // Delay underline positioning to ensure Swiper is ready
+    setTimeout(() => updateUnderlinePosition(), 150);
     
     // Wait for Finsweet initialization, then setup reactive functionality
     await waitForFinsweetInitialization();
@@ -397,12 +413,5 @@
     init();
   }
 
-  // Expose for debugging
-  window.FilterSystem = {
-    init,
-    updateActiveFiltersDisplay,
-    updateUnderlinePosition,
-    getActiveFilters: () => activeFilters
-  };
 
 })();
