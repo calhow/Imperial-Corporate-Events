@@ -102,69 +102,6 @@ parallaxMediaMatcher.add("(min-width: 479px)", () => {
   
 });
 
-// Character-by-character text animation
-const TextSplitAnimation = (() => {
-  const homeText = document.querySelector('.home_text');
-  if (!homeText) return;
-
-  // Wait for DOM content to be loaded
-  window.addEventListener('DOMContentLoaded', () => {
-    // Create a SplitText instance
-    const splitText = new SplitText(homeText, {
-      type: "chars",
-      charsClass: "split-char"
-    });
-    
-    // Process split characters to add immediate parent classes only
-    splitText.chars.forEach(char => {
-      // Find the immediate parent of this character
-      const immediateParent = char.parentNode;
-      
-      // If the immediate parent is a span with special classes, add those classes
-      if (immediateParent && immediateParent.tagName === 'SPAN' && 
-          (immediateParent.classList.contains('home_text_span') || 
-           immediateParent.classList.contains('home_text_hover_span') ||
-           immediateParent.classList.contains('home_line_span'))) {
-        // Add classes from the immediate span parent
-        immediateParent.className.split(' ').forEach(className => {
-          if (className) char.classList.add(className);
-        });
-      } else {
-        // If not in a special span, add the main container classes
-        homeText.className.split(' ').forEach(className => {
-          if (className) char.classList.add(className);
-        });
-      }
-    });
-    
-    // Initial state - all characters invisible and shifted down
-    gsap.set(splitText.chars, { 
-      y: "1rem", 
-      opacity: 0 ,
-      willChange: "transform, opacity"
-    });
-    
-    // Create animation to reveal characters
-    gsap.timeline({
-      scrollTrigger: {
-        trigger: "[data-hero-wrap]",
-        start: "bottom-=250px top",
-        once: true
-      },
-      onComplete: () => {
-        // After animation completes, revert the split text
-        gsap.set(splitText.chars, { willChange: "auto" });
-        splitText.revert();
-      }
-    }).to(splitText.chars, {
-      y: "0rem",
-      opacity: 1,
-      stagger: 0.005,
-      ease: "power2.out",
-      duration: 0.5
-    });
-  });
-})();
 
 /**
  * HeroVideoManager (No Animation Version)
@@ -246,3 +183,101 @@ const HeroVideoManager = (() => {
 
 // Wait for the DOM to be fully loaded before initializing the video manager.
 document.addEventListener('DOMContentLoaded', HeroVideoManager.init);
+
+
+// Initialize multiple review carousels with alternating directions
+const reviewSwipers = [];
+const reviewCarousels = document.querySelectorAll('.swiper.is-review-carousel');
+
+reviewCarousels.forEach((carousel, index) => {
+  // Define speeds for each carousel
+  const speeds = [12000, 15000, 14000];
+  const speed = speeds[index] || 12000; // Fallback to 10000 if more than 3 carousels
+  
+  const swiper = new Swiper(carousel, {
+    speed: speed,
+    autoplay: {
+      delay: 0,
+      disableOnInteraction: false,
+      reverseDirection: index === 1 // Second instance (index 1) goes in reverse
+    },
+    loop: true,
+    allowTouchMove: false,
+    slidesPerView: 'auto',
+    freeMode: true,
+  });
+  
+  reviewSwipers.push(swiper);
+});
+
+
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Select all the main logo containers
+  const logoItems = gsap.utils.toArray('.logo_item');
+
+  // ## 1. Initial State Setup ##
+  logoItems.forEach((item, index) => {
+      const logos = item.querySelectorAll('.logo_svg');
+      item.dataset.currentIndex = 0;
+      gsap.set(logos, { opacity: 0, y: '2rem', scale: 1, filter: 'blur(24px)' });
+      if (logos.length > 0) {
+          gsap.set(logos[0], { opacity: 0.72, y: '0rem', scale: 1, filter: 'blur(0px)' });
+      }
+  });
+
+  // ## 2. The Animation Function for a Single Item ##
+  function animateLogoItem(item) {
+      const logos = item.querySelectorAll('.logo_svg');
+      if (logos.length < 2) return;
+
+      let currentIndex = parseInt(item.dataset.currentIndex);
+      let nextIndex = (currentIndex + 1) % logos.length;
+      item.dataset.currentIndex = nextIndex; // Update the index for the next run
+
+      const currentLogo = logos[currentIndex];
+      const nextLogo = logos[nextIndex];
+
+      const tl = gsap.timeline();
+    
+      // Animate OUT
+      tl.to(currentLogo, {
+          y: '-3rem',
+          scale: 1.5,
+          opacity: 0,
+          filter: 'blur(24px)',
+          duration: 0.6,
+          ease: 'power2.in'
+      });
+    
+      // Animate IN (with the .fromTo() fix)
+      tl.fromTo(nextLogo, {
+          y: '2rem',
+          opacity: 0,
+          filter: 'blur(24px)',
+          scale: 1
+      }, {
+          y: '0rem',
+          opacity: 0.72,
+          filter: 'blur(0px)',
+          scale: 1,
+          duration: 0.6,
+          ease: 'power2.out'
+      });
+  }
+
+  // ## 3. The Master Timeline & Recursive Loop ##
+  function runFullSequence() {
+      const masterTl = gsap.timeline({
+          onComplete: () => {
+              gsap.delayedCall(4, runFullSequence);
+          }
+      });
+
+      logoItems.forEach((item, index) => {
+          masterTl.call(animateLogoItem, [item], index * 0.075);
+      });
+  }
+  runFullSequence();
+
+});
