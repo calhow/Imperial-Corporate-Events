@@ -114,52 +114,57 @@
         }
       }
       
-      if (checkedRadio && fillElement) {
-        // Find the radio wrapper and underline element within it
-        const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
-        const targetUnderline = radioWrap.querySelector('.form_theme-tab_underline');
-        if (!targetUnderline) return;
+      if (!checkedRadio || !fillElement) {
+        return;
+      }
+      
+      // Find the radio wrapper and underline element within it
+      const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
+      const targetUnderline = radioWrap.querySelector('.form_theme-tab_underline');
+      
+      if (!targetUnderline) {
+        return;
+      }
+      
+      // Force a reflow to ensure accurate measurements
+      radioWrap.offsetHeight;
+      
+      // Get the width of the radio wrapper
+      const radioWrapRect = radioWrap.getBoundingClientRect();
+      const radioWrapWidth = radioWrapRect.width;
+      
+      // Ensure we have a valid width before proceeding
+      if (radioWrapWidth <= 0) {
+        setTimeout(() => updateUnderlinePosition(), 50);
+        return;
+      }
+      
+      // Use GSAP Flip for smooth animation if available
+      if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
+        // Record the current state
+        const state = Flip.getState(fillElement);
         
-        // Force a reflow to ensure accurate measurements
-        radioWrap.offsetHeight;
+        // Make DOM changes - move element AND set target width
+        targetUnderline.appendChild(fillElement);
+        fillElement.style.width = `${radioWrapWidth}px`;
         
-        // Get the width of the radio wrapper - use getBoundingClientRect for more accurate measurements
-        const radioWrapRect = radioWrap.getBoundingClientRect();
-        const radioWrapWidth = radioWrapRect.width;
-        
-        // Ensure we have a valid width before proceeding
-        if (radioWrapWidth <= 0) {
-          // Retry after a short delay if width is invalid
-          setTimeout(() => updateUnderlinePosition(), 50);
-          return;
-        }
-        
-        // Use GSAP Flip for smooth animation if available
-        if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
-          // Record the current state
-          const state = Flip.getState(fillElement);
-          
-          // Make DOM changes
-          targetUnderline.appendChild(fillElement);
-          fillElement.style.width = `${radioWrapWidth}px`;
-          
-          // Animate from the previous state
-          Flip.from(state, {
-            duration: window.innerWidth >= 992 ? 0.4 : 0.3,
-            ease: "power1.out"
-          });
-        } else if (typeof gsap !== 'undefined') {
-          // Fallback GSAP animation without Flip
-          gsap.set(fillElement, { clearProps: "all" });
-          targetUnderline.appendChild(fillElement);
-          fillElement.style.width = `${radioWrapWidth}px`;
-        } else {
-          // Fallback without GSAP
-          fillElement.style.transform = '';
-          fillElement.style.transition = 'width 0.3s ease';
-          targetUnderline.appendChild(fillElement);
-          fillElement.style.width = `${radioWrapWidth}px`;
-        }
+        // Use Flip to animate from previous state to current state
+        Flip.from(state, {
+          duration: window.innerWidth >= 992 ? 0.4 : 0.3,
+          ease: "power1.out",
+          absolute: true
+        });
+      } else if (typeof gsap !== 'undefined') {
+        // Fallback GSAP animation without Flip
+        gsap.set(fillElement, { clearProps: "all" });
+        targetUnderline.appendChild(fillElement);
+        fillElement.style.width = `${radioWrapWidth}px`;
+      } else {
+        // Fallback without GSAP
+        fillElement.style.transform = '';
+        fillElement.style.transition = 'width 0.3s ease';
+        targetUnderline.appendChild(fillElement);
+        fillElement.style.width = `${radioWrapWidth}px`;
       }
     });
   }
@@ -260,6 +265,82 @@
     }
   }
 
+  // Store swiper instance globally for navigation
+  let themeSwiperInstance = null;
+
+  // Navigate to the active theme tab (responsive: Swiper for desktop, scroll for mobile)
+  function navigateToActiveTab() {
+    // Find the active theme tab (checked radio button)
+    const checkedRadio = document.querySelector('.form_theme-radio_wrap input:checked');
+    if (!checkedRadio) {
+      return;
+    }
+
+    const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
+    const isMobile = window.innerWidth <= 992;
+
+    if (isMobile) {
+      // Mobile: Use scroll positioning to center the active tab
+      const scrollContainer = document.querySelector('.form_theme-tab_list');
+      
+      if (!scrollContainer) {
+        return;
+      }
+
+      // Get container and tab measurements
+      const containerWidth = scrollContainer.clientWidth;
+      const containerScrollWidth = scrollContainer.scrollWidth;
+      const tabLeft = radioWrap.offsetLeft;
+      const tabWidth = radioWrap.offsetWidth;
+      
+      // Calculate scroll position to center the tab
+      const centerPosition = tabLeft + (tabWidth / 2) - (containerWidth / 2);
+      const maxScrollPosition = containerScrollWidth - containerWidth;
+      const scrollPosition = Math.max(0, Math.min(centerPosition, maxScrollPosition));
+      
+      // Use smooth scroll to center the active tab
+      scrollContainer.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth'
+      });
+      
+    } else {
+      // Desktop: Use Swiper navigation
+      if (!themeSwiperInstance) {
+        return;
+      }
+
+      // Find the slide index of the active tab
+      const allSlides = document.querySelectorAll('.form_theme-tab_item');
+      let activeSlideIndex = -1;
+
+      allSlides.forEach((slide, index) => {
+        if (slide.contains(radioWrap)) {
+          activeSlideIndex = index;
+        }
+      });
+
+      if (activeSlideIndex >= 0) {
+        // Calculate target slide index with offset for better visibility
+        let targetSlideIndex;
+        
+        if (activeSlideIndex === 0) {
+          // If it's the first slide, stay at first slide
+          targetSlideIndex = 0;
+        } else if (activeSlideIndex === allSlides.length - 1) {
+          // If it's the last slide, stay at last slide
+          targetSlideIndex = activeSlideIndex;
+        } else {
+          // Navigate to the slide before the active one for better visibility
+          targetSlideIndex = activeSlideIndex - 1;
+        }
+        
+        // Use slideTo to navigate to the calculated target slide
+        themeSwiperInstance.slideTo(targetSlideIndex, 300, false);
+      }
+    }
+  }
+
   // Initialize swiper for theme filters using UniversalSwiperManager
   function setupSwiper() {
     if (typeof Swiper === 'undefined' || !window.UniversalSwiperManager) return;
@@ -290,6 +371,8 @@
         watchOverflow: true,
         on: {
           init: function() {
+            // Store the swiper instance globally
+            themeSwiperInstance = this;
             updateSwiperClasses.call(this);
             // Update underline position after Swiper is fully initialized
             setTimeout(() => updateUnderlinePosition(), 100);
@@ -393,15 +476,18 @@
     setupFilterRows();
     setupSwiper();
     
-    // Delay underline positioning to ensure Swiper is ready
-    setTimeout(() => updateUnderlinePosition(), 150);
-    
     // Wait for Finsweet initialization, then setup reactive functionality
     await waitForFinsweetInitialization();
     
     // Setup reactive functionality AFTER Finsweet is ready
     setupEventListeners();
     updateActiveFiltersDisplay();
+    
+    // Set initial underline position AFTER everything is ready
+    setTimeout(() => updateUnderlinePosition(), 100);
+    
+    // Navigate swiper to active tab if one is set via URL parameters
+    setTimeout(() => navigateToActiveTab(), 150);
     
     isInitialized = true;
   }
