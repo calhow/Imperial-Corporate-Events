@@ -541,18 +541,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Initialize Swiper on that container
   const swiper = new Swiper(swiperContainer, {
-    // --- Core Settings (same as before) ---
+    // --- Core Settings ---
     direction: 'vertical',
     loop: true,
     speed: 2000,
     allowTouchMove: false,
     slidesPerView: 'auto',
-    freeMode: true,
+    freeMode: {
+      enabled: true,
+      momentum: false,
+      sticky: false,
+    },
     autoplay: {
       delay: 0,
       disableOnInteraction: false,
+      pauseOnMouseEnter: false,
     },
-    // --- Class Mappings (same as before) ---
+    // --- Smooth Transitions ---
+    effect: 'slide',
+    grabCursor: false,
+    preventInteractionOnTransition: true,
+    // --- Class Mappings ---
     wrapperClass: 'category_list',
     slideClass: 'category_item',
   });
