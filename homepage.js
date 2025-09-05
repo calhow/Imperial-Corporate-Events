@@ -220,7 +220,12 @@ document.addEventListener('DOMContentLoaded', () => {
   logoItems.forEach((item, index) => {
       const logos = item.querySelectorAll('.logo_svg');
       item.dataset.currentIndex = 0;
-      gsap.set(logos, { opacity: 0, y: '2rem', scale: 1, filter: 'blur(10px)' });
+      
+      // Check if mobile (767px and down) to conditionally apply blur
+      const isMobile = window.innerWidth <= 767;
+      const blurFilter = isMobile ? 'blur(0px)' : 'blur(10px)';
+      
+      gsap.set(logos, { opacity: 0, y: '2rem', scale: 1, filter: blurFilter });
       if (logos.length > 0) {
           gsap.set(logos[0], { opacity: 0.72, y: '0rem', scale: 1, filter: 'blur(0px)' });
       }
@@ -238,6 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const currentLogo = logos[currentIndex];
       const nextLogo = logos[nextIndex];
 
+      // Check if mobile (767px and down) to conditionally apply blur
+      const isMobile = window.innerWidth <= 767;
+      const blurOutFilter = isMobile ? 'blur(0px)' : 'blur(10px)';
+      const blurInFilter = isMobile ? 'blur(0px)' : 'blur(10px)';
+
       const tl = gsap.timeline();
     
       // Animate OUT
@@ -245,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
           y: '-3rem',
           scale: 1.25,
           opacity: 0,
-          filter: 'blur(10px)',
+          filter: blurOutFilter,
           duration: 0.5,
           ease: 'power2.in'
       });
@@ -254,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tl.fromTo(nextLogo, {
           y: '2rem',
           opacity: 0,
-          filter: 'blur(10px)',
+          filter: blurInFilter,
           scale: 1
       }, {
           y: '0rem',
