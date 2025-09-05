@@ -899,3 +899,127 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initializeTabs();
 });
+
+
+/* Subscribe section animation */
+gsap.registerPlugin(ScrollTrigger);
+
+const subscribeAnimation = () => {
+  const subscribeWrap = document.querySelector('.subscribe_wrap');
+  const heading1 = document.querySelector('.sub_heading.is-1');
+  const heading2 = document.querySelector('.sub_heading.is-2');
+  const componentWrap = document.querySelector('.subscribe_component_wrap');
+  const catListWrap = document.querySelector('.cat_list_cta_wrap');
+  
+  if (!subscribeWrap || !heading1 || !heading2 || !componentWrap || !catListWrap) return;
+  
+  let mm = gsap.matchMedia();
+  
+  // Desktop animation (768px and up)
+  mm.add("(min-width: 768px)", () => {
+    // Set initial states for desktop
+    gsap.set(heading1, { x: 220 });
+    gsap.set(heading2, { x: -220 });
+    gsap.set(componentWrap, { scaleX: 0 });
+    gsap.set(catListWrap, { opacity: 0 });
+    
+    // Create timeline
+    const tl = gsap.timeline({ paused: true });
+    
+    // Custom scroll trigger with manual visibility check
+    ScrollTrigger.create({
+      trigger: subscribeWrap,
+      start: 'top bottom',
+      end: 'bottom top',
+      onUpdate: (self) => {
+        const rect = subscribeWrap.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        
+        // Check if element is fully in viewport
+        const isFullyInView = rect.bottom <= windowHeight && rect.top >= 0;
+        
+        // Check if element is completely out of view
+        const isCompletelyHidden = rect.bottom < 0 || rect.top > windowHeight;
+        
+        if (isFullyInView && tl.progress() === 0) {
+          tl.play();
+        } else if (isCompletelyHidden && tl.progress() > 0) {
+          tl.reverse();
+        }
+      }
+    });
+    
+    // Add desktop animations to timeline
+    tl.to([heading1, heading2], {
+      x: 0,
+      duration: 0.5,
+      ease: 'power2.out'
+    })
+    .to(componentWrap, {
+      scaleX: 1,
+      duration: 0.5,
+      ease: 'power2.out'
+    })
+    .to(catListWrap, {
+      opacity: 1,
+      duration: 0.3,
+      ease: 'power2.out'
+    });
+  });
+  
+  // Mobile animation (767px and below)
+  mm.add("(max-width: 767px)", () => {
+    // Set initial states for mobile
+    gsap.set(heading1, { y: 140 });
+    gsap.set(heading2, { y: -140 });
+    gsap.set(componentWrap, { scaleY: 0 });
+    gsap.set(catListWrap, { opacity: 0 });
+    
+    // Create timeline
+    const tl = gsap.timeline({ paused: true });
+    
+    // Custom scroll trigger with manual visibility check
+    ScrollTrigger.create({
+      trigger: subscribeWrap,
+      start: 'top bottom',
+      end: 'bottom top',
+      onUpdate: (self) => {
+        const rect = subscribeWrap.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        
+        // Check if element is fully in viewport
+        const isFullyInView = rect.bottom <= windowHeight && rect.top >= 0;
+        
+        // Check if element is completely out of view
+        const isCompletelyHidden = rect.bottom < 0 || rect.top > windowHeight;
+        
+        if (isFullyInView && tl.progress() === 0) {
+          tl.play();
+        } else if (isCompletelyHidden && tl.progress() > 0) {
+          tl.reverse();
+        }
+      }
+    });
+    
+    // Add mobile animations to timeline
+    tl.to([heading1, heading2], {
+      y: 0,
+      duration: 0.5,
+      ease: 'power2.out'
+    })
+    .to(componentWrap, {
+      scaleY: 1,
+      duration: 0.5,
+      ease: 'power2.out'
+    })
+    .to(catListWrap, {
+      opacity: 1,
+      duration: 0.3,
+      ease: 'power2.out'
+    });
+  });
+};
+
+// Initialize subscribe animation
+document.addEventListener('DOMContentLoaded', subscribeAnimation);
+
