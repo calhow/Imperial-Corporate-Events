@@ -2087,8 +2087,7 @@ const initializePackageForm = (modalTarget) => {
   });
 
   // intercept the "real" submit button click so we can run our loading UI
-  submitBtn.addEventListener('click', (e) => {
-    e.preventDefault();
+  submitBtn.addEventListener('click', () => {
     const tempBtn = document.createElement('button');
     tempBtn.type = 'submit';
     tempBtn.style.display = 'none';
