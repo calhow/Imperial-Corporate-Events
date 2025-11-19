@@ -713,9 +713,116 @@ const HomeModalVideoPlayer = {
   },
 };
 
-// Initialize the home video player when the page content is loaded
+// Team Modal Video Player
+const TeamModalVideoPlayer = {
+  video: null,
+  hls: null,
+  modalGroup: 'team',
+  isInitialized: false,
+
+  init() {
+    this.video = document.querySelector('[data-modal-group="team"] .exp_video');
+    if (!this.video) return;
+
+    const source = this.video.querySelector('source.exp_vid_src');
+    if (!source?.dataset.hlsSrc) return;
+
+    this.isInitialized = true;
+    this.setupEventListeners();
+  },
+
+  setupEventListeners() {
+    document.addEventListener('click', (event) => {
+      const modalToggleBtn = event.target.closest("[data-modal-open], [data-modal-close]");
+      if (!modalToggleBtn) return;
+
+      const modalGroup = modalToggleBtn.getAttribute("data-modal-open") || 
+                         modalToggleBtn.getAttribute("data-modal-close");
+      
+      if (modalGroup !== this.modalGroup) return;
+
+      const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
+      
+      if (isOpening) {
+        setTimeout(() => this.startVideo(), 300);
+      } else {
+        this.stopVideo();
+      }
+    });
+
+    const checkModalState = () => {
+      if (!window.modalStates) return;
+      
+      const isModalOpen = window.modalStates[this.modalGroup];
+      
+      if (isModalOpen && !this.hls) {
+        this.startVideo();
+      } else if (!isModalOpen && this.hls) {
+        this.stopVideo();
+      }
+    };
+
+    setInterval(checkModalState, 500);
+  },
+
+  startVideo() {
+    if (!this.video || this.hls) return;
+    
+    const source = this.video.querySelector('source.exp_vid_src');
+    if (!source?.dataset.hlsSrc || !Hls.isSupported()) return;
+
+    this.hls = new Hls({
+      capLevelToPlayerSize: true,
+      startLevel: -1,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 15
+    });
+
+    this.hls.loadSource(source.dataset.hlsSrc);
+    this.hls.attachMedia(this.video);
+    
+    gsap.set(this.video, { opacity: 0 });
+    
+    this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      this.playVideo();
+    });
+
+    this.hls.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        console.error('HLS fatal error:', data);
+        this.stopVideo();
+      }
+    });
+  },
+
+  stopVideo() {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    
+    if (this.video && !this.video.paused) {
+      this.video.pause();
+    }
+    
+    gsap.set(this.video, { opacity: 0 });
+  },
+  
+  playVideo() {
+    if (!this.video) return;
+
+    this.video.play().then(() => {
+      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
+    }).catch((error) => {
+      console.warn("Autoplay was prevented:", error);
+    });
+  },
+};
+
+// Initialize video players when the page content is loaded
 document.addEventListener('DOMContentLoaded', () => {
   HomeModalVideoPlayer.init();
+  TeamModalVideoPlayer.init();
 });
 
 
