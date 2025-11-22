@@ -1883,6 +1883,11 @@ const initializeModalContent = async (contentElement) => {
             
             // Initialize availability checkbox sync
             availabilitySyncCleanup = initializeAvailabilitySync(packageModalTarget);
+            
+            // Process gclid for dynamically loaded forms
+            if (typeof window.GclidTracker !== 'undefined' && window.GclidTracker.processFormsInScope) {
+                window.GclidTracker.processFormsInScope(packageModalTarget);
+            }
         },
 
     ];
