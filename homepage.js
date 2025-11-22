@@ -593,11 +593,12 @@ document.addEventListener('DOMContentLoaded', function () {
 const HomeModalVideoPlayer = {
   video: null,
   hls: null,
-  modalGroup: 'home', // Changed to target the 'home' modal
+  modalGroup: 'home',
   isInitialized: false,
+  hlsReady: false,
+  shouldAutoPlay: false,
 
   init() {
-    // Find the video element within the correct modal group
     this.video = document.querySelector('[data-modal-group="home"] .exp_video');
     if (!this.video) return;
 
@@ -605,13 +606,39 @@ const HomeModalVideoPlayer = {
     if (!source?.dataset.hlsSrc) return;
 
     this.isInitialized = true;
+    this.initializeHLS();
     this.setupEventListeners();
   },
 
+  initializeHLS() {
+    const source = this.video.querySelector('source.exp_vid_src');
+    if (!source?.dataset.hlsSrc || !Hls.isSupported()) return;
+
+    this.hls = new Hls({
+      capLevelToPlayerSize: true,
+      startLevel: -1,
+      maxBufferLength: 15,
+      maxMaxBufferLength: 15
+    });
+
+    this.hls.loadSource(source.dataset.hlsSrc);
+    this.hls.attachMedia(this.video);
+    
+    gsap.set(this.video, { opacity: 0 });
+    
+    this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      this.hlsReady = true;
+    });
+
+    this.hls.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        this.pauseVideo();
+      }
+    });
+  },
+
   setupEventListeners() {
-    // Listen for modal open/close events using the existing modal system
     document.addEventListener('click', (event) => {
-      // Assuming a utility function like Utils.safeClosest exists
       const modalToggleBtn = event.target.closest("[data-modal-open], [data-modal-close]");
       if (!modalToggleBtn) return;
 
@@ -623,93 +650,58 @@ const HomeModalVideoPlayer = {
       const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
       
       if (isOpening) {
-        // Start video when modal opens, with a slight delay
-        setTimeout(() => this.startVideo(), 300);
+        this.shouldAutoPlay = true;
+        setTimeout(() => this.playVideo(), 300);
       } else {
-        // Stop video when modal closes
-        this.stopVideo();
+        this.shouldAutoPlay = false;
+        this.pauseVideo();
       }
     });
 
-    // Also listen for modal state changes via the global modalStates (if it exists)
+    if (this.video) {
+      this.video.addEventListener('pause', () => {
+        if (this.shouldAutoPlay) {
+          this.shouldAutoPlay = false;
+        }
+      });
+
+      this.video.addEventListener('play', () => {
+        if (!this.shouldAutoPlay && window.modalStates?.[this.modalGroup]) {
+          this.shouldAutoPlay = true;
+        }
+      });
+    }
+
     const checkModalState = () => {
-      // The check for window.modalStates is kept for compatibility
       if (!window.modalStates) return;
       
       const isModalOpen = window.modalStates[this.modalGroup];
+      const isVideoPlaying = this.video && !this.video.paused;
       
-      if (isModalOpen && !this.hls) {
-        this.startVideo();
-      } else if (!isModalOpen && this.hls) {
-        this.stopVideo();
+      if (isModalOpen && !isVideoPlaying && this.hlsReady && this.shouldAutoPlay) {
+        this.playVideo();
+      } else if (!isModalOpen && isVideoPlaying) {
+        this.pauseVideo();
       }
     };
 
-    // Check modal state periodically
     setInterval(checkModalState, 500);
   },
 
-  startVideo() {
-    if (!this.video || this.hls) return;
-    
-    const source = this.video.querySelector('source.exp_vid_src');
-    // Ensure HLS is supported by the browser
-    if (!source?.dataset.hlsSrc || !Hls.isSupported()) return;
+  playVideo() {
+    if (!this.video || !this.hlsReady) return;
 
-    // Configure and create a new HLS instance
-    this.hls = new Hls({
-      capLevelToPlayerSize: true,
-      startLevel: -1,
-      maxBufferLength: 15,
-      maxMaxBufferLength: 15
-    });
-
-    this.hls.loadSource(source.dataset.hlsSrc);
-    this.hls.attachMedia(this.video);
-    
-    // Set initial opacity to 0 before playing
-    gsap.set(this.video, { opacity: 0 });
-    
-    // Auto-play after HLS manifest is parsed and ready
-    this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      this.playVideo();
-    });
-
-    // Handle fatal errors by stopping the video
-    this.hls.on(Hls.Events.ERROR, (event, data) => {
-      if (data.fatal) {
-        console.error('HLS fatal error:', data);
-        this.stopVideo();
-      }
-    });
+    this.video.play().then(() => {
+      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
+    }).catch(() => {});
   },
 
-  stopVideo() {
-    // Destroy the HLS instance to free up resources
-    if (this.hls) {
-      this.hls.destroy();
-      this.hls = null;
-    }
-    
-    // Pause the video element if it's playing
+  pauseVideo() {
     if (this.video && !this.video.paused) {
       this.video.pause();
     }
     
-    // Hide the video element
-    gsap.set(this.video, { opacity: 0 });
-  },
-  
-  playVideo() {
-    if (!this.video) return;
-
-    // Play the video and fade it in smoothly
-    this.video.play().then(() => {
-      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
-    }).catch((error) => {
-      // Silently handle autoplay restrictions if the browser blocks it
-      console.warn("Autoplay was prevented:", error);
-    });
+    gsap.to(this.video, { opacity: 0, duration: 0.3, ease: 'power2.out' });
   },
 };
 
@@ -719,6 +711,8 @@ const TeamModalVideoPlayer = {
   hls: null,
   modalGroup: 'team',
   isInitialized: false,
+  hlsReady: false,
+  shouldAutoPlay: false,
 
   init() {
     this.video = document.querySelector('[data-modal-group="team"] .exp_video');
@@ -728,46 +722,11 @@ const TeamModalVideoPlayer = {
     if (!source?.dataset.hlsSrc) return;
 
     this.isInitialized = true;
+    this.initializeHLS();
     this.setupEventListeners();
   },
 
-  setupEventListeners() {
-    document.addEventListener('click', (event) => {
-      const modalToggleBtn = event.target.closest("[data-modal-open], [data-modal-close]");
-      if (!modalToggleBtn) return;
-
-      const modalGroup = modalToggleBtn.getAttribute("data-modal-open") || 
-                         modalToggleBtn.getAttribute("data-modal-close");
-      
-      if (modalGroup !== this.modalGroup) return;
-
-      const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
-      
-      if (isOpening) {
-        setTimeout(() => this.startVideo(), 300);
-      } else {
-        this.stopVideo();
-      }
-    });
-
-    const checkModalState = () => {
-      if (!window.modalStates) return;
-      
-      const isModalOpen = window.modalStates[this.modalGroup];
-      
-      if (isModalOpen && !this.hls) {
-        this.startVideo();
-      } else if (!isModalOpen && this.hls) {
-        this.stopVideo();
-      }
-    };
-
-    setInterval(checkModalState, 500);
-  },
-
-  startVideo() {
-    if (!this.video || this.hls) return;
-    
+  initializeHLS() {
     const source = this.video.querySelector('source.exp_vid_src');
     if (!source?.dataset.hlsSrc || !Hls.isSupported()) return;
 
@@ -784,38 +743,81 @@ const TeamModalVideoPlayer = {
     gsap.set(this.video, { opacity: 0 });
     
     this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      this.playVideo();
+      this.hlsReady = true;
     });
 
     this.hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
-        console.error('HLS fatal error:', data);
-        this.stopVideo();
+        this.pauseVideo();
       }
     });
   },
 
-  stopVideo() {
-    if (this.hls) {
-      this.hls.destroy();
-      this.hls = null;
+  setupEventListeners() {
+    document.addEventListener('click', (event) => {
+      const modalToggleBtn = event.target.closest("[data-modal-open], [data-modal-close]");
+      if (!modalToggleBtn) return;
+
+      const modalGroup = modalToggleBtn.getAttribute("data-modal-open") || 
+                         modalToggleBtn.getAttribute("data-modal-close");
+      
+      if (modalGroup !== this.modalGroup) return;
+
+      const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
+      
+      if (isOpening) {
+        this.shouldAutoPlay = true;
+        setTimeout(() => this.playVideo(), 300);
+      } else {
+        this.shouldAutoPlay = false;
+        this.pauseVideo();
+      }
+    });
+
+    if (this.video) {
+      this.video.addEventListener('pause', () => {
+        if (this.shouldAutoPlay) {
+          this.shouldAutoPlay = false;
+        }
+      });
+
+      this.video.addEventListener('play', () => {
+        if (!this.shouldAutoPlay && window.modalStates?.[this.modalGroup]) {
+          this.shouldAutoPlay = true;
+        }
+      });
     }
-    
+
+    const checkModalState = () => {
+      if (!window.modalStates) return;
+      
+      const isModalOpen = window.modalStates[this.modalGroup];
+      const isVideoPlaying = this.video && !this.video.paused;
+      
+      if (isModalOpen && !isVideoPlaying && this.hlsReady && this.shouldAutoPlay) {
+        this.playVideo();
+      } else if (!isModalOpen && isVideoPlaying) {
+        this.pauseVideo();
+      }
+    };
+
+    setInterval(checkModalState, 500);
+  },
+
+  playVideo() {
+    if (!this.video || !this.hlsReady) return;
+
+    this.video.play().then(() => {
+      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
+    }).catch(() => {});
+  },
+
+  pauseVideo() {
     if (this.video && !this.video.paused) {
       this.video.pause();
     }
     
-    gsap.set(this.video, { opacity: 0 });
-  },
-  
-  playVideo() {
-    if (!this.video) return;
-
-    this.video.play().then(() => {
-      gsap.to(this.video, { opacity: 1, duration: 0.7, ease: 'power2.out' });
-    }).catch((error) => {
-      console.warn("Autoplay was prevented:", error);
-    });
+    gsap.to(this.video, { opacity: 0, duration: 0.3, ease: 'power2.out' });
   },
 };
 

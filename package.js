@@ -2130,7 +2130,7 @@ const initializeTabButtons = (scope = document) => {
   });
 };
 
-// Synchronizes availability checkboxes between forms
+// Synchronizes availability checkboxes between forms and manages hidden date string input
 const initializeAvailabilitySync = (modalTarget) => {
   if (!modalTarget) return null;
   
@@ -2145,7 +2145,32 @@ const initializeAvailabilitySync = (modalTarget) => {
   if (!availabilityCheckboxes.length || !packageCheckboxes.length) return null;
   
   const eventListeners = [];
-  let isSyncing = false; // Prevent infinite loops
+  let isSyncing = false;
+  
+  const HIDDEN_INPUT_NAME = 'selected-dates';
+  
+  // Updates or removes hidden input with selected dates string
+  const updateHiddenDateInput = (form, checkboxes) => {
+    const selectedDates = Array.from(checkboxes)
+      .filter(cb => cb.checked)
+      .map(cb => cb.value);
+    
+    let hiddenInput = form.querySelector(`input[name="${HIDDEN_INPUT_NAME}"]`);
+    
+    if (selectedDates.length > 0) {
+      if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = HIDDEN_INPUT_NAME;
+        form.appendChild(hiddenInput);
+      }
+      hiddenInput.value = selectedDates.join(', ');
+    } else {
+      if (hiddenInput) {
+        hiddenInput.remove();
+      }
+    }
+  };
   
   // Helper function to find matching checkbox by value
   const findMatchingCheckbox = (value, checkboxes) => {
@@ -2162,15 +2187,16 @@ const initializeAvailabilitySync = (modalTarget) => {
         isSyncing = true;
         matchingCheckbox.checked = checkbox.checked;
         
-        // Trigger change event on the target checkbox
         const changeEvent = new Event('change', { bubbles: true });
         matchingCheckbox.dispatchEvent(changeEvent);
         
-        // Update parent label states
         const parentLabel = matchingCheckbox.closest('label');
         if (parentLabel) {
           parentLabel.classList.toggle('is-checked', checkbox.checked);
         }
+        
+        updateHiddenDateInput(availabilityForm, availabilityCheckboxes);
+        updateHiddenDateInput(packageForm, packageCheckboxes);
         
         setTimeout(() => { isSyncing = false; }, 0);
       }
@@ -2190,15 +2216,16 @@ const initializeAvailabilitySync = (modalTarget) => {
         isSyncing = true;
         matchingCheckbox.checked = checkbox.checked;
         
-        // Trigger change event on the target checkbox
         const changeEvent = new Event('change', { bubbles: true });
         matchingCheckbox.dispatchEvent(changeEvent);
         
-        // Update parent label states
         const parentLabel = matchingCheckbox.closest('label');
         if (parentLabel) {
           parentLabel.classList.toggle('is-checked', checkbox.checked);
         }
+        
+        updateHiddenDateInput(packageForm, packageCheckboxes);
+        updateHiddenDateInput(availabilityForm, availabilityCheckboxes);
         
         setTimeout(() => { isSyncing = false; }, 0);
       }
@@ -2208,12 +2235,19 @@ const initializeAvailabilitySync = (modalTarget) => {
     eventListeners.push({ element: checkbox, type: 'change', handler });
   });
   
+  // Initialize hidden inputs based on current state
+  updateHiddenDateInput(availabilityForm, availabilityCheckboxes);
+  updateHiddenDateInput(packageForm, packageCheckboxes);
+  
   // Return cleanup function
   return () => {
     eventListeners.forEach(({ element, type, handler }) => {
       element.removeEventListener(type, handler);
     });
     eventListeners.length = 0;
+    
+    availabilityForm.querySelector(`input[name="${HIDDEN_INPUT_NAME}"]`)?.remove();
+    packageForm.querySelector(`input[name="${HIDDEN_INPUT_NAME}"]`)?.remove();
   };
 };
 
