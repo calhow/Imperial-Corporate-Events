@@ -2025,8 +2025,8 @@ const initializeModalContent = async (contentElement) => {
 const initializePackageForm = (modalTarget) => {
   if (!modalTarget) return;
 
-  // (1) Grab the form by ID...
-  const form = modalTarget.querySelector('#wf-form-Package');
+  // (1) Grab the form by ID - try both Package and Event form IDs
+  const form = modalTarget.querySelector('#wf-form-Package, #wf-form-Event');
   // (2) ...and *any* button with data-form-submit
   const submitBtn = modalTarget.querySelector('[data-form-submit]');
   const formWrapper = form?.closest('.w-form');

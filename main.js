@@ -226,6 +226,63 @@ lenis.on("scroll", ScrollTrigger.update);
 gsap.ticker.add((time) => lenis.raf(time * 1000));
 gsap.ticker.lagSmoothing(0);
 
+// Consent Pro scroll lock management
+// Consent Pro scroll lock management
+(() => {
+  let cachedElements = null;
+  
+  const getConsentElements = () => {
+    if (cachedElements) return cachedElements;
+    
+    const shadowRoot = document.querySelector('[fs-consent-element="internal-component"]')?.shadowRoot;
+    if (!shadowRoot) return null;
+    
+    const banner = shadowRoot.querySelector('[fs-consent-element="banner"]');
+    const preferences = shadowRoot.querySelector('[fs-consent-element="preferences"]');
+    
+    if (banner || preferences) {
+      cachedElements = { banner, preferences };
+    }
+    
+    return cachedElements;
+  };
+  
+  const isVisible = (el) => el && window.getComputedStyle(el).display !== 'none';
+  
+  const updateScrollLock = () => {
+    const elements = getConsentElements();
+    if (!elements) return;
+    
+    const shouldLock = isVisible(elements.banner) || isVisible(elements.preferences);
+    const isLocked = document.body.classList.contains('no-scroll');
+    
+    if (shouldLock === isLocked) return;
+    
+    document.body.classList.toggle('no-scroll', shouldLock);
+    document.body.classList.toggle('u-modal-prevent-scroll', shouldLock);
+    shouldLock ? lenis.stop() : lenis.start();
+  };
+  
+  const initObserver = () => {
+    const elements = getConsentElements();
+    
+    if (!elements) {
+      setTimeout(initObserver, 500);
+      return;
+    }
+    
+    const observer = new MutationObserver(updateScrollLock);
+    const observeConfig = { attributes: true, attributeFilter: ['style', 'class'] };
+    
+    [elements.banner, elements.preferences].filter(Boolean).forEach(el => observer.observe(el, observeConfig));
+    
+    updateScrollLock();
+  };
+  
+  document.readyState === 'loading' 
+    ? document.addEventListener('DOMContentLoaded', initObserver)
+    : initObserver();
+})();
 
 // Initialize form field counters
 const initializeCountersInScope = (scope = document) => {
