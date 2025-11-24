@@ -141,6 +141,9 @@
       
       // Use GSAP Flip for smooth animation if available
       if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
+        // Kill any existing animations on fillElement to prevent conflicts
+        gsap.killTweensOf(fillElement);
+        
         // Record the current state
         const state = Flip.getState(fillElement);
         

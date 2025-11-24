@@ -234,11 +234,11 @@ gsap.ticker.lagSmoothing(0);
   const getConsentElements = () => {
     if (cachedElements) return cachedElements;
     
-    const shadowRoot = document.querySelector('[fs-consent-element="internal-component"]')?.shadowRoot;
-    if (!shadowRoot) return null;
+    const container = document.querySelector('[fs-consent-element="internal-component"]');
+    if (!container) return null;
     
-    const banner = shadowRoot.querySelector('[fs-consent-element="banner"]');
-    const preferences = shadowRoot.querySelector('[fs-consent-element="preferences"]');
+    const banner = container.querySelector('[fs-consent-element="banner"]');
+    const preferences = container.querySelector('[fs-consent-element="preferences"]');
     
     if (banner || preferences) {
       cachedElements = { banner, preferences };
