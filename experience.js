@@ -517,6 +517,8 @@ const MobileModalVideoPlayer = {
   hls: null,
   modalGroup: 'exp-vid',
   isInitialized: false,
+  hlsReady: false,
+  isHandlingModalOpen: false,
 
   isMobile: () => window.innerWidth <= 991,
 
@@ -536,7 +538,6 @@ const MobileModalVideoPlayer = {
   },
 
   setupEventListeners() {
-    // Listen for modal open/close events using the existing modal system
     document.addEventListener('click', (event) => {
       const modalToggleBtn = Utils.safeClosest(event, "[data-modal-open], [data-modal-close]");
       if (!modalToggleBtn) return;
@@ -549,28 +550,23 @@ const MobileModalVideoPlayer = {
       const isOpening = modalToggleBtn.hasAttribute("data-modal-open");
       
       if (isOpening && this.isMobile()) {
-        // Start video when modal opens
-        setTimeout(() => this.startVideo(), 300); // Delay to ensure modal is visible
+        this.handleModalOpen();
       } else {
-        // Stop video when modal closes
-        this.stopVideo();
+        this.handleModalClose();
       }
     });
 
-    // Also listen for modal state changes via the global modalStates
+    // Backup mechanism to ensure video starts if click handler missed
     const checkModalState = () => {
       if (!window.modalStates || !this.isMobile()) return;
       
       const isModalOpen = window.modalStates[this.modalGroup];
       
-      if (isModalOpen && !this.hls) {
-        this.startVideo();
-      } else if (!isModalOpen && this.hls) {
-        this.stopVideo();
+      if (isModalOpen && !this.hlsReady && !this.isHandlingModalOpen) {
+        this.handleModalOpen();
       }
     };
 
-    // Check modal state periodically
     setInterval(checkModalState, 500);
   },
 
@@ -584,12 +580,42 @@ const MobileModalVideoPlayer = {
     }
   },
 
-  startVideo() {
-    if (!this.video || this.hls || !this.isMobile()) return;
+  handleModalOpen() {
+    if (this.isHandlingModalOpen) return;
+    
+    this.isHandlingModalOpen = true;
+    
+    // Resume from previous position if HLS already initialized
+    if (this.hlsReady) {
+      this.playVideo();
+      this.isHandlingModalOpen = false;
+      return;
+    }
+    
+    // Initialize HLS on first open
+    setTimeout(() => {
+      this.initializeHLS();
+      this.isHandlingModalOpen = false;
+    }, 300);
+  },
+
+  handleModalClose() {
+    if (!this.video) return;
+    
+    // Pause video, keep HLS alive and preserve playback position
+    if (!this.video.paused) {
+      this.video.pause();
+    }
+    
+    gsap.to(this.video, { opacity: 0, duration: 0.3, ease: 'power2.out' });
+  },
+
+  initializeHLS() {
+    if (!this.video || this.hlsReady || !this.isMobile()) return;
     
     const source = this.video.querySelector('source.exp_vid_src');
     if (!source?.dataset.hlsSrc || !Hls.isSupported()) return;
-
+    
     this.hls = new Hls({
       capLevelToPlayerSize: true,
       startLevel: -1,
@@ -600,33 +626,28 @@ const MobileModalVideoPlayer = {
     this.hls.loadSource(source.dataset.hlsSrc);
     this.hls.attachMedia(this.video);
     
-    // Set initial opacity
     gsap.set(this.video, { opacity: 0 });
     
-    // Auto-play after HLS is ready
     this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      this.hlsReady = true;
       this.playVideo();
     });
 
-    // Handle errors
     this.hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
-        this.stopVideo();
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            this.hls.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            this.hls.recoverMediaError();
+            break;
+          default:
+            this.destroyHLS();
+            break;
+        }
       }
     });
-  },
-
-  stopVideo() {
-    if (this.hls) {
-      this.hls.destroy();
-      this.hls = null;
-    }
-    
-    if (this.video && !this.video.paused) {
-      this.video.pause();
-    }
-    
-    gsap.set(this.video, { opacity: 0 });
   },
   
   playVideo() {
@@ -639,8 +660,22 @@ const MobileModalVideoPlayer = {
     });
   },
 
+  destroyHLS() {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+      this.hlsReady = false;
+    }
+    
+    if (this.video) {
+      this.video.pause();
+      this.video.currentTime = 0;
+      gsap.set(this.video, { opacity: 0 });
+    }
+  },
+
   cleanup() {
-    this.stopVideo();
+    this.destroyHLS();
     this.isInitialized = false;
   }
 };

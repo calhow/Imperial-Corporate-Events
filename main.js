@@ -1253,18 +1253,23 @@ document.querySelectorAll('.exp_card_reviews').forEach(el => {
 });
 
 // Unified Video Manager - High Performance & Simple
+// Optimized with instant playback:
+// 1. Videos preload HLS as soon as they partially enter viewport (ScrollTrigger)
+// 2. Videos only play when actual play trigger is met (hover/scroll position)
 const UnifiedVideoManager = (() => {
   // HLS instance pool for reuse
   const hlsPool = new Map();
   const activeVideos = new Set();
+  const preloadedVideos = new Set();
   let intersectionObserver = null;
   let currentDevice = null;
+  const scrollTriggers = [];
+  const preloadTriggers = [];
   
   // Simple configuration
   const config = {
     fadeInDuration: 0.5,
     fadeOutDuration: 0.3,
-    playDelay: 150,
     hlsConfig: {
       capLevelToPlayerSize: true,
       startLevel: -1,
@@ -1292,6 +1297,24 @@ const UnifiedVideoManager = (() => {
     return hls;
   };
   
+  // Preload video HLS without playing
+  const preloadVideo = (video) => {
+    if (!video || preloadedVideos.has(video)) return;
+    
+    const source = video.querySelector('source');
+    if (!source?.dataset.hlsSrc) return;
+    
+    preloadedVideos.add(video);
+    
+    const hls = getHLSInstance(video);
+    
+    if (hls) {
+      hls.startLoad();
+    } else {
+      video.load();
+    }
+  };
+  
   // Play video with fade in
   const playVideo = (video) => {
     if (!video || activeVideos.has(video)) return;
@@ -1301,43 +1324,47 @@ const UnifiedVideoManager = (() => {
     
     activeVideos.add(video);
     
-    // Clear any existing timeout
-    if (video._playTimeout) {
-      clearTimeout(video._playTimeout);
+    // Track when play was initiated for fast scroll protection
+    video._playInitiatedAt = Date.now();
+    
+    // Ensure HLS is loaded (will use preloaded instance if available)
+    const hls = getHLSInstance(video);
+    
+    if (hls && !preloadedVideos.has(video)) {
+      hls.startLoad();
     }
     
-    video._playTimeout = setTimeout(() => {
-      const hls = getHLSInstance(video);
+    video.play().then(() => {
+      video._playStartedAt = Date.now();
       
-      if (hls) {
-        hls.startLoad();
-      }
-      
-      video.play().then(() => {
-        requestAnimationFrame(() => {
-          gsap.to(video, { 
-            opacity: 1, 
-            duration: config.fadeInDuration, 
-            ease: "power2.out" 
-          });
+      requestAnimationFrame(() => {
+        gsap.to(video, { 
+          opacity: 1, 
+          duration: config.fadeInDuration, 
+          ease: "power2.out" 
         });
-      }).catch(() => {
-        // Silent error handling
-        activeVideos.delete(video);
       });
-    }, config.playDelay);
+    }).catch(() => {
+      activeVideos.delete(video);
+      delete video._playInitiatedAt;
+    });
   };
   
   // Pause video with fade out
   const pauseVideo = (video) => {
     if (!video) return;
     
-    activeVideos.delete(video);
-    
-    if (video._playTimeout) {
-      clearTimeout(video._playTimeout);
-      video._playTimeout = null;
+    // Protect against fast scrolling on mobile/tablet only - if video was just initiated, ignore pause
+    if (Utils.isMobile() && video._playInitiatedAt) {
+      const timeSincePlayInitiated = Date.now() - video._playInitiatedAt;
+      if (timeSincePlayInitiated < 500) {
+        return;
+      }
     }
+    
+    activeVideos.delete(video);
+    delete video._playInitiatedAt;
+    delete video._playStartedAt;
     
     if (!video.paused) {
       video.pause();
@@ -1350,6 +1377,28 @@ const UnifiedVideoManager = (() => {
     });
   };
   
+  // Setup preload triggers for all videos using ScrollTrigger
+  const setupPreloadTriggers = () => {
+    // Clear existing preload triggers
+    preloadTriggers.forEach(trigger => {
+      if (trigger) trigger.kill();
+    });
+    preloadTriggers.length = 0;
+    
+    document.querySelectorAll('.exp_card_video').forEach(video => {
+      if (!hasValidVideoSource(video)) return;
+      
+      const trigger = ScrollTrigger.create({
+        trigger: video,
+        start: "top bottom",
+        once: true,
+        onEnter: () => preloadVideo(video)
+      });
+      
+      preloadTriggers.push(trigger);
+    });
+  };
+  
   // Desktop hover handlers using event delegation
   const handleMouseOver = (event) => {
     const card = Utils.safeClosest(event, '.exp_card_wrap');
@@ -1357,10 +1406,13 @@ const UnifiedVideoManager = (() => {
     
     // Check if we're coming from outside the card
     const relatedTarget = event.relatedTarget;
-    if (relatedTarget && card.contains(relatedTarget)) return;
+    const isInternalMove = relatedTarget && card.contains(relatedTarget);
+    if (isInternalMove) return;
     
     const video = card.querySelector('.exp_card_video');
-    if (video && hasValidVideoSource(video)) {
+    const hasValidSource = video ? hasValidVideoSource(video) : false;
+    const hasVideo = video && hasValidSource;
+    if (hasVideo) {
       playVideo(video);
     }
   };
@@ -1371,7 +1423,8 @@ const UnifiedVideoManager = (() => {
     
     // Check if we're moving to another element within the same card
     const relatedTarget = event.relatedTarget;
-    if (relatedTarget && card.contains(relatedTarget)) return;
+    const isInternalMove = relatedTarget && card.contains(relatedTarget);
+    if (isInternalMove) return;
     
     const video = card.querySelector('.exp_card_video');
     if (video) {
@@ -1401,6 +1454,13 @@ const UnifiedVideoManager = (() => {
       // Add playing listener if not already added
       if (!video.hasPlayingListener) {
         video.addEventListener('playing', () => {
+          const isTracked = activeVideos.has(video);
+          
+          if (!isTracked) {
+            video.pause();
+            return;
+          }
+          
           if (gsap.getProperty(video, "opacity") < 1) {
             requestAnimationFrame(() => {
               gsap.to(video, { opacity: 1, duration: config.fadeInDuration, ease: "power2.out" });
@@ -1424,27 +1484,32 @@ const UnifiedVideoManager = (() => {
       }
     });
     
-    // Setup Intersection Observer for standalone videos (vertical scrolling)
+    // Setup GSAP ScrollTrigger for standalone videos (vertical scrolling)
     if (standaloneVideos.length > 0) {
-      intersectionObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          const video = entry.target;
-          
-          if (entry.isIntersecting) {
+      standaloneVideos.forEach(video => {
+        const trigger = ScrollTrigger.create({
+          trigger: video,
+          start: "bottom bottom",
+          end: "top 72px",
+          onEnter: () => {
             video.isVisuallyActive = true;
             playVideo(video);
-          } else {
+          },
+          onLeave: () => {
+            video.isVisuallyActive = false;
+            pauseVideo(video);
+          },
+          onEnterBack: () => {
+            video.isVisuallyActive = true;
+            playVideo(video);
+          },
+          onLeaveBack: () => {
             video.isVisuallyActive = false;
             pauseVideo(video);
           }
         });
-      }, {
-        threshold: 0.5,
-        rootMargin: '0px 0px -72px 0px' // Account for sticky nav
-      });
-      
-      standaloneVideos.forEach(video => {
-        intersectionObserver.observe(video);
+        
+        scrollTriggers.push(trigger);
       });
     }
     
@@ -1485,10 +1550,8 @@ const UnifiedVideoManager = (() => {
     const scrollerObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          // Scroller is visible, check horizontal visibility
           checkHorizontalVisibility();
         } else {
-          // Scroller is not visible, pause all videos in it
           videos.forEach(video => {
             if (video.isVisuallyActive) {
               video.isVisuallyActive = false;
@@ -1515,6 +1578,35 @@ const UnifiedVideoManager = (() => {
   const setupDesktopListeners = () => {
     document.addEventListener('mouseover', handleMouseOver, true);
     document.addEventListener('mouseout', handleMouseOut, true);
+    
+    // Setup initial states for desktop videos
+    const videos = document.querySelectorAll('.exp_card_video');
+    
+    videos.forEach(video => {
+      if (hasValidVideoSource(video)) {
+        const poster = video.parentElement?.querySelector('.exp_card_poster');
+        if (poster?.src) video.poster = poster.src;
+        gsap.set(video, { opacity: 0 });
+        
+        if (!video.hasPlayingListener) {
+          video.addEventListener('playing', () => {
+            const isTracked = activeVideos.has(video);
+            
+            if (!isTracked) {
+              video.pause();
+              return;
+            }
+            
+            if (gsap.getProperty(video, "opacity") < 1) {
+              requestAnimationFrame(() => {
+                gsap.to(video, { opacity: 1, duration: config.fadeInDuration, ease: "power2.out" });
+              });
+            }
+          });
+          video.hasPlayingListener = true;
+        }
+      }
+    });
   };
   
   const removeDesktopListeners = () => {
@@ -1532,37 +1624,22 @@ const UnifiedVideoManager = (() => {
   const handleDeviceChange = () => {
     const deviceType = Utils.isMobile() ? 'mobile' : 'desktop';
     
-    if (currentDevice === deviceType) return;
+    if (currentDevice === deviceType) {
+      return;
+    }
     
     // Cleanup current setup
     cleanup();
     currentDevice = deviceType;
+    
+    // Setup preload triggers for all videos (regardless of device)
+    setupPreloadTriggers();
     
     // Setup for new device
     if (deviceType === 'mobile') {
       setupMobileObserver();
     } else {
       setupDesktopListeners();
-      
-      // Setup initial states for desktop videos
-      document.querySelectorAll('.exp_card_video').forEach(video => {
-        if (hasValidVideoSource(video)) {
-          const poster = video.parentElement?.querySelector('.exp_card_poster');
-          if (poster?.src) video.poster = poster.src;
-          gsap.set(video, { opacity: 0 });
-          
-          if (!video.hasPlayingListener) {
-            video.addEventListener('playing', () => {
-              if (gsap.getProperty(video, "opacity") < 1) {
-                requestAnimationFrame(() => {
-                  gsap.to(video, { opacity: 1, duration: config.fadeInDuration, ease: "power2.out" });
-                });
-              }
-            });
-            video.hasPlayingListener = true;
-          }
-        }
-      });
     }
   };
   
@@ -1572,10 +1649,6 @@ const UnifiedVideoManager = (() => {
     activeVideos.forEach(video => {
       if (video && !video.paused) {
         video.pause();
-      }
-      if (video._playTimeout) {
-        clearTimeout(video._playTimeout);
-        video._playTimeout = null;
       }
     });
     activeVideos.clear();
@@ -1594,6 +1667,22 @@ const UnifiedVideoManager = (() => {
       intersectionObserver.disconnect();
       intersectionObserver = null;
     }
+    
+    // Kill all ScrollTriggers (play triggers)
+    scrollTriggers.forEach(trigger => {
+      if (trigger) {
+        trigger.kill();
+      }
+    });
+    scrollTriggers.length = 0;
+    
+    // Kill all preload triggers
+    preloadTriggers.forEach(trigger => {
+      if (trigger) {
+        trigger.kill();
+      }
+    });
+    preloadTriggers.length = 0;
     
     // Cleanup horizontal scroll listeners
     document.querySelectorAll('.swiper-wrapper').forEach(scroller => {

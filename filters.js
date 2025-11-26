@@ -8,6 +8,8 @@
   let activeFilters = {};
   let isInitialized = false;
   let listInstances = [];
+  let isUnderlineAnimating = false;
+  let pendingUnderlineUpdate = false;
 
 
         
@@ -99,8 +101,17 @@
     }
   }
 
-        // Update underline position for theme tabs
+  // Update underline position for theme tabs
   function updateUnderlinePosition() {
+    // If already animating, queue an update to run after current animation completes
+    if (isUnderlineAnimating) {
+      pendingUnderlineUpdate = true;
+      return;
+    }
+    
+    // Clear any pending flag since we're running now
+    pendingUnderlineUpdate = false;
+    
     // Use requestAnimationFrame to ensure layout is complete
     requestAnimationFrame(() => {
       let checkedRadio = document.querySelector(".form_theme-radio_wrap input:checked");
@@ -141,6 +152,9 @@
       
       // Use GSAP Flip for smooth animation if available
       if (typeof gsap !== 'undefined' && gsap.registerPlugin && typeof Flip !== 'undefined') {
+        // Mark as animating
+        isUnderlineAnimating = true;
+        
         // Kill any existing animations on fillElement to prevent conflicts
         gsap.killTweensOf(fillElement);
         
@@ -155,7 +169,16 @@
         Flip.from(state, {
           duration: window.innerWidth >= 992 ? 0.4 : 0.3,
           ease: "power1.out",
-          absolute: true
+          absolute: true,
+          onComplete: () => {
+            isUnderlineAnimating = false;
+            
+            // If an update was queued during this animation, run it now
+            if (pendingUnderlineUpdate) {
+              pendingUnderlineUpdate = false;
+              setTimeout(() => updateUnderlinePosition(), 0);
+            }
+          }
         });
       } else if (typeof gsap !== 'undefined') {
         // Fallback GSAP animation without Flip
@@ -183,7 +206,7 @@
       });
     });
 
-    // Theme radio changes for underline (keep as manual listener)
+    // Theme radio changes for underline
     document.addEventListener('change', (e) => {
       if (e.target.matches('.form_theme-radio_wrap input[type="radio"]')) {
         updateUnderlinePosition();
@@ -196,9 +219,23 @@
           e.target.closest('[data-filter-empty-clear-all="true"], [data-filter-mobile-clear-all="true"]')) {
         
         const clearButton = document.querySelector('[fs-list-element="clear"][data-filter-clear-all="true"]');
+        
         if (clearButton) {
           clearButton.click();
+          // Navigate to active tab after filters are cleared
+          setTimeout(() => navigateToActiveTab(), 100);
         }
+      }
+    });
+
+    // Direct clear all button clicks
+    document.addEventListener('click', (e) => {
+      const target = e.target.matches('[fs-list-element="clear"][data-filter-clear-all="true"]') ? e.target : 
+                     e.target.closest('[fs-list-element="clear"][data-filter-clear-all="true"]');
+      
+      if (target) {
+        // Navigate to active tab after filters are cleared
+        setTimeout(() => navigateToActiveTab(), 100);
       }
     });
 
@@ -274,9 +311,22 @@
   // Navigate to the active theme tab (responsive: Swiper for desktop, scroll for mobile)
   function navigateToActiveTab() {
     // Find the active theme tab (checked radio button)
-    const checkedRadio = document.querySelector('.form_theme-radio_wrap input:checked');
+    let checkedRadio = document.querySelector('.form_theme-radio_wrap input:checked');
+    
+    // Fallback: If no radio is checked, check the first one (All experiences)
     if (!checkedRadio) {
-      return;
+      const firstRadioWrap = document.querySelector('.form_theme-radio_wrap:first-child');
+      if (firstRadioWrap) {
+        const firstRadio = firstRadioWrap.querySelector('input[type="radio"]');
+        if (firstRadio) {
+          firstRadio.checked = true;
+          checkedRadio = firstRadio;
+        }
+      }
+      
+      if (!checkedRadio) {
+        return;
+      }
     }
 
     const radioWrap = checkedRadio.closest('.form_theme-radio_wrap');
